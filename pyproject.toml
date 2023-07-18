@@ -1,0 +1,32 @@
+[tool.poetry]
+name = "rakun"
+version = "0.1.0"
+description = "Rakun Multi Agent System"
+authors = ["Ceylon AI <info@ceylon.ai>"]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+[tool.poetry.dev-dependencies]
+maturin = "^1.1.0"
+pytest = "^7.4.0"
+pytest-benchmark = "^4.0.0"
+
+
+[build-system]
+requires = ["maturin>=1.1,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "rakun"
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+]
+
+
+[tool.maturin]
+python-source = "python"
+features = ["pyo3/extension-module"]
