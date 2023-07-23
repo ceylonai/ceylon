@@ -18,16 +18,29 @@ class AgentWrapper:
         self.id = uuid.uuid4()
         self.agent = agent
         self.start_time = None
+        self.subscribe = rakun.MessageProcessor(self.__process_message__)
+
+    async def __process_message__(self, message):
+        print(f"Agent:{self.id} Message: {message}")
 
     async def __start__(self):
         self.start_time = rakun.get_time()
         await self.__state__("start")
 
-        while True:
-            await self.__state__("running")
-            # await asyncio.sleep(1)
+        async def message_handler():
+            res = self.subscribe.start()
+            print(f"Agent:{self.id} Message: {res}")
+            await res
 
-        # await self.__state__("stop")
+        async def background():
+            for i in range(10):
+                await self.__state__(f"running {i}")
+
+        async with asyncio.TaskGroup() as tg:
+            background_task = tg.create_task(background())
+            message_task = tg.create_task(message_handler())
+
+        await self.__state__("stop")
 
     async def __state__(self, state):
         logging.info(f"{self.start_time} Agent:{self.id} State: {state}")
