@@ -13,6 +13,6 @@ pyo3 = { version = "0.18.1", features = ["extension-module"] }
 pyo3-asyncio = { version = "0.18.0", features = ["attributes", "tokio-runtime"] }
 pyo3-log = "0.8.3"
 log = "0.4.19"
-tokio = "1.29.1"
+tokio = { version = "1.29.1", features = ["full"] }
 chrono = "0.4.26"
 anyhow = "1.0.72"

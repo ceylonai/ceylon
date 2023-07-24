@@ -43,20 +43,40 @@ impl Server {
         let task_locals = pyo3_asyncio::TaskLocals::new(event_loop).copy_context(py)?;
         let task_locals_copy = task_locals.clone();
 
+        // let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+        //
+        // let tx2 = tx.clone();
         std::thread::spawn(move || {
             tokio::runtime::Runtime::new().unwrap().block_on(async move {
                 debug!("Starting server {}",name);
+
                 execute_event_handler(startup_handler, &task_locals_copy)
                     .await
                     .unwrap();
-
-                loop {
-                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                }
             });
         });
 
-        let task_locals_copy = task_locals.clone();
+        let event_loop = (*event_loop).call_method0("run_forever");
+        if event_loop.is_err() {
+            debug!("Ctrl c handler");
+            println!("{}", event_loop.err().unwrap());
+            // Python::with_gil(|py| {
+            //     pyo3_asyncio::tokio::run(py, async move {
+            //         execute_event_handler(shutdown_handler, &task_locals.clone())
+            //             .await
+            //             .unwrap();
+            //         Ok(())
+            //     })
+            // })?;
+            // abort();
+        }
+        // std::thread::spawn(move || {
+        //     tokio::runtime::Runtime::new().unwrap().block_on(async move {
+        //         tx2.send("sending from second handle").await;
+        //     });
+        // });
+
+        // let task_locals_copy = task_locals.clone();
         // let event_loop = (*event_loop).call_method0("run_forever");
         // if event_loop.is_err() {
         //     debug!("Ctrl c handler");
@@ -70,7 +90,7 @@ impl Server {
         //     })?;
         //     std::process::abort();
         // }
-
+        // t.join().unwrap();
         Ok(())
     }
 

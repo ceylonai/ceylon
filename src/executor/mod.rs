@@ -35,7 +35,7 @@ pub async fn execute_event_handler(
 ) -> Result<()> {
     if let Some(function) = event_handler {
         if function.is_async {
-            debug!("event handler async");
+            debug!("Startup event handler async");
             Python::with_gil(|py| {
                 pyo3_asyncio::into_future_with_locals(
                     task_locals,
@@ -44,7 +44,7 @@ pub async fn execute_event_handler(
             })?
                 .await?;
         } else {
-            debug!("event handler");
+            debug!("Startup event handler");
             Python::with_gil(|py| function.handler.call0(py))?;
         }
     }

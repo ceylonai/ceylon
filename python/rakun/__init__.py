@@ -25,46 +25,27 @@ class AgentWrapper:
 
         async def start():
             logging.info(f"Agent:{self.id} Start Process")
+            return 0
 
         async def stop():
-            logging.info(f"Agent:{self.id} Start Process")
+            logging.info(f"Agent:{self.id} Stop Process")
+            return 0
 
         start_func = rakun.FunctionInfo(start, True, 0)
-        stop_func = rakun.FunctionInfo(start, True, 0)
+        stop_func = rakun.FunctionInfo(stop, True, 0)
 
         self.server.add_startup_handler(start_func)
         self.server.add_shutdown_handler(stop_func)
 
-    async def __process_message__(self, message):
+    def __process_message__(self, message):
         print(f"Agent:{self.id} Message: {message}")
 
-    async def __start__(self):
-        self.server.start(1)
-
-        # self.start_time = rakun.get_start_time()
-        # await self.__state__("start")
-        #
-        # async def message_handler():
-        #     pass
-        #     # print(f"Agent:{self.id} Message: {res}")
-        #     # await res
-        #
-        # async def background():
-        #     for i in range(10):
-        #         await self.__state__(f"running {i}")
-        #
-        # async with asyncio.TaskGroup() as tg:
-        #     background_task = tg.create_task(background())
-        #     message_task = tg.create_task(message_handler())
-        #
-        # await self.__state__("stop")
-
-    async def __state__(self, state):
-        logging.info(f"{self.start_time} Agent:{self.id} State: {state}")
-        await self.agent.__state__(state)
+    def __start__(self):
+        self.server.start(4)
 
     def start(self):
-        asyncio.run(self.__start__())
+        self.__start__()
+        # asyncio.run(self.__start__())
 
     def stop(self):
         evt = asyncio.get_event_loop()
