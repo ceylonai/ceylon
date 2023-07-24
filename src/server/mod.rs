@@ -6,9 +6,8 @@ use pyo3::{pyclass, pymethods};
 use pyo3::prelude::*;
 
 use crate::executor::{execute_event_handler, execute_process_function};
-use crate::transport::message_processor;
+use crate::transport::{Transporter};
 use crate::types::{FunctionInfo, MessageProcessor};
-
 
 #[pyclass]
 pub struct Server {
@@ -78,26 +77,42 @@ impl Server {
 
 
         tokio::runtime::Runtime::new().unwrap().block_on(async move {
-            message_processor().await.unwrap();
+            let mut msg_porter = Transporter::new();
+            let tx = msg_porter.get_tx();
+
+            tokio::spawn(async move {
+                for i in 0..1000 {
+                    match tx.send(format!("Hi {}", i)).await {
+                        Ok(_) => {
+                            println!("Sent message {}", i);
+                        }
+                        Err(e) => {
+                            println!("error {}", e);
+                        }
+                    };
+                    // sleep
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                }
+            });
+
+
+            msg_porter.message_processor().await.expect("TODO: panic message");
+            // let (tx, rx) = tokio::sync::mpsc::channel(32);
+            // let tx2 = tx.clone();
             // tokio::spawn(async move {
-            //     tx.send("sending from first handle").await;
+            //     message_processor(rx).await.unwrap();
             // });
-            //
-            // tokio::spawn(async move {
-            //     tx2.send("sending from second handle").await;
-            // });
+            // for i in 0..1000 {
+            //     match tx2.send(format!("Hi {}", i)).await {
+            //         Ok(_) => {
+            //             println!("Sent message {}", i);
+            //         }
+            //         Err(e) => {
+            //             println!("error {}", e);
+            //         }
+            //     };
+            // }
         });
-
-
-        // tokio::runtime::Runtime::new().unwrap().block_on(async move {
-        //     tokio::spawn(async move {
-        //         tx.send("sending from first handle").await;
-        //     });
-        //
-        //     tokio::spawn(async move {
-        //         tx2.send("sending from second handle").await;
-        //     });
-        // });
 
 
         let event_loop = (*event_loop).call_method0("run_forever");
