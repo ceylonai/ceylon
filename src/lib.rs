@@ -6,6 +6,7 @@ use pyo3::prelude::*;
 mod server;
 mod types;
 mod executor;
+mod transport;
 
 thread_local! {
     static START_TIME: RefCell<DateTime<Utc>> = RefCell::new(Utc::now());

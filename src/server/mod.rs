@@ -6,7 +6,9 @@ use pyo3::{pyclass, pymethods};
 use pyo3::prelude::*;
 
 use crate::executor::{execute_event_handler, execute_process_function};
+use crate::transport::message_processor;
 use crate::types::{FunctionInfo, MessageProcessor};
+
 
 #[pyclass]
 pub struct Server {
@@ -70,27 +72,32 @@ impl Server {
                             .await
                             .unwrap();
                     }
-
-                    // for handler in self.message_handlers.lock().unwrap().iter() {
-                    //     execute_event_handler(handler.function.handler.clone(), &task_locals_copy2).await.unwrap();
-                    // }
-                    // execute_event_handler(startup_handler.clone(), &task_locals_copy2)
-                    //     .await
-                    //     .unwrap();
                 }
             });
         });
 
 
         tokio::runtime::Runtime::new().unwrap().block_on(async move {
-            tokio::spawn(async move {
-                tx.send("sending from first handle").await;
-            });
-
-            tokio::spawn(async move {
-                tx2.send("sending from second handle").await;
-            });
+            message_processor().await.unwrap();
+            // tokio::spawn(async move {
+            //     tx.send("sending from first handle").await;
+            // });
+            //
+            // tokio::spawn(async move {
+            //     tx2.send("sending from second handle").await;
+            // });
         });
+
+
+        // tokio::runtime::Runtime::new().unwrap().block_on(async move {
+        //     tokio::spawn(async move {
+        //         tx.send("sending from first handle").await;
+        //     });
+        //
+        //     tokio::spawn(async move {
+        //         tx2.send("sending from second handle").await;
+        //     });
+        // });
 
 
         let event_loop = (*event_loop).call_method0("run_forever");
