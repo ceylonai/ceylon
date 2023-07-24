@@ -28,6 +28,28 @@ fn get_function_output<'a, T>(
     }
 }
 
+#[inline]
+pub async fn execute_process_function(
+    input: &str,
+    function: &FunctionInfo,
+    task_locals: &TaskLocals,
+) -> Result<()> {
+    if function.is_async {
+        debug!("Process event handler async");
+        Python::with_gil(|py| {
+            pyo3_asyncio::into_future_with_locals(
+                task_locals,
+                function.handler.as_ref(py).call1((input.to_object(py), ))?,
+            )
+        })?
+            .await?;
+    } else {
+        debug!("Process event handler");
+        Python::with_gil(|py| function.handler.call0(py))?;
+    }
+
+    Ok(())
+}
 
 pub async fn execute_event_handler(
     event_handler: Option<Arc<FunctionInfo>>,

@@ -22,6 +22,7 @@ class AgentWrapper:
         self.agent = agent
         self.start_time = None
         self.server = rakun.Server(agent.name)
+        self.count = 0
 
         async def start():
             logging.info(f"Agent:{self.id} Start Process")
@@ -37,8 +38,14 @@ class AgentWrapper:
         self.server.add_startup_handler(start_func)
         self.server.add_shutdown_handler(stop_func)
 
-    def __process_message__(self, message):
-        print(f"Agent:{self.id} Message: {message}")
+        message_processor_fnc = rakun.FunctionInfo(self.__process_message__, True, 1)
+        message_processor = rakun.MessageProcessor(message_processor_fnc, "ALL")
+
+        self.server.add_message_handler(message_processor)
+
+    async def __process_message__(self, message):
+        print(f"Agent:{self.id} Messagssse: {message} {self.count}")
+        self.count += 1
 
     def __start__(self):
         self.server.start(4)

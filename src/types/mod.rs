@@ -22,3 +22,22 @@ impl FunctionInfo {
         }
     }
 }
+
+
+#[pyclass]
+#[derive(Debug, Clone)]
+pub struct MessageProcessor {
+    pub function: FunctionInfo,
+    pub filter: String,
+}
+
+#[pymethods]
+impl MessageProcessor {
+    #[new]
+    pub fn new(function: FunctionInfo, filter: String) -> Self {
+        Self {
+            function,
+            filter,
+        }
+    }
+}
