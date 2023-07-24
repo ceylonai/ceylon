@@ -12,35 +12,52 @@ if hasattr(rakun, "__all__"):
 
 logging.basicConfig(level=logging.DEBUG)
 
+rakun_version = rakun.get_version()
+logging.info(f"Rakun version: {rakun_version}")
+
 
 class AgentWrapper:
     def __init__(self, agent):
         self.id = uuid.uuid4()
         self.agent = agent
         self.start_time = None
-        self.subscribe = rakun.MessageProcessor(self.__process_message__)
+        self.server = rakun.Server(agent.name)
+
+        async def start():
+            logging.info(f"Agent:{self.id} Start Process")
+
+        async def stop():
+            logging.info(f"Agent:{self.id} Start Process")
+
+        start_func = rakun.FunctionInfo(start, True, 0)
+        stop_func = rakun.FunctionInfo(start, True, 0)
+
+        self.server.add_startup_handler(start_func)
+        self.server.add_shutdown_handler(stop_func)
 
     async def __process_message__(self, message):
         print(f"Agent:{self.id} Message: {message}")
 
     async def __start__(self):
-        self.start_time = rakun.get_time()
-        await self.__state__("start")
+        self.server.start(1)
 
-        async def message_handler():
-            res = self.subscribe.start()
-            print(f"Agent:{self.id} Message: {res}")
-            await res
-
-        async def background():
-            for i in range(10):
-                await self.__state__(f"running {i}")
-
-        async with asyncio.TaskGroup() as tg:
-            background_task = tg.create_task(background())
-            message_task = tg.create_task(message_handler())
-
-        await self.__state__("stop")
+        # self.start_time = rakun.get_start_time()
+        # await self.__state__("start")
+        #
+        # async def message_handler():
+        #     pass
+        #     # print(f"Agent:{self.id} Message: {res}")
+        #     # await res
+        #
+        # async def background():
+        #     for i in range(10):
+        #         await self.__state__(f"running {i}")
+        #
+        # async with asyncio.TaskGroup() as tg:
+        #     background_task = tg.create_task(background())
+        #     message_task = tg.create_task(message_handler())
+        #
+        # await self.__state__("stop")
 
     async def __state__(self, state):
         logging.info(f"{self.start_time} Agent:{self.id} State: {state}")
