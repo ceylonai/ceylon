@@ -1,19 +1,18 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use log::info;
 use pyo3::{IntoPy, Python};
 use pyo3_asyncio::TaskLocals;
-use tokio::sync::mpsc::Receiver;
 
-use crate::executor::{execute_event_handler, execute_process_function};
+use crate::executor::execute_process_function;
 use crate::transport::Transporter;
-use crate::types::{FunctionInfo, MessageProcessor};
+use crate::types::{Event, EventProcessor, EventType, FunctionInfo, OriginatorType, TransportStatus};
 
 pub(crate) struct Application {
     name: String,
     startup_handler: Option<Arc<FunctionInfo>>,
     shutdown_handler: Option<Arc<FunctionInfo>>,
-    message_handlers: Vec<MessageProcessor>,
+    message_handlers: Vec<EventProcessor>,
     background_process_handler: Option<Arc<FunctionInfo>>,
     task_locals: Option<TaskLocals>,
     msg_rx: tokio::sync::watch::Receiver<String>,
@@ -46,15 +45,15 @@ impl Application {
         let message_handlers = self.message_handlers.clone();
 
 
-        match execute_event_handler(startup_handler, &task_locals_copy)
-            .await {
-            Ok(_) => (
-                info!("Server starting..."),
-            ),
-            Err(e) => (
-                println!("error 11 {}", e),
-            )
-        };
+        // match execute_event_handler(startup_handler, &task_locals_copy)
+        //     .await {
+        //     Ok(_) => (
+        //         info!("Server starting..."),
+        //     ),
+        //     Err(e) => (
+        //         println!("error 11 {}", e),
+        //     )
+        // };
 
         let (tx, mut rx) = tokio::sync::mpsc::channel(100);
         let mut msg_porter = Transporter::new(tx.clone(), self.name.clone());
@@ -85,11 +84,43 @@ impl Application {
         let message_processors = self.message_handlers.clone();
         tokio::spawn(async move {
             let mh = message_handlers.clone();
-            while let Some(message) = rx.recv().await {
-                // println!("Received message: {:?}", message.clone());
+            while let Some(status) = rx.recv().await {
+                let (msg, status) = match status {
+                    TransportStatus::Data(data) => {
+                        (data, EventType::DATA)
+                    }
+                    TransportStatus::Error(err) => {
+                        (err, EventType::ERROR)
+                    }
+                    TransportStatus::Info(info) => {
+                        (info, EventType::MESSAGE)
+                    }
+                    TransportStatus::PeerDiscovered(peer_id) => {
+                        (peer_id, EventType::MESSAGE)
+                    }
+                    TransportStatus::PeerConnected(peer_id) => {
+                        (peer_id, EventType::START)
+                    }
+                    TransportStatus::PeerDisconnected(peer_id) => {
+                        (peer_id, EventType::STOP)
+                    }
+                    TransportStatus::Stopped => {
+                        ("Stopped".to_string(), EventType::STOP)
+                    }
+                    TransportStatus::Started => {
+                        ("Ready".to_string(), EventType::READY)
+                    }
+                };
+
+                let event = Event::new(
+                    msg,
+                    status,
+                    "SYSTEM".to_string(),
+                    OriginatorType::System,
+                );
 
                 let input = Python::with_gil(|py| {
-                    message.clone().into_py(py)
+                    event.clone().into_py(py)
                 });
 
                 for mp in message_processors.iter() {
@@ -126,19 +157,19 @@ impl Application {
 
     pub fn shutdown(&mut self) {}
 
-    pub fn set_startup_handler(&mut self, handler: FunctionInfo) {
-        self.startup_handler = Some(Arc::new(handler));
-    }
+    // pub fn set_startup_handler(&mut self, handler: FunctionInfo) {
+    //     self.startup_handler = Some(Arc::new(handler));
+    // }
+    //
+    // pub fn set_shutdown_handler(&mut self, handler: FunctionInfo) {
+    //     self.shutdown_handler = Some(Arc::new(handler));
+    // }
+    //
+    // pub fn set_background_processor(&mut self, handler: FunctionInfo) {
+    //     self.background_process_handler = Some(Arc::new(handler));
+    // }
 
-    pub fn set_shutdown_handler(&mut self, handler: FunctionInfo) {
-        self.shutdown_handler = Some(Arc::new(handler));
-    }
-
-    pub fn set_background_processor(&mut self, handler: FunctionInfo) {
-        self.background_process_handler = Some(Arc::new(handler));
-    }
-
-    pub fn add_message_handler(&mut self, mp: MessageProcessor) {
+    pub fn add_event_processor(&mut self, mp: EventProcessor) {
         self.message_handlers.push(mp);
     }
 }

@@ -20,18 +20,8 @@ use tokio::sync::mpsc::{
     Sender,
     Receiver,
 };
-use crate::types::{DataMessage, DataMessagePublisher};
+use crate::types::{Event, OriginatorType, TransportStatus};
 
-pub enum TransportStatus {
-    Started,
-    Stopped,
-    Data(String),
-    Error(String),
-    Info(String),
-    PeerDiscovered(String),
-    PeerConnected(String),
-    PeerDisconnected(String),
-}
 
 // for `.fuse()`
 mod p2p;
@@ -48,12 +38,12 @@ pub struct Transporter {
     owner: String,
     rx: Receiver<String>,
     tx: Sender<String>,
-    msg_tx: Sender<DataMessage>,
+    msg_tx: Sender<TransportStatus>,
 }
 
 impl Transporter {
     pub fn new(
-        msg_tx: Sender<DataMessage>,
+        msg_tx: Sender<TransportStatus>,
         owner: String,
     ) -> Self {
         let (tx, rx) = mpsc::channel(32);
@@ -66,29 +56,29 @@ impl Transporter {
     }
 
     async fn send(&mut self, status: TransportStatus) {
-        let (msg, status) = match status {
-            TransportStatus::Started => { ("Started".to_string(), "Ok".to_string()) }
-            TransportStatus::Stopped => { ("Stopped".to_string(), "Ok".to_string()) }
-            TransportStatus::Data(data) => { (data, "Data".to_string()) }
-            TransportStatus::Error(err) => { (err, "Error".to_string()) }
-            TransportStatus::Info(info) => { (info, "Info".to_string()) }
-            TransportStatus::PeerDiscovered(peer_id) => {
-                (peer_id, "PeerDiscovered".to_string())
-            }
-            TransportStatus::PeerConnected(peer_id) => {
-                (peer_id, "PeerConnected".to_string())
-            }
-            TransportStatus::PeerDisconnected(peer_id) => {
-                (peer_id, "PeerDisconnected".to_string())
-            }
-        };
-
-        let data_msg = DataMessage::new(
-            msg,
-            status,
-            "SYSTEM".to_string(),
-            DataMessagePublisher::System);
-        match self.msg_tx.clone().send(data_msg).await {
+        // let (msg, status) = match status {
+        //     TransportStatus::Started => { ("Started".to_string(), "Ok".to_string()) }
+        //     TransportStatus::Stopped => { ("Stopped".to_string(), "Ok".to_string()) }
+        //     TransportStatus::Data(data) => { (data, "Data".to_string()) }
+        //     TransportStatus::Error(err) => { (err, "Error".to_string()) }
+        //     TransportStatus::Info(info) => { (info, "Info".to_string()) }
+        //     TransportStatus::PeerDiscovered(peer_id) => {
+        //         (peer_id, "PeerDiscovered".to_string())
+        //     }
+        //     TransportStatus::PeerConnected(peer_id) => {
+        //         (peer_id, "PeerConnected".to_string())
+        //     }
+        //     TransportStatus::PeerDisconnected(peer_id) => {
+        //         (peer_id, "PeerDisconnected".to_string())
+        //     }
+        // };
+        //
+        // let data_msg = DataMessage::new(
+        //     msg,
+        //     status,
+        //     "SYSTEM".to_string(),
+        //     DataMessagePublisher::System);
+        match self.msg_tx.clone().send(status).await {
             Ok(_) => {
                 info!("Sent message");
             }

@@ -24,46 +24,22 @@ class AgentWrapper:
         self.server = rakun.Server(agent.name)
         self.count = 0
 
-        async def start():
-            logging.info(f"Agent:{self.id} Start Process")
-            print(f"Start Process {self.id}")
-            return 0
+        evt_processor_fnc = rakun.FunctionInfo(self.__event__processor__, True, 1)
+        evt_processor = rakun.EventProcessor(evt_processor_fnc, rakun.EventType.START)
 
-        async def stop():
-            logging.info(f"Agent:{self.id} Stop Process")
-            print(f"Stop Process {self.id}")
-            return 0
+        self.server.add_event_processor(evt_processor)
 
-        async def processor():
-            logging.info(f"Agent:{self.id} Start Process")
-            while True:
-                self.server.publish(f"test {self.count}")
-                self.count += 1
-                await asyncio.sleep(1)
-
-        start_func = rakun.FunctionInfo(start, True, 0)
-        stop_func = rakun.FunctionInfo(stop, True, 0)
-        processor_func = rakun.FunctionInfo(processor, True, 0)
-
-        self.server.add_startup_handler(start_func)
-        self.server.add_shutdown_handler(stop_func)
-        self.server.add_background_processor(processor_func)
-
-        message_processor_fnc = rakun.FunctionInfo(self.__process_message__, True, 1)
-        message_processor = rakun.MessageProcessor(message_processor_fnc, "ALL")
-
-        self.server.add_message_handler(message_processor)
-
-    async def __process_message__(self, data):
-        if data and data.publisher == rakun.DataMessagePublisher.System:
-            print(f"Message From System Service: {data.message}")
-            if data.message == "Started":
-                while True:
-                    await asyncio.sleep(5)
-                    print(f"Process {self.id} is starting")
-                    self.server.publish(f"Process {self.id} is starting")
-
-        self.count += 1
+    async def __event__processor__(self, data: rakun.Event):
+        print(f"Received message: {data.content} {data.creator} {data.event_type} {data.origin_type}")
+        # if data and data.publisher == rakun.DataMessagePublisher.System:
+        #     print(f"Message From System Service: {data.message}")
+        #     if data.message == "Started":
+        #         while True:
+        #             await asyncio.sleep(5)
+        #             print(f"Process {self.id} is starting")
+        #             self.server.publish(f"Process {self.id} is starting")
+        #
+        # self.count += 1
 
     def __start__(self):
         self.server.start(4)

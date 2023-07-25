@@ -34,9 +34,10 @@ fn rakun(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_start_time, m)?)?;
     // Classes
     m.add_class::<types::FunctionInfo>()?;
-    m.add_class::<types::MessageProcessor>()?;
-    m.add_class::<types::DataMessage>()?;
-    m.add_class::<types::DataMessagePublisher>()?;
+    m.add_class::<types::EventProcessor>()?;
+    m.add_class::<types::Event>()?;
+    m.add_class::<types::EventType>()?;
+    m.add_class::<types::OriginatorType>()?;
     m.add_class::<server::Server>()?;
     pyo3::prepare_freethreaded_python();
     Ok(())

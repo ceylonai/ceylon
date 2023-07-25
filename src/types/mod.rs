@@ -26,59 +26,85 @@ impl FunctionInfo {
 
 #[pyclass]
 #[derive(Debug, Clone)]
-pub struct MessageProcessor {
+pub struct EventProcessor {
     pub function: FunctionInfo,
-    pub filter: String,
+    pub event: EventType,
 }
 
 #[pymethods]
-impl MessageProcessor {
+impl EventProcessor {
     #[new]
-    pub fn new(function: FunctionInfo, filter: String) -> Self {
+    pub fn new(function: FunctionInfo, event: EventType) -> Self {
         Self {
             function,
-            filter,
+            event,
         }
     }
 }
 
 #[pyclass]
 #[derive(Debug, Clone)]
-pub enum DataMessagePublisher {
+pub enum OriginatorType {
     System,
     Agent,
 }
 
 #[pyclass]
 #[derive(Debug, Clone)]
-pub struct DataMessage {
+pub enum EventType {
+    START,
+    STOP,
+    READY,
+    MESSAGE,
+    DATA,
+    ERROR,
+}
+
+#[pyclass]
+#[derive(Debug, Clone)]
+pub struct Event {
+    /// Event Data Message
     #[pyo3(get, set)]
-    pub message: String,
+    pub content: String,
 
     #[pyo3(get, set)]
-    pub status: String,
+    pub event_type: EventType,
 
     #[pyo3(get, set)]
-    pub publisher: DataMessagePublisher,
+    pub origin_type: OriginatorType,
 
     #[pyo3(get, set)]
-    pub sender: String,
+    pub creator: String,
 
     #[pyo3(get, set)]
     pub dispatch_time: String,
 }
 
 #[pymethods]
-impl DataMessage {
+impl Event {
     #[new]
-    pub fn new(message: String, status: String, sender: String, publisher: DataMessagePublisher) -> Self {
+    pub fn new(content: String,
+               event_type: EventType,
+               creator: String,
+               origin_type: OriginatorType) -> Self {
         let dispatch_time = chrono::Utc::now().to_rfc3339();
         Self {
-            message,
-            status,
-            sender,
+            content,
+            event_type,
+            creator,
             dispatch_time,
-            publisher,
+            origin_type,
         }
     }
+}
+
+pub enum TransportStatus {
+    Started,
+    Stopped,
+    Data(String),
+    Error(String),
+    Info(String),
+    PeerDiscovered(String),
+    PeerConnected(String),
+    PeerDisconnected(String),
 }

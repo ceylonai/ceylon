@@ -5,7 +5,7 @@ use pyo3::{pyclass, pymethods};
 // pyO3 module
 use pyo3::prelude::*;
 
-use crate::types::{FunctionInfo, MessageProcessor};
+use crate::types::{FunctionInfo, EventProcessor};
 
 mod application;
 
@@ -78,30 +78,29 @@ impl Server {
         Ok(())
     }
 
-    pub fn add_message_handler(&mut self, mp: MessageProcessor) {
-        // debug!("Added message handler {:?}", self.message_handlers.len());
+    pub fn add_event_processor(&mut self, mp: EventProcessor) {
         let mut application = self.application.lock().unwrap();
-        application.add_message_handler(mp);
+        application.add_event_processor(mp);
     }
 
     pub fn remove_message_handler(&mut self, function: FunctionInfo) {
         // Remove the message handler
     }
 
-    /// Add a new startup handler
-    pub fn add_startup_handler(&mut self, function: FunctionInfo) {
-        let mut application = self.application.lock().unwrap();
-        application.set_startup_handler(function);
-    }
-
-    /// Add a new shutdown handler
-    pub fn add_shutdown_handler(&mut self, function: FunctionInfo) {
-        let mut application = self.application.lock().unwrap();
-        application.set_shutdown_handler(function);
-    }
-    /// Add a new shutdown handler
-    pub fn add_background_processor(&mut self, function: FunctionInfo) {
-        let mut application = self.application.lock().unwrap();
-        application.set_background_processor(function);
-    }
+    // /// Add a new startup handler
+    // pub fn add_startup_handler(&mut self, function: FunctionInfo) {
+    //     let mut application = self.application.lock().unwrap();
+    //     application.set_startup_handler(function);
+    // }
+    //
+    // /// Add a new shutdown handler
+    // pub fn add_shutdown_handler(&mut self, function: FunctionInfo) {
+    //     let mut application = self.application.lock().unwrap();
+    //     application.set_shutdown_handler(function);
+    // }
+    // /// Add a new shutdown handler
+    // pub fn add_background_processor(&mut self, function: FunctionInfo) {
+    //     let mut application = self.application.lock().unwrap();
+    //     application.set_background_processor(function);
+    // }
 }
