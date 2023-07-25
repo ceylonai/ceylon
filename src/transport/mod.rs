@@ -28,6 +28,9 @@ pub enum TransportStatus {
     Data(String),
     Error(String),
     Info(String),
+    PeerDiscovered(String),
+    PeerConnected(String),
+    PeerDisconnected(String),
 }
 
 // for `.fuse()`
@@ -69,6 +72,15 @@ impl Transporter {
             TransportStatus::Data(data) => { (data, "Data".to_string()) }
             TransportStatus::Error(err) => { (err, "Error".to_string()) }
             TransportStatus::Info(info) => { (info, "Info".to_string()) }
+            TransportStatus::PeerDiscovered(peer_id) => {
+                (peer_id, "PeerDiscovered".to_string())
+            }
+            TransportStatus::PeerConnected(peer_id) => {
+                (peer_id, "PeerConnected".to_string())
+            }
+            TransportStatus::PeerDisconnected(peer_id) => {
+                (peer_id, "PeerDisconnected".to_string())
+            }
         };
 
         let data_msg = DataMessage::new(
@@ -168,30 +180,30 @@ impl Transporter {
             event = swarm.select_next_some() => match event {
                 SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
                     for (peer_id, _multiaddr) in list {
-                        let status = format!("mDNS discovered a new peer: {peer_id}");
-                        self.send(TransportStatus::Info(status)).await;
+                        let status = format!("{peer_id}");
+                        self.send(TransportStatus::PeerDiscovered(status)).await;
                         swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
                     }
                 },
                 SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
                     for (peer_id, _multiaddr) in list {
-                        let status = format!("mDNS discover peer has expired: {peer_id}");
-                       self.send(TransportStatus::Info(status)).await;
+                        let status = format!("{peer_id}");
+                       self.send(TransportStatus::PeerDisconnected(status)).await;
                         swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
 
                     }
                 },
                 SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Message {
-                    propagation_source: peer_id,
-                    message_id: id,
+                    propagation_source: _peer_id,
+                    message_id: _id,
                     message,
                 })) => {
-                    let status = format!("Received message: {message:?}");
+                    let status = format!("{message:?}");
                    self.send(TransportStatus::Data(status)).await;
                     },
                 SwarmEvent::NewListenAddr { address, .. } => {
-                        let status = format!("Local node is listening on {address}");
-                    self.send(TransportStatus::Info(status)).await;
+                        let status = format!("{address}");
+                    self.send(TransportStatus::PeerConnected(status)).await;
                 }
                 _ => {}
             }

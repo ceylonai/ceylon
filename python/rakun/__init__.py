@@ -34,11 +34,20 @@ class AgentWrapper:
             print(f"Stop Process {self.id}")
             return 0
 
+        async def processor():
+            logging.info(f"Agent:{self.id} Start Process")
+            while True:
+                self.server.publish(f"test {self.count}")
+                self.count += 1
+                await asyncio.sleep(1)
+
         start_func = rakun.FunctionInfo(start, True, 0)
         stop_func = rakun.FunctionInfo(stop, True, 0)
+        processor_func = rakun.FunctionInfo(processor, True, 0)
 
         self.server.add_startup_handler(start_func)
         self.server.add_shutdown_handler(stop_func)
+        self.server.add_background_processor(processor_func)
 
         message_processor_fnc = rakun.FunctionInfo(self.__process_message__, True, 1)
         message_processor = rakun.MessageProcessor(message_processor_fnc, "ALL")
@@ -48,6 +57,11 @@ class AgentWrapper:
     async def __process_message__(self, data):
         if data and data.publisher == rakun.DataMessagePublisher.System:
             print(f"Message From System Service: {data.message}")
+            if data.message == "Started":
+                while True:
+                    await asyncio.sleep(5)
+                    print(f"Process {self.id} is starting")
+                    self.server.publish(f"Process {self.id} is starting")
 
         self.count += 1
 
