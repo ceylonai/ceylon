@@ -13,8 +13,10 @@ use libp2p::{
     swarm::NetworkBehaviour, tcp, Transport, yamux,
 };
 use libp2p_quic as quic;
+use log::{error, info};
 use tokio::io::AsyncBufReadExt;
 use tokio::sync::mpsc;
+use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::Sender;
 
 // for `.fuse()`
@@ -31,15 +33,31 @@ struct MyBehaviour {
 pub struct Transporter {
     rx: mpsc::Receiver<String>,
     tx: mpsc::Sender<String>,
+    msg_tx: mpsc::Sender<String>,
 }
 
 impl Transporter {
-    pub fn new() -> Self {
+    pub fn new(
+        msg_tx: mpsc::Sender<String>,
+    ) -> Self {
         let (tx, rx) = tokio::sync::mpsc::channel(32);
         Self {
             rx,
             tx,
+            msg_tx,
         }
+    }
+
+    async fn send(&mut self, msg: String) {
+        println!("send {}", msg.clone());
+        match self.msg_tx.send(msg).await {
+            Ok(_) => {
+                info!("Sent message");
+            }
+            Err(e) => {
+                error!("error {}", e);
+            }
+        };
     }
 
     pub fn get_tx(&mut self) -> Sender<String> {
@@ -47,10 +65,11 @@ impl Transporter {
     }
 
     pub async fn message_processor(&mut self) -> Result<(), Box<dyn Error>> {
+        self.send("Hello".to_string()).await;
         // Create a random PeerId
         let id_keys = identity::Keypair::generate_ed25519();
         let local_peer_id = PeerId::from(id_keys.public());
-        println!("Local peer id: {local_peer_id}");
+        info!("Local peer id: {local_peer_id}");
 
         // Set up an encrypted DNS-enabled TCP Transport over the yamux protocol.
         let tcp_transport = tcp::tokio::Transport::new(tcp::Config::default().nodelay(true))
@@ -105,7 +124,7 @@ impl Transporter {
         swarm.listen_on("/ip4/0.0.0.0/udp/0/quic-v1".parse()?)?;
         swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse()?)?;
 
-        println!("Enter messages via STDIN and they will be sent to connected peers using Gossipsub");
+        info!("Enter messages via STDIN and they will be sent to connected peers using Gossipsub");
 
 
         // tokio::spawn(async move {
@@ -115,6 +134,7 @@ impl Transporter {
         //     }
         // });
         // Kick it off
+        let agent_tx = self.msg_tx.clone();
         loop {
             tokio::select! {
             message = self.rx.recv() => {
@@ -122,33 +142,37 @@ impl Transporter {
                     if let Err(e) = swarm
                     .behaviour_mut().gossipsub
                     .publish(topic.clone(), message.as_bytes()) {
-                    println!("Publish error: {e:?}");
+                    error!("Publish error: {e:?}");
                 }
                 }
             }
             event = swarm.select_next_some() => match event {
                 SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
                     for (peer_id, _multiaddr) in list {
-                        println!("mDNS discovered a new peer: {peer_id}");
+                        let status = format!("mDNS discovered a new peer: {peer_id}");
+                        self.send(status).await;
                         swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
                     }
                 },
                 SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
                     for (peer_id, _multiaddr) in list {
-                        println!("mDNS discover peer has expired: {peer_id}");
+                        let status = format!("mDNS discover peer has expired: {peer_id}");
+                        self.send(status).await;
                         swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
+
                     }
                 },
                 SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Message {
                     propagation_source: peer_id,
                     message_id: id,
                     message,
-                })) => println!(
-                        "Got message: '{}' with id: {id} from peer: {peer_id}",
-                        String::from_utf8_lossy(&message.data),
-                    ),
+                })) => {
+                    let status = format!("Received message: {message:?}");
+                    self.send(status).await;
+                    },
                 SwarmEvent::NewListenAddr { address, .. } => {
-                    println!("Local node is listening on {address}");
+                        let status = format!("Local node is listening on {address}");
+                    self.send(status).await;
                 }
                 _ => {}
             }

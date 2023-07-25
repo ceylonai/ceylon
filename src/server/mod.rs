@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use log::{debug, info};
+use log::{debug, error, info};
 use pyo3::{pyclass, pymethods};
 // pyO3 module
 use pyo3::prelude::*;
@@ -77,48 +77,44 @@ impl Server {
 
 
         tokio::runtime::Runtime::new().unwrap().block_on(async move {
-            let mut msg_porter = Transporter::new();
+            let (tx, mut rx) = tokio::sync::mpsc::channel(32);
+            let mut msg_porter = Transporter::new(tx.clone());
             let tx = msg_porter.get_tx();
+
+
+            tokio::spawn(async move {
+                loop {
+                    println!("Test loop");
+                    let msg = tokio::select! {
+                        Some(msg) = rx.recv() => msg,
+                    };
+                    println!("Got {:?}", msg);
+                }
+            });
+
 
             tokio::spawn(async move {
                 for i in 0..1000 {
                     match tx.send(format!("Hi {}", i)).await {
                         Ok(_) => {
-                            println!("Sent message {}", i);
+                            info!("Sent message {}", i);
                         }
                         Err(e) => {
-                            println!("error {}", e);
+                            error!("error {}", e);
                         }
                     };
                     // sleep
-                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
                 }
             });
-
-
             msg_porter.message_processor().await.expect("TODO: panic message");
-            // let (tx, rx) = tokio::sync::mpsc::channel(32);
-            // let tx2 = tx.clone();
-            // tokio::spawn(async move {
-            //     message_processor(rx).await.unwrap();
-            // });
-            // for i in 0..1000 {
-            //     match tx2.send(format!("Hi {}", i)).await {
-            //         Ok(_) => {
-            //             println!("Sent message {}", i);
-            //         }
-            //         Err(e) => {
-            //             println!("error {}", e);
-            //         }
-            //     };
-            // }
         });
 
 
         let event_loop = (*event_loop).call_method0("run_forever");
         if event_loop.is_err() {
             debug!("Ctrl c handler");
-            println!("{}", event_loop.err().unwrap());
+            info!("{}", event_loop.err().unwrap());
             Python::with_gil(|py| {
                 pyo3_asyncio::tokio::run(py, async move {
                     execute_event_handler(shutdown_handler, &task_locals.clone())
