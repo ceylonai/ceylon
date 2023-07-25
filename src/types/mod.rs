@@ -1,4 +1,4 @@
-use pyo3::{Py, PyAny, pyclass, pymethods};
+use pyo3::{prelude::*, Py, PyAny, pyclass, pymethods};
 
 #[pyclass]
 #[derive(Debug, Clone)]
@@ -44,23 +44,41 @@ impl MessageProcessor {
 
 #[pyclass]
 #[derive(Debug, Clone)]
+pub enum DataMessagePublisher {
+    System,
+    Agent,
+}
+
+#[pyclass]
+#[derive(Debug, Clone)]
 pub struct DataMessage {
+    #[pyo3(get, set)]
     pub message: String,
+
+    #[pyo3(get, set)]
     pub status: String,
+
+    #[pyo3(get, set)]
+    pub publisher: DataMessagePublisher,
+
+    #[pyo3(get, set)]
     pub sender: String,
+
+    #[pyo3(get, set)]
     pub dispatch_time: String,
 }
 
 #[pymethods]
 impl DataMessage {
     #[new]
-    pub fn new(message: String, status: String, sender: String) -> Self {
+    pub fn new(message: String, status: String, sender: String, publisher: DataMessagePublisher) -> Self {
         let dispatch_time = chrono::Utc::now().to_rfc3339();
         Self {
             message,
             status,
             sender,
             dispatch_time,
+            publisher,
         }
     }
 }

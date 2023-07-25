@@ -20,7 +20,7 @@ use tokio::sync::mpsc::{
     Sender,
     Receiver,
 };
-use crate::types::DataMessage;
+use crate::types::{DataMessage, DataMessagePublisher};
 
 pub enum TransportStatus {
     Started,
@@ -70,7 +70,12 @@ impl Transporter {
             TransportStatus::Error(err) => { (err, "Error".to_string()) }
             TransportStatus::Info(info) => { (info, "Info".to_string()) }
         };
-        let data_msg = DataMessage::new(msg, status, self.owner.clone());
+
+        let data_msg = DataMessage::new(
+            msg,
+            status,
+            "SYSTEM".to_string(),
+            DataMessagePublisher::System);
         match self.msg_tx.clone().send(data_msg).await {
             Ok(_) => {
                 info!("Sent message");

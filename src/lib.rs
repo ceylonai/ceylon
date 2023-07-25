@@ -35,6 +35,8 @@ fn rakun(_py: Python, m: &PyModule) -> PyResult<()> {
     // Classes
     m.add_class::<types::FunctionInfo>()?;
     m.add_class::<types::MessageProcessor>()?;
+    m.add_class::<types::DataMessage>()?;
+    m.add_class::<types::DataMessagePublisher>()?;
     m.add_class::<server::Server>()?;
     pyo3::prepare_freethreaded_python();
     Ok(())
