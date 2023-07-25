@@ -41,3 +41,26 @@ impl MessageProcessor {
         }
     }
 }
+
+#[pyclass]
+#[derive(Debug, Clone)]
+pub struct DataMessage {
+    pub message: String,
+    pub status: String,
+    pub sender: String,
+    pub dispatch_time: String,
+}
+
+#[pymethods]
+impl DataMessage {
+    #[new]
+    pub fn new(message: String, status: String, sender: String) -> Self {
+        let dispatch_time = chrono::Utc::now().to_rfc3339();
+        Self {
+            message,
+            status,
+            sender,
+            dispatch_time,
+        }
+    }
+}

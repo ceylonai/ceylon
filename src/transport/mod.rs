@@ -16,8 +16,19 @@ use libp2p_quic as quic;
 use log::{error, info};
 use tokio::io::AsyncBufReadExt;
 use tokio::sync::mpsc;
-use tokio::sync::mpsc::error::SendError;
-use tokio::sync::mpsc::Sender;
+use tokio::sync::mpsc::{
+    Sender,
+    Receiver,
+};
+use crate::types::DataMessage;
+
+pub enum TransportStatus {
+    Started,
+    Stopped,
+    Data(String),
+    Error(String),
+    Info(String),
+}
 
 // for `.fuse()`
 mod p2p;
@@ -31,26 +42,36 @@ struct MyBehaviour {
 }
 
 pub struct Transporter {
-    rx: mpsc::Receiver<String>,
-    tx: mpsc::Sender<String>,
-    msg_tx: mpsc::Sender<String>,
+    owner: String,
+    rx: Receiver<String>,
+    tx: Sender<String>,
+    msg_tx: Sender<DataMessage>,
 }
 
 impl Transporter {
     pub fn new(
-        msg_tx: mpsc::Sender<String>,
+        msg_tx: Sender<DataMessage>,
+        owner: String,
     ) -> Self {
-        let (tx, rx) = tokio::sync::mpsc::channel(32);
+        let (tx, rx) = mpsc::channel(32);
         Self {
             rx,
             tx,
             msg_tx,
+            owner,
         }
     }
 
-    async fn send(&mut self, msg: String) {
-        println!("send {}", msg.clone());
-        match self.msg_tx.send(msg).await {
+    async fn send(&mut self, status: TransportStatus) {
+        let (msg, status) = match status {
+            TransportStatus::Started => { ("Started".to_string(), "Ok".to_string()) }
+            TransportStatus::Stopped => { ("Stopped".to_string(), "Ok".to_string()) }
+            TransportStatus::Data(data) => { (data, "Data".to_string()) }
+            TransportStatus::Error(err) => { (err, "Error".to_string()) }
+            TransportStatus::Info(info) => { (info, "Info".to_string()) }
+        };
+        let data_msg = DataMessage::new(msg, status, self.owner.clone());
+        match self.msg_tx.clone().send(data_msg).await {
             Ok(_) => {
                 info!("Sent message");
             }
@@ -65,7 +86,7 @@ impl Transporter {
     }
 
     pub async fn message_processor(&mut self) -> Result<(), Box<dyn Error>> {
-        self.send("Hello".to_string()).await;
+        self.send(TransportStatus::Started).await;
         // Create a random PeerId
         let id_keys = identity::Keypair::generate_ed25519();
         let local_peer_id = PeerId::from(id_keys.public());
@@ -127,13 +148,6 @@ impl Transporter {
         info!("Enter messages via STDIN and they will be sent to connected peers using Gossipsub");
 
 
-        // tokio::spawn(async move {
-        //     for i in 0..10000 {
-        //
-        //         tokio::time::sleep(Duration::from_secs(1)).await;
-        //     }
-        // });
-        // Kick it off
         let agent_tx = self.msg_tx.clone();
         loop {
             tokio::select! {
@@ -150,14 +164,14 @@ impl Transporter {
                 SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
                     for (peer_id, _multiaddr) in list {
                         let status = format!("mDNS discovered a new peer: {peer_id}");
-                        self.send(status).await;
+                        self.send(TransportStatus::Info(status)).await;
                         swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
                     }
                 },
                 SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
                     for (peer_id, _multiaddr) in list {
                         let status = format!("mDNS discover peer has expired: {peer_id}");
-                        self.send(status).await;
+                       self.send(TransportStatus::Info(status)).await;
                         swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
 
                     }
@@ -168,11 +182,11 @@ impl Transporter {
                     message,
                 })) => {
                     let status = format!("Received message: {message:?}");
-                    self.send(status).await;
+                   self.send(TransportStatus::Data(status)).await;
                     },
                 SwarmEvent::NewListenAddr { address, .. } => {
                         let status = format!("Local node is listening on {address}");
-                    self.send(status).await;
+                    self.send(TransportStatus::Info(status)).await;
                 }
                 _ => {}
             }

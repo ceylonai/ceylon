@@ -30,7 +30,7 @@ fn get_function_output<'a, T>(
 
 #[inline]
 pub async fn execute_process_function(
-    input: &str,
+    input: PyObject,
     function: &FunctionInfo,
     task_locals: &TaskLocals,
 ) -> Result<()> {
