@@ -79,17 +79,17 @@ jobs:
         with:
           python-version: '3.10'
           architecture: ${{ matrix.target }}
-      - name: Setup protoc
-        uses: arduino/setup-protoc@v1.1.2
-      - name: Build libp2p-core
-        run: |
-          protoc --version
-          echo $(which protoc)
-          export PROTOC=$(which protoc)
-          echo "PROTOC=$(which protoc)" >> $GITHUB_ENV
-          git clone https://github.com/libp2p/rust-libp2p.git
-          cd rust-libp2p
-          cargo build --release
+#      - name: Setup protoc
+#        uses: arduino/setup-protoc@v1.1.2
+#      - name: Build libp2p-core
+#        run: |
+#          protoc --version
+#          echo $(which protoc)
+#          export PROTOC=$(which protoc)
+#          echo "PROTOC=$(which protoc)" >> $GITHUB_ENV
+#          git clone https://github.com/libp2p/rust-libp2p.git
+#          cd rust-libp2p
+#          cargo build --release
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
