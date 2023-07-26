@@ -43,6 +43,6 @@ fn rakun(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<types::OriginatorType>()?;
     m.add_class::<server::server::Server>()?;
     m.add_class::<server::server::MessageProcessor>()?;
-    pyo3::prepare_freethreaded_python();
+    // pyo3::prepare_freethreaded_python();
     Ok(())
 }
