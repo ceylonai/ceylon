@@ -2,7 +2,7 @@ import logging
 
 import rakun
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 
 class AgentBasic:
@@ -26,5 +26,8 @@ class AgentBasic:
 if __name__ == '__main__':
     agent_manager = rakun.AgentManager()
     agent_manager.register_agent(AgentBasic("AGENT1"))
-    # agent_manager.register_agent(AgentBasic("AGENT2"))
+    agent_manager.register_agent(AgentBasic("AGENT2"))
+    agent_manager.register_agent(AgentBasic("AGENT3"))
+    agent_manager.register_agent(AgentBasic("AGENT4"))
+    agent_manager.register_agent(AgentBasic("AGENT5"))
     agent_manager.start()

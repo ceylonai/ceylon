@@ -2,6 +2,8 @@ import asyncio
 import logging
 import uuid
 from multiprocessing import allow_connection_pickling
+import random
+from threading import Thread
 
 from rakun import rakun
 
@@ -32,20 +34,15 @@ class AgentWrapper:
         rakun.publish(message)
 
     async def __event__processor__(self, data: rakun.Event):
-        print(
-            f"Received message to {self.agent.name}: {data.content} {data.creator} {data.event_type} {data.origin_type}")
-        # print(f"Process {self.id} is starting")
-        # await self.publish(f"Process {self.id} Send regartst")
-        # async def process(dt):
+        if data.event_type == rakun.EventType.DATA:
+            print(
+                f"Received message to {self.agent.name}: {data.content} {data.creator} {data.event_type} {data.origin_type}")
+
         if data.event_type == rakun.EventType.START:
             while True:
                 self.publisher.publish(f"Greeting from {self.id} {self.agent.name}")
-                # await asyncio.sleep(5)
-        #
-        # self.p.apply_async(process, (data,))
-        # # self.p.join()
-        # self.count += 1
-
+                sleep_time = random.randint(5, 15)
+                await asyncio.sleep(sleep_time)
     def __start__(self):
         self.server.start(4)
 
@@ -84,10 +81,10 @@ class AgentManager:
 
         agents_thread = []
         for agent in self.agents:
-            agent.start()
-            # t = Process(target=agent.start)
-            # t.start()
-            # agents_thread.append(t)
+            # agent.start()
+            t = Thread(target=agent.start)
+            t.start()
+            agents_thread.append(t)
 
         try:
             while True:

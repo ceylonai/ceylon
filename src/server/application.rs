@@ -1,4 +1,4 @@
-use log::info;
+use log::{debug, info};
 use pyo3::{IntoPy, Python};
 use pyo3_asyncio::TaskLocals;
 
@@ -24,7 +24,7 @@ impl Application {
     }
 
     pub async fn start(&mut self) {
-        println!("Starting application: {}", self.name);
+        debug!("Starting application: {}", self.name);
         let task_locals_copy = self.task_locals.clone().unwrap();
         let message_handlers = self.event_processors.clone();
 
@@ -38,18 +38,18 @@ impl Application {
                 match msg {
                     Ok(msg) => {
                         let data = msg_server_rx.borrow().to_string();
-                        println!("[Server] Sent Dispatch Message to [Application]-2: {}", data.clone());
+                        debug!("[Server] Sent Dispatch Message to [Application]-2: {}", data.clone());
                         match tx.send(data).await {
                             Ok(_) => {
-                                info!("Sent message");
+                                debug!("Sent message");
                             }
                             Err(e) => {
-                                println!("error 33 {}", e);
+                                debug!("error 33 {}", e);
                             }
                         }
                     }
                     Err(e) => {
-                        println!("error 44 {}", e);
+                        debug!("error 44 {}", e);
                     }
                 }
             }
@@ -87,7 +87,7 @@ impl Application {
                 };
 
                 if status == EventType::DATA {
-                    println!("[Application] Received Income Message from [Transporter]-2: {}", msg.clone());
+                    debug!("[Application] Received Income Message from [Transporter]-2: {}", msg.clone());
                 }
 
                 let event = Event::new(
@@ -111,12 +111,12 @@ impl Application {
                                 info!("Server starting..."),
                             ),
                             Err(e) => (
-                                println!("error 55 {}", e),
+                                debug!("error 55 {}", e),
                             )
                         };
                     });
                 }
-                println!("Processing message released");
+                debug!("Processing message released");
             }
         });
 
@@ -125,7 +125,7 @@ impl Application {
                 info!("Message Porter started");
             }
             Err(e) => {
-                println!("Message Porter error 66 {}", e);
+                debug!("Message Porter error 66 {}", e);
             }
         };
     }

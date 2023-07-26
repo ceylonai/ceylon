@@ -13,14 +13,13 @@ use libp2p::{
     swarm::NetworkBehaviour, tcp, Transport, yamux,
 };
 use libp2p_quic as quic;
-use log::{error, info};
+use log::{debug, error, info};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{
     Receiver,
     Sender,
 };
-
-use crate::types::TransportStatus;
+use crate::types::{TransportMessage, TransportStatus};
 
 mod p2p;
 
@@ -56,7 +55,7 @@ impl Transporter {
     async fn send(&mut self, status: TransportStatus) {
         match self.msg_tx.clone().send(status).await {
             Ok(_) => {
-                info!("Sent message");
+                debug!("Sent message");
             }
             Err(e) => {
                 error!("error {}", e);
@@ -72,7 +71,7 @@ impl Transporter {
         // Create a random PeerId
         let id_keys = identity::Keypair::generate_ed25519();
         let local_peer_id = PeerId::from(id_keys.public());
-        info!("Local peer id: {local_peer_id}");
+        debug!("Local peer id: {local_peer_id}");
 
         // Set up an encrypted DNS-enabled TCP Transport over the yamux protocol.
         let tcp_transport = tcp::tokio::Transport::new(tcp::Config::default().nodelay(true))
@@ -127,7 +126,7 @@ impl Transporter {
         swarm.listen_on("/ip4/0.0.0.0/udp/0/quic-v1".parse()?)?;
         swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse()?)?;
 
-        info!("Enter messages via STDIN and they will be sent to connected peers using Gossipsub");
+        debug!("Enter messages via STDIN and they will be sent to connected peers using Gossipsub");
 
 
         let agent_tx = self.msg_tx.clone();
@@ -136,13 +135,12 @@ impl Transporter {
             tokio::select! {
             message = self.rx.recv() => {
                 if let Some(message) = message {
-                        println!("[Application] Sent Dispatch Message to [Transporter]-2: {}", message.clone());
-                        let current_time = Utc::now().clone().format("%Y-%m-%d %H:%M:%S.%f").to_string();
-                        let server_message = format!("{message} {current_time}");
+                        debug!("[Application] Sent Dispatch Message to [Transporter]-2: {}", message.clone());
+                        let server_message = TransportMessage::to_bytes(message.clone());
                     if let Err(e) = swarm
                     .behaviour_mut().gossipsub
-                    .publish(topic.clone(), server_message.as_bytes()) {
-                    println!("Publish error: {e:?}");
+                    .publish(topic.clone(),server_message) {
+                    debug!("Publish error: {e:?}");
                 }
                 }
             }
@@ -166,20 +164,16 @@ impl Transporter {
                 SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Message {
                     propagation_source: _peer_id,
                     message_id: _id,
-                    message,
-                })) => {
+                    message,})) => {
+                        let data_message = TransportMessage::from_bytes(message.data);
 
-                        let data = String::from_utf8(message.data).unwrap();
-
-                    let status = format!("{data}");
-                        println!("[Transporter] Received Income Message from [Agent]-1: {}", status.clone());
-                   self.send(TransportStatus::Data(status)).await;
+                        let status =data_message.data;
+                                debug!("[Transporter] Received Income Message from [Agent]-1: {}", status.clone());
+                        self.send(TransportStatus::Data(status)).await;
                     },
                 SwarmEvent::NewListenAddr { address, .. } => {
                         let status = format!("{address}");
-                    self.send(TransportStatus::PeerConnected(status)).await;
-
-
+                        self.send(TransportStatus::PeerConnected(status)).await;
                 }
                 _ => {}
             }

@@ -1,4 +1,9 @@
+use std::collections::hash_map::DefaultHasher;
+use std::fmt::format;
 use pyo3::{prelude::*, Py, PyAny, pyclass, pymethods};
+use serde::{Deserialize, Serialize};
+use std::hash::{Hash, Hasher};
+use std::ptr::hash;
 
 #[pyclass]
 #[derive(Debug, Clone)]
@@ -108,4 +113,40 @@ pub enum TransportStatus {
     PeerDiscovered(String),
     PeerConnected(String),
     PeerDisconnected(String),
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TransportMessage {
+    pub unique_id: String,
+    pub data: String,
+    pub dispatch_time: String,
+}
+
+impl TransportMessage {
+    fn new(data: String) -> Self {
+        let dispatch_time = chrono::Utc::now().to_rfc3339();
+        let unique_id = calculate_hash(&format!("{dispatch_time}{data}")).to_string();
+        Self {
+            unique_id,
+            data,
+            dispatch_time,
+        }
+    }
+
+    pub fn to_bytes(data: String) -> Vec<u8> {
+        let server_message = TransportMessage::new(data);
+        let message_str = serde_json::to_string(&server_message).unwrap();
+        message_str.into_bytes()
+    }
+    pub fn from_bytes(data: Vec<u8>) -> Self {
+        let message_str = String::from_utf8(data).unwrap();
+        let server_message = serde_json::from_str(&message_str).unwrap();
+        server_message
+    }
+}
+
+fn calculate_hash<T: Hash>(t: &T) -> u64 {
+    let mut s = DefaultHasher::new();
+    t.hash(&mut s);
+    s.finish()
 }
