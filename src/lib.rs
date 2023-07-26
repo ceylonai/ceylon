@@ -40,8 +40,8 @@ fn rakun(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<types::Event>()?;
     m.add_class::<types::EventType>()?;
     m.add_class::<types::OriginatorType>()?;
-    m.add_class::<server::Server>()?;
-    m.add_class::<server::MessageProcessor>()?;
+    m.add_class::<server::server::Server>()?;
+    m.add_class::<server::server::MessageProcessor>()?;
     pyo3::prepare_freethreaded_python();
     Ok(())
 }

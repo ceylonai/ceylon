@@ -72,10 +72,11 @@ impl Transporter for P2PTransporter {
     }
 
     async fn message_processor(&mut self) -> Result<(), Box<dyn Error>> {
+        let owner = self.owner.clone();
         // Create a random PeerId
         let id_keys = identity::Keypair::generate_ed25519();
         let local_peer_id = PeerId::from(id_keys.public());
-        debug!("Local peer id: {local_peer_id}");
+        debug!("Local peer id: {local_peer_id} {owner}");
 
         // Set up an encrypted DNS-enabled TCP Transport over the yamux protocol.
         let tcp_transport = tcp::tokio::Transport::new(tcp::Config::default().nodelay(true))
@@ -133,14 +134,13 @@ impl Transporter for P2PTransporter {
         debug!("Enter messages via STDIN and they will be sent to connected peers using Gossipsub");
 
 
-        let agent_tx = self.msg_tx.clone();
         self.send(TransportStatus::Started).await;
         loop {
             tokio::select! {
             message = self.rx.recv() => {
                 if let Some(message) = message {
                         debug!("[Application] Sent Dispatch Message to [Transporter]-2: {}", message.clone());
-                        let server_message = TransportMessage::to_bytes(message.clone());
+                        let server_message = TransportMessage::using_bytes(message.clone());
                     if let Err(e) = swarm
                     .behaviour_mut().gossipsub
                     .publish(topic.clone(),server_message) {

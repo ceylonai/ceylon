@@ -1,9 +1,8 @@
 use std::collections::hash_map::DefaultHasher;
-use std::fmt::format;
-use pyo3::{prelude::*, Py, PyAny, pyclass, pymethods};
-use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
-use std::ptr::hash;
+
+use pyo3::{Py, PyAny, pyclass, pymethods};
+use serde::{Deserialize, Serialize};
 
 #[pyclass]
 #[derive(Debug, Clone)]
@@ -32,6 +31,7 @@ impl FunctionInfo {
 #[pyclass]
 #[derive(Debug, Clone)]
 pub struct EventProcessor {
+    pub name: String,
     pub function: FunctionInfo,
     pub event: EventType,
 }
@@ -39,8 +39,9 @@ pub struct EventProcessor {
 #[pymethods]
 impl EventProcessor {
     #[new]
-    pub fn new(function: FunctionInfo, event: EventType) -> Self {
+    pub fn new(name: String, function: FunctionInfo, event: EventType) -> Self {
         Self {
+            name,
             function,
             event,
         }
@@ -133,7 +134,7 @@ impl TransportMessage {
         }
     }
 
-    pub fn to_bytes(data: String) -> Vec<u8> {
+    pub fn using_bytes(data: String) -> Vec<u8> {
         let server_message = TransportMessage::new(data);
         let message_str = serde_json::to_string(&server_message).unwrap();
         message_str.into_bytes()

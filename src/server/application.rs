@@ -1,4 +1,3 @@
-use libp2p::Transport;
 use log::{debug, info};
 use pyo3::{IntoPy, Python};
 use pyo3_asyncio::TaskLocals;
@@ -35,9 +34,11 @@ impl Application {
 
         let mut msg_server_rx = self.msg_server_rx.clone();
         tokio::spawn(async move {
-            while let msg = msg_server_rx.changed().await {
-                match msg {
-                    Ok(msg) => {
+            loop {
+                tokio::select! {
+                    msg = msg_server_rx.changed() => {
+                        match msg {
+                    Ok(_msg) => {
                         let data = msg_server_rx.borrow().to_string();
                         debug!("[Server] Sent Dispatch Message to [Application]-2: {}", data.clone());
                         match tx.send(data).await {
@@ -51,6 +52,8 @@ impl Application {
                     }
                     Err(e) => {
                         debug!("error 44 {}", e);
+                    }
+                }
                     }
                 }
             }
@@ -139,5 +142,13 @@ impl Application {
 
     pub fn add_event_processor(&mut self, mp: EventProcessor) {
         self.event_processors.push(mp);
+    }
+    pub fn remove_message_handler(&mut self, mp: EventProcessor) {
+        for i in 0..self.event_processors.len() {
+            if self.event_processors[i].name == mp.name {
+                self.event_processors.remove(i);
+                break;
+            }
+        }
     }
 }

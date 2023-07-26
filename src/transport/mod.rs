@@ -1,14 +1,7 @@
 use std::error::Error;
-use std::hash::{Hash, Hasher};
-
 use async_trait::async_trait;
-use futures::{prelude::*};
-use libp2p::{
-    swarm::NetworkBehaviour, Transport,
-};
 use tokio::sync::mpsc::Sender;
 use crate::types::TransportStatus;
-
 pub mod p2p;
 
 
@@ -21,6 +14,3 @@ pub trait Transporter {
     fn get_tx(&mut self) -> Sender<String>;
     async fn message_processor(&mut self) -> Result<(), Box<dyn Error>>;
 }
-
-
-
