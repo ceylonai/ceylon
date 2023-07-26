@@ -17,19 +17,6 @@ permissions:
   contents: read
 
 jobs:
-  #  build:
-  #    runs-on: ubuntu-latest
-  #    steps:
-  #      - name: Install protobuf-compiler
-  #        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
-  #
-  #      - name: Build libp2p-core
-  #        run: |
-  #          export PROTOC=$(which protoc)
-  #          git clone https://github.com/libp2p/rust-libp2p.git
-  #          cd rust-libp2p
-  #          git checkout v0.39.0
-  #          cargo build --release
   linux:
     runs-on: ubuntu-latest
     strategy:
@@ -44,9 +31,6 @@ jobs:
           python-version: '3.7'
       - name: Setup protoc
         uses: arduino/setup-protoc@v1.1.2
-
-        #      - name: Install protobuf-compiler
-        #        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
       - name: Build libp2p-core
         run: |
           protoc --version
@@ -81,17 +65,6 @@ jobs:
         with:
           python-version: '3.10'
           architecture: ${{ matrix.target }}
-      #      - name: Setup protoc
-      #        uses: arduino/setup-protoc@v1.1.2
-      #      - name: Build libp2p-core
-      #        run: |
-      #          protoc --version
-      #          echo $(which protoc)
-      #          export PROTOC=$(which protoc)
-      #          echo "PROTOC=$(which protoc)" >> $GITHUB_ENV
-      #          git clone https://github.com/libp2p/rust-libp2p.git
-      #          cd rust-libp2p
-      #          cargo build --release
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -157,4 +130,4 @@ jobs:
           MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
         with:
           command: upload
-#          args: --skip-existing *
+          args: --skip-existing *

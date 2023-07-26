@@ -5,16 +5,16 @@ from multiprocessing import allow_connection_pickling
 import random
 from threading import Thread
 
-from rakun import rakun
-from rakun.rakun import FunctionInfo, EventProcessor, MessageProcessor, Server
+from rk_core import rk_core
+from rk_core.rk_core import FunctionInfo, EventProcessor, MessageProcessor, Server, EventType, Event
 
-__doc__ = rakun.__doc__
-if hasattr(rakun, "__all__"):
-    __all__ = rakun.__all__
+__doc__ = rk_core.__doc__
+if hasattr(rk_core, "__all__"):
+    __all__ = rk_core.__all__
 
 logging.basicConfig(level=logging.CRITICAL)
 
-rakun_version = rakun.get_version()
+rakun_version = rk_core.get_version()
 logging.info(f"Rakun version: {rakun_version}")
 
 
@@ -28,15 +28,15 @@ class AgentWrapper:
         self.server.add_event_processor(
             EventProcessor("__event__processor__",
                            FunctionInfo(self.__event__processor__, True, 1),
-                           rakun.EventType.Start))
+                           EventType.Start))
         self.server.add_event_processor(
             EventProcessor("__data__processor__",
                            FunctionInfo(self.__data__processor__, True, 1),
-                           rakun.EventType.Data))
+                           EventType.Data))
         self.publisher = MessageProcessor()
         self.publisher.start()
 
-    async def __event__processor__(self, data: rakun.Event):
+    async def __event__processor__(self, data: Event):
         print(
             f"Received message to {self.agent.name}: {data.content} {data.creator} {data.event_type} {data.origin_type}")
 
@@ -45,7 +45,7 @@ class AgentWrapper:
             sleep_time = random.randint(5, 15)
             await asyncio.sleep(sleep_time)
 
-    async def __data__processor__(self, data: rakun.Event):
+    async def __data__processor__(self, data: Event):
         print(
             f"Received message to Data Processor {self.agent.name}: {data.content} {data.creator} {data.event_type} {data.origin_type}")
 

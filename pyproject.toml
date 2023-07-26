@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "rakun"
+name = "rk-core"
 version = "0.1.0"
 description = "Rakun Multi Agent System"
 authors = ["Ceylon AI <info@ceylon.ai>"]
@@ -19,7 +19,7 @@ requires = ["maturin>=1.1,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "rakun"
+name = "rk-core"
 requires-python = ">=3.7"
 classifiers = [
     "Programming Language :: Rust",

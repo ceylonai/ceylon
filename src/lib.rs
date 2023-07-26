@@ -30,7 +30,7 @@ fn get_version() -> String {
 
 /// A Python module implemented in Rust.
 #[pymodule]
-fn rakun(_py: Python, m: &PyModule) -> PyResult<()> {
+fn rk_core(_py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
     m.add_function(wrap_pyfunction!(get_version, m)?)?;
     m.add_function(wrap_pyfunction!(get_start_time, m)?)?;

@@ -1,6 +1,6 @@
 import logging
 
-import rakun
+import rk_core
 
 logging.basicConfig(level=logging.INFO)
 
@@ -24,7 +24,7 @@ class AgentBasic:
 
 
 if __name__ == '__main__':
-    agent_manager = rakun.AgentManager()
+    agent_manager = rk_core.AgentManager()
     agent_manager.register_agent(AgentBasic("AGENT1"))
     agent_manager.register_agent(AgentBasic("AGENT2"))
     agent_manager.register_agent(AgentBasic("AGENT3"))
