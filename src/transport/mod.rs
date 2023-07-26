@@ -4,7 +4,6 @@ use std::hash::{Hash, Hasher};
 use std::time::Duration;
 
 use futures::{future::Either, prelude::*};
-use futures::FutureExt;
 use libp2p::{
     core::{muxing::StreamMuxerBox, transport::OrTransport, upgrade},
     gossipsub, identity, mdns, noise,
@@ -14,16 +13,14 @@ use libp2p::{
 };
 use libp2p_quic as quic;
 use log::{error, info};
-use tokio::io::AsyncBufReadExt;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{
-    Sender,
     Receiver,
+    Sender,
 };
-use crate::types::{Event, OriginatorType, TransportStatus};
 
+use crate::types::TransportStatus;
 
-// for `.fuse()`
 mod p2p;
 
 
@@ -56,28 +53,6 @@ impl Transporter {
     }
 
     async fn send(&mut self, status: TransportStatus) {
-        // let (msg, status) = match status {
-        //     TransportStatus::Started => { ("Started".to_string(), "Ok".to_string()) }
-        //     TransportStatus::Stopped => { ("Stopped".to_string(), "Ok".to_string()) }
-        //     TransportStatus::Data(data) => { (data, "Data".to_string()) }
-        //     TransportStatus::Error(err) => { (err, "Error".to_string()) }
-        //     TransportStatus::Info(info) => { (info, "Info".to_string()) }
-        //     TransportStatus::PeerDiscovered(peer_id) => {
-        //         (peer_id, "PeerDiscovered".to_string())
-        //     }
-        //     TransportStatus::PeerConnected(peer_id) => {
-        //         (peer_id, "PeerConnected".to_string())
-        //     }
-        //     TransportStatus::PeerDisconnected(peer_id) => {
-        //         (peer_id, "PeerDisconnected".to_string())
-        //     }
-        // };
-        //
-        // let data_msg = DataMessage::new(
-        //     msg,
-        //     status,
-        //     "SYSTEM".to_string(),
-        //     DataMessagePublisher::System);
         match self.msg_tx.clone().send(status).await {
             Ok(_) => {
                 info!("Sent message");
@@ -93,7 +68,6 @@ impl Transporter {
     }
 
     pub async fn message_processor(&mut self) -> Result<(), Box<dyn Error>> {
-        self.send(TransportStatus::Started).await;
         // Create a random PeerId
         let id_keys = identity::Keypair::generate_ed25519();
         let local_peer_id = PeerId::from(id_keys.public());
@@ -136,7 +110,7 @@ impl Transporter {
         )
             .expect("Correct configuration");
         // Create a Gossipsub topic
-        let topic = gossipsub::IdentTopic::new("test-net");
+        let topic = gossipsub::IdentTopic::new("message-topic");
         // subscribes to our topic
         gossipsub.subscribe(&topic)?;
 
@@ -156,17 +130,20 @@ impl Transporter {
 
 
         let agent_tx = self.msg_tx.clone();
+        self.send(TransportStatus::Started).await;
         loop {
             tokio::select! {
             message = self.rx.recv() => {
                 if let Some(message) = message {
+                        println!("Received message HHHHHHH: {}", message);
                     if let Err(e) = swarm
                     .behaviour_mut().gossipsub
                     .publish(topic.clone(), message.as_bytes()) {
-                    error!("Publish error: {e:?}");
+                    println!("Publish error: {e:?}");
                 }
                 }
             }
+
             event = swarm.select_next_some() => match event {
                 SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
                     for (peer_id, _multiaddr) in list {
@@ -194,6 +171,8 @@ impl Transporter {
                 SwarmEvent::NewListenAddr { address, .. } => {
                         let status = format!("{address}");
                     self.send(TransportStatus::PeerConnected(status)).await;
+
+
                 }
                 _ => {}
             }

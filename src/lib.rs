@@ -26,12 +26,14 @@ fn get_version() -> String {
     env!("CARGO_PKG_VERSION").into()
 }
 
+
 /// A Python module implemented in Rust.
 #[pymodule]
 fn rakun(_py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
     m.add_function(wrap_pyfunction!(get_version, m)?)?;
     m.add_function(wrap_pyfunction!(get_start_time, m)?)?;
+    // m.add_function(wrap_pyfunction!(server::publish, m)?)?;
     // Classes
     m.add_class::<types::FunctionInfo>()?;
     m.add_class::<types::EventProcessor>()?;
@@ -39,6 +41,7 @@ fn rakun(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<types::EventType>()?;
     m.add_class::<types::OriginatorType>()?;
     m.add_class::<server::Server>()?;
+    m.add_class::<server::MessageProcessor>()?;
     pyo3::prepare_freethreaded_python();
     Ok(())
 }

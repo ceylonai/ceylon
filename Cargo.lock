@@ -1983,6 +1983,7 @@ dependencies = [
  "chrono",
  "env_logger",
  "futures",
+ "lazy_static",
  "libp2p",
  "libp2p-quic",
  "log",

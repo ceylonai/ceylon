@@ -1,16 +1,15 @@
 import asyncio
-import threading
+import logging
 import uuid
-from time import sleep
+from multiprocessing import allow_connection_pickling
 
 from rakun import rakun
-import logging
 
 __doc__ = rakun.__doc__
 if hasattr(rakun, "__all__"):
     __all__ = rakun.__all__
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.CRITICAL)
 
 rakun_version = rakun.get_version()
 logging.info(f"Rakun version: {rakun_version}")
@@ -23,22 +22,28 @@ class AgentWrapper:
         self.start_time = None
         self.server = rakun.Server(agent.name)
         self.count = 0
-
         evt_processor_fnc = rakun.FunctionInfo(self.__event__processor__, True, 1)
         evt_processor = rakun.EventProcessor(evt_processor_fnc, rakun.EventType.START)
-
         self.server.add_event_processor(evt_processor)
+        self.publisher = rakun.MessageProcessor()
+        self.publisher.start()
+
+    async def publish(self, message):
+        rakun.publish(message)
 
     async def __event__processor__(self, data: rakun.Event):
-        print(f"Received message: {data.content} {data.creator} {data.event_type} {data.origin_type}")
-        # if data and data.publisher == rakun.DataMessagePublisher.System:
-        #     print(f"Message From System Service: {data.message}")
-        #     if data.message == "Started":
-        #         while True:
-        #             await asyncio.sleep(5)
-        #             print(f"Process {self.id} is starting")
-        #             self.server.publish(f"Process {self.id} is starting")
+        print(
+            f"Received message to {self.agent.name}: {data.content} {data.creator} {data.event_type} {data.origin_type}")
+        # print(f"Process {self.id} is starting")
+        # await self.publish(f"Process {self.id} Send regartst")
+        # async def process(dt):
+        if data.event_type == rakun.EventType.START:
+            while True:
+                self.publisher.publish(f"Greeting from {self.id} {self.agent.name}")
+                await asyncio.sleep(5)
         #
+        # self.p.apply_async(process, (data,))
+        # # self.p.join()
         # self.count += 1
 
     def __start__(self):
@@ -75,13 +80,14 @@ class AgentManager:
 
     def start(self):
         logging.info("Starting Rakun.")
+        allow_connection_pickling()
 
         agents_thread = []
         for agent in self.agents:
-            t = threading.Thread(target=agent.start)
-            agents_thread.append(t)
-            t.start()
-            sleep(0.001)
+            agent.start()
+            # t = Process(target=agent.start)
+            # t.start()
+            # agents_thread.append(t)
 
         try:
             while True:

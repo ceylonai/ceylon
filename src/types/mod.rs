@@ -56,6 +56,7 @@ pub enum EventType {
     STOP,
     READY,
     MESSAGE,
+    SYSTEM_EVENT,
     DATA,
     ERROR,
 }
