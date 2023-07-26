@@ -43,7 +43,7 @@ impl MessageProcessor {
     }
 
     fn publish(&mut self, message: String) {
-        println!("Publishing message000000000000: {}", message);
+        println!("[Agent] Sent Dispatch Message to [MessageProcessor]-0: {}", message);
 
         //
         match self.msg_tx.send(message) {
@@ -93,6 +93,7 @@ impl Server {
         let msg_tx = self.msg_tx.clone();
         std::thread::spawn(move || {
             while let Ok(msg) = RX_TX.lock().unwrap().1.recv() {
+                println!("[MessageProcessor] Sent Dispatch Message to [Server]-1: {}", msg.clone());
                 msg_tx.lock().unwrap().send(msg).unwrap();
             }
         });

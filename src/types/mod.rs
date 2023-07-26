@@ -50,7 +50,7 @@ pub enum OriginatorType {
 }
 
 #[pyclass]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialOrd, PartialEq)]
 pub enum EventType {
     START,
     STOP,

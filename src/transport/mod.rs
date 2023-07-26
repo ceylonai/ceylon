@@ -2,6 +2,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::error::Error;
 use std::hash::{Hash, Hasher};
 use std::time::Duration;
+use chrono::Utc;
 
 use futures::{future::Either, prelude::*};
 use libp2p::{
@@ -135,10 +136,12 @@ impl Transporter {
             tokio::select! {
             message = self.rx.recv() => {
                 if let Some(message) = message {
-                        println!("Received message HHHHHHH: {}", message);
+                        println!("[Application] Sent Dispatch Message to [Transporter]-2: {}", message.clone());
+                        let current_time = Utc::now().clone().format("%Y-%m-%d %H:%M:%S.%f").to_string();
+                        let server_message = format!("{message} {current_time}");
                     if let Err(e) = swarm
                     .behaviour_mut().gossipsub
-                    .publish(topic.clone(), message.as_bytes()) {
+                    .publish(topic.clone(), server_message.as_bytes()) {
                     println!("Publish error: {e:?}");
                 }
                 }
@@ -165,7 +168,11 @@ impl Transporter {
                     message_id: _id,
                     message,
                 })) => {
-                    let status = format!("{message:?}");
+
+                        let data = String::from_utf8(message.data).unwrap();
+
+                    let status = format!("{data}");
+                        println!("[Transporter] Received Income Message from [Agent]-1: {}", status.clone());
                    self.send(TransportStatus::Data(status)).await;
                     },
                 SwarmEvent::NewListenAddr { address, .. } => {

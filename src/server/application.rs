@@ -10,7 +10,7 @@ pub(crate) struct Application {
     name: String,
     event_processors: Vec<EventProcessor>,
     task_locals: Option<TaskLocals>,
-    msg_rx: tokio::sync::watch::Receiver<String>,
+    msg_server_rx: tokio::sync::watch::Receiver<String>,
 }
 
 impl Application {
@@ -19,7 +19,7 @@ impl Application {
             name: name.to_string(),
             event_processors: Vec::new(),
             task_locals: None,
-            msg_rx,
+            msg_server_rx: msg_rx,
         }
     }
 
@@ -32,12 +32,13 @@ impl Application {
         let mut msg_porter = Transporter::new(tx.clone(), self.name.clone());
         let tx = msg_porter.get_tx();
 
-        let mut rxt = self.msg_rx.clone();
+        let mut msg_server_rx = self.msg_server_rx.clone();
         tokio::spawn(async move {
-            while let msg = rxt.changed().await {
+            while let msg = msg_server_rx.changed().await {
                 match msg {
                     Ok(msg) => {
-                        let data = rxt.borrow().to_string();
+                        let data = msg_server_rx.borrow().to_string();
+                        println!("[Server] Sent Dispatch Message to [Application]-2: {}", data.clone());
                         match tx.send(data).await {
                             Ok(_) => {
                                 info!("Sent message");
@@ -84,6 +85,10 @@ impl Application {
                         ("Ready".to_string(), EventType::START)
                     }
                 };
+
+                if status == EventType::DATA {
+                    println!("[Application] Received Income Message from [Transporter]-2: {}", msg.clone());
+                }
 
                 let event = Event::new(
                     msg,

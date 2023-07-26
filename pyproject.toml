@@ -6,6 +6,7 @@ authors = ["Ceylon AI <info@ceylon.ai>"]
 
 [tool.poetry.dependencies]
 python = "^3.11"
+coverage = "^7.2.7"
 
 [tool.poetry.dev-dependencies]
 maturin = "^1.1.0"

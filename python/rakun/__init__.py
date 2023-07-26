@@ -40,7 +40,7 @@ class AgentWrapper:
         if data.event_type == rakun.EventType.START:
             while True:
                 self.publisher.publish(f"Greeting from {self.id} {self.agent.name}")
-                await asyncio.sleep(5)
+                # await asyncio.sleep(5)
         #
         # self.p.apply_async(process, (data,))
         # # self.p.join()
