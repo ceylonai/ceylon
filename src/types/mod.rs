@@ -109,7 +109,7 @@ impl Event {
 pub enum TransportStatus {
     Started,
     Stopped,
-    Data(String),
+    Data(TransportMessage),
     Error(String),
     Info(String),
     PeerDiscovered(String),
@@ -117,26 +117,30 @@ pub enum TransportStatus {
     PeerDisconnected(String),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct TransportMessage {
+    pub sender_id: String,
+    pub sender: String,
     pub unique_id: String,
     pub data: String,
     pub dispatch_time: String,
 }
 
 impl TransportMessage {
-    fn new(data: String) -> Self {
+    fn new(data: String, sender_id: String, sender: String) -> Self {
         let dispatch_time = chrono::Utc::now().to_rfc3339();
         let unique_id = calculate_hash(&format!("{dispatch_time}{data}")).to_string();
         Self {
+            sender_id,
+            sender,
             unique_id,
             data,
             dispatch_time,
         }
     }
 
-    pub fn using_bytes(data: String) -> Vec<u8> {
-        let server_message = TransportMessage::new(data);
+    pub fn using_bytes(data: String, sender_id: String, sender: String) -> Vec<u8> {
+        let server_message = TransportMessage::new(data, sender_id, sender);
         let message_str = serde_json::to_string(&server_message).unwrap();
         message_str.into_bytes()
     }

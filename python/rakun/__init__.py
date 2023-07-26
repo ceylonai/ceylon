@@ -6,6 +6,7 @@ import random
 from threading import Thread
 
 from rakun import rakun
+from rakun.rakun import FunctionInfo, EventProcessor, MessageProcessor, Server
 
 __doc__ = rakun.__doc__
 if hasattr(rakun, "__all__"):
@@ -22,27 +23,31 @@ class AgentWrapper:
         self.id = uuid.uuid4()
         self.agent = agent
         self.start_time = None
-        self.server = rakun.Server(agent.name)
+        self.server = Server(agent.name)
         self.count = 0
-        evt_processor_fnc = rakun.FunctionInfo(self.__event__processor__, True, 1)
-        evt_processor = rakun.EventProcessor("__event__processor__", evt_processor_fnc, rakun.EventType.Start)
-        self.server.add_event_processor(evt_processor)
-        self.publisher = rakun.MessageProcessor()
+        self.server.add_event_processor(
+            EventProcessor("__event__processor__",
+                           FunctionInfo(self.__event__processor__, True, 1),
+                           rakun.EventType.Start))
+        self.server.add_event_processor(
+            EventProcessor("__data__processor__",
+                           FunctionInfo(self.__data__processor__, True, 1),
+                           rakun.EventType.Data))
+        self.publisher = MessageProcessor()
         self.publisher.start()
 
-    async def publish(self, message):
-        rakun.publish(message)
-
     async def __event__processor__(self, data: rakun.Event):
-        if data.event_type == rakun.EventType.Data:
-            print(
-                f"Received message to {self.agent.name}: {data.content} {data.creator} {data.event_type} {data.origin_type}")
+        print(
+            f"Received message to {self.agent.name}: {data.content} {data.creator} {data.event_type} {data.origin_type}")
 
-        if data.event_type == rakun.EventType.Start:
-            while True:
-                self.publisher.publish(f"Greeting from {self.id} {self.agent.name}")
-                sleep_time = random.randint(5, 15)
-                await asyncio.sleep(sleep_time)
+        while True:
+            self.publisher.publish(f"Greeting from {self.id} {self.agent.name}")
+            sleep_time = random.randint(5, 15)
+            await asyncio.sleep(sleep_time)
+
+    async def __data__processor__(self, data: rakun.Event):
+        print(
+            f"Received message to Data Processor {self.agent.name}: {data.content} {data.creator} {data.event_type} {data.origin_type}")
 
     def __start__(self):
         self.server.start()
