@@ -25,7 +25,7 @@ class AgentWrapper:
         self.server = rakun.Server(agent.name)
         self.count = 0
         evt_processor_fnc = rakun.FunctionInfo(self.__event__processor__, True, 1)
-        evt_processor = rakun.EventProcessor("__event__processor__", evt_processor_fnc, rakun.EventType.START)
+        evt_processor = rakun.EventProcessor("__event__processor__", evt_processor_fnc, rakun.EventType.Start)
         self.server.add_event_processor(evt_processor)
         self.publisher = rakun.MessageProcessor()
         self.publisher.start()
@@ -34,11 +34,11 @@ class AgentWrapper:
         rakun.publish(message)
 
     async def __event__processor__(self, data: rakun.Event):
-        if data.event_type == rakun.EventType.DATA:
+        if data.event_type == rakun.EventType.Data:
             print(
                 f"Received message to {self.agent.name}: {data.content} {data.creator} {data.event_type} {data.origin_type}")
 
-        if data.event_type == rakun.EventType.START:
+        if data.event_type == rakun.EventType.Start:
             while True:
                 self.publisher.publish(f"Greeting from {self.id} {self.agent.name}")
                 sleep_time = random.randint(5, 15)

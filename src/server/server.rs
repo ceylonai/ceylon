@@ -10,9 +10,12 @@ use crate::transport::p2p::P2PTransporter;
 use crate::types::EventProcessor;
 
 lazy_static! {
-    pub static ref RX_TX: Arc<Mutex<(std::sync::mpsc::Sender<String>,
-        std::sync::mpsc::Receiver<String>)>>
-    = Arc::new(Mutex::new(std::sync::mpsc::channel::<String>()));
+    pub static ref RX_TX: Arc<
+        Mutex<(
+            std::sync::mpsc::Sender<String>,
+            std::sync::mpsc::Receiver<String>
+        )>,
+    > = Arc::new(Mutex::new(std::sync::mpsc::channel::<String>()));
 }
 
 #[pyclass]
@@ -43,7 +46,10 @@ impl MessageProcessor {
     }
 
     fn publish(&mut self, message: String) {
-        debug!("[Agent] Sent Dispatch Message to [MessageProcessor]-0: {}", message);
+        debug!(
+            "[Agent] Sent Dispatch Message to [MessageProcessor]-0: {}",
+            message
+        );
         match self.msg_tx.send(message) {
             Ok(_) => {
                 debug!("Sent message");
@@ -54,7 +60,6 @@ impl MessageProcessor {
         };
     }
 }
-
 
 #[pyclass]
 pub struct Server {
@@ -72,35 +77,35 @@ impl Server {
             msg_tx: Arc::new(Mutex::new(msg_tx)),
         }
     }
-    pub fn start(
-        &mut self,
-        py: Python
-    ) -> PyResult<()> {
+    pub fn start(&mut self, py: Python) -> PyResult<()> {
         let application = self.application.clone();
         let asyncio = py.import("asyncio")?;
         let event_loop = asyncio.call_method0("new_event_loop")?;
-        asyncio.call_method1("set_event_loop", (event_loop, ))?;
+        asyncio.call_method1("set_event_loop", (event_loop,))?;
 
         let task_locals = pyo3_asyncio::TaskLocals::new(event_loop).copy_context(py)?;
 
         let msg_tx = self.msg_tx.clone();
         std::thread::spawn(move || {
             while let Ok(msg) = RX_TX.lock().unwrap().1.recv() {
-                debug!("[MessageProcessor] Sent Dispatch Message to [Server]-1: {}", msg.clone());
+                debug!(
+                    "[MessageProcessor] Sent Dispatch Message to [Server]-1: {}",
+                    msg.clone()
+                );
                 msg_tx.lock().unwrap().send(msg).unwrap();
             }
         });
-
 
         std::thread::spawn(move || {
             let mut application = application.lock().unwrap();
             application.initialize(task_locals.clone());
 
-            tokio::runtime::Runtime::new().unwrap().block_on(async move {
-                application.start::<P2PTransporter>().await;
-            })
+            tokio::runtime::Runtime::new()
+                .unwrap()
+                .block_on(async move {
+                    application.start::<P2PTransporter>().await;
+                })
         });
-
 
         let event_loop = (*event_loop).call_method0("run_forever");
         if event_loop.is_err() {

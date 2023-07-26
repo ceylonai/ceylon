@@ -64,59 +64,37 @@ impl Application {
             let _mh = message_handlers.clone();
             while let Some(status) = rx.recv().await {
                 let (msg, status) = match status {
-                    TransportStatus::Data(data) => {
-                        (data, EventType::DATA)
-                    }
-                    TransportStatus::Error(err) => {
-                        (err, EventType::ERROR)
-                    }
-                    TransportStatus::Info(info) => {
-                        (info, EventType::MESSAGE)
-                    }
-                    TransportStatus::PeerDiscovered(peer_id) => {
-                        (peer_id, EventType::SYSTEM_EVENT)
-                    }
-                    TransportStatus::PeerConnected(peer_id) => {
-                        (peer_id, EventType::SYSTEM_EVENT)
-                    }
-                    TransportStatus::PeerDisconnected(peer_id) => {
-                        (peer_id, EventType::SYSTEM_EVENT)
-                    }
-                    TransportStatus::Stopped => {
-                        ("Stopped".to_string(), EventType::STOP)
-                    }
-                    TransportStatus::Started => {
-                        ("Ready".to_string(), EventType::START)
-                    }
+                    TransportStatus::Data(data) => (data, EventType::Data),
+                    TransportStatus::Error(err) => (err, EventType::Error),
+                    TransportStatus::Info(info) => (info, EventType::Message),
+                    TransportStatus::PeerDiscovered(peer_id) => (peer_id, EventType::SystemEvent),
+                    TransportStatus::PeerConnected(peer_id) => (peer_id, EventType::SystemEvent),
+                    TransportStatus::PeerDisconnected(peer_id) => (peer_id, EventType::SystemEvent),
+                    TransportStatus::Stopped => ("Stopped".to_string(), EventType::Stop),
+                    TransportStatus::Started => ("Ready".to_string(), EventType::Start),
                 };
 
-                if status == EventType::DATA {
-                    debug!("[Application] Received Income Message from [Transporter]-2: {}", msg.clone());
+                if status == EventType::Data {
+                    debug!(
+                        "[Application] Received Income Message from [Transporter]-2: {}",
+                        msg.clone()
+                    );
                 }
 
-                let event = Event::new(
-                    msg,
-                    status,
-                    "SYSTEM".to_string(),
-                    OriginatorType::System,
-                );
+                let event = Event::new(msg, status, "SYSTEM".to_string(), OriginatorType::System);
 
-                let input = Python::with_gil(|py| {
-                    event.clone().into_py(py)
-                });
+                let input = Python::with_gil(|py| event.clone().into_py(py));
 
                 for mp in message_processors.iter() {
                     let input_copy = input.clone();
                     let tlc = task_locals_copy.clone();
                     let mp2 = mp.clone();
                     tokio::spawn(async move {
-                        match execute_process_function(input_copy.clone(), &mp2.function, &tlc).await {
-                            Ok(_) => (
-                                info!("Server starting..."),
-                            ),
-                            Err(e) => (
-                                debug!("error 55 {}", e),
-                            )
+                        match execute_process_function(input_copy.clone(), &mp2.function, &tlc)
+                            .await
+                        {
+                            Ok(_) => (info!("Server starting..."),),
+                            Err(e) => (debug!("error 55 {}", e),),
                         };
                     });
                 }

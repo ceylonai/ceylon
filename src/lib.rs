@@ -3,21 +3,23 @@ use std::cell::RefCell;
 use chrono::{DateTime, Utc};
 use pyo3::prelude::*;
 
-mod server;
-mod types;
 mod executor;
+mod server;
 mod transport;
+mod types;
 
 thread_local! {
     static START_TIME: RefCell<DateTime<Utc>> = RefCell::new(Utc::now());
 }
 
-
 /// Formats the sum of two numbers as string.
 #[pyfunction]
 fn get_start_time() -> PyResult<String> {
     let start_time = START_TIME.with(|start_time| *start_time.borrow());
-    println!(" Start time: {}", start_time.format("%Y-%m-%d %H:%M:%S.%f").to_string());
+    println!(
+        " Start time: {}",
+        start_time.format("%Y-%m-%d %H:%M:%S.%f").to_string()
+    );
     Ok(start_time.format("%Y-%m-%d %H:%M:%S.%f").to_string())
 }
 
@@ -25,7 +27,6 @@ fn get_start_time() -> PyResult<String> {
 fn get_version() -> String {
     env!("CARGO_PKG_VERSION").into()
 }
-
 
 /// A Python module implemented in Rust.
 #[pymodule]

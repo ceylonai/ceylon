@@ -1,7 +1,7 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
-use pyo3::{Py, PyAny, pyclass, pymethods};
+use pyo3::{pyclass, pymethods, Py, PyAny};
 use serde::{Deserialize, Serialize};
 
 #[pyclass]
@@ -26,7 +26,6 @@ impl FunctionInfo {
         }
     }
 }
-
 
 #[pyclass]
 #[derive(Debug, Clone)]
@@ -58,13 +57,13 @@ pub enum OriginatorType {
 #[pyclass]
 #[derive(Debug, Clone, PartialOrd, PartialEq)]
 pub enum EventType {
-    START,
-    STOP,
-    READY,
-    MESSAGE,
-    SYSTEM_EVENT,
-    DATA,
-    ERROR,
+    Start,
+    Stop,
+    Ready,
+    Message,
+    SystemEvent,
+    Data,
+    Error,
 }
 
 #[pyclass]
@@ -90,10 +89,12 @@ pub struct Event {
 #[pymethods]
 impl Event {
     #[new]
-    pub fn new(content: String,
-               event_type: EventType,
-               creator: String,
-               origin_type: OriginatorType) -> Self {
+    pub fn new(
+        content: String,
+        event_type: EventType,
+        creator: String,
+        origin_type: OriginatorType,
+    ) -> Self {
         let dispatch_time = chrono::Utc::now().to_rfc3339();
         Self {
             content,

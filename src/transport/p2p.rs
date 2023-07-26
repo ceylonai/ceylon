@@ -1,29 +1,24 @@
+use async_trait::async_trait;
 use std::collections::hash_map::DefaultHasher;
 use std::error::Error;
 use std::hash::{Hash, Hasher};
 use std::time::Duration;
-use async_trait::async_trait;
 
+use crate::transport::Transporter;
 use futures::{future::Either, prelude::*};
+use libp2p::swarm::NetworkBehaviour;
 use libp2p::{
     core::{muxing::StreamMuxerBox, transport::OrTransport, upgrade},
     gossipsub, identity, mdns, noise,
-    PeerId,
     swarm::{SwarmBuilder, SwarmEvent},
-    tcp, Transport, yamux,
+    tcp, yamux, PeerId, Transport,
 };
-use libp2p::swarm::NetworkBehaviour;
 use libp2p_quic as quic;
 use log::{debug, error};
 use tokio::sync::mpsc;
-use tokio::sync::mpsc::{
-    Receiver,
-    Sender,
-};
-use crate::transport::Transporter;
+use tokio::sync::mpsc::{Receiver, Sender};
 
 use crate::types::{TransportMessage, TransportStatus};
-
 
 // We create a custom network behaviour that combines Gossipsub and Mdns.
 #[derive(NetworkBehaviour)]
@@ -37,6 +32,7 @@ pub struct P2PTransporter {
     rx: Receiver<String>,
     tx: Sender<String>,
     msg_tx: Sender<TransportStatus>,
+    connected_peers: Vec<PeerId>,
 }
 
 impl P2PTransporter {
@@ -54,16 +50,14 @@ impl P2PTransporter {
 
 #[async_trait]
 impl Transporter for P2PTransporter {
-    fn new(
-        msg_tx: Sender<TransportStatus>,
-        owner: String,
-    ) -> Self {
+    fn new(msg_tx: Sender<TransportStatus>, owner: String) -> Self {
         let (tx, rx) = mpsc::channel(32);
         Self {
             rx,
             tx,
             msg_tx,
             owner,
+            connected_peers: Vec::new(),
         }
     }
 
@@ -81,7 +75,9 @@ impl Transporter for P2PTransporter {
         // Set up an encrypted DNS-enabled TCP Transport over the yamux protocol.
         let tcp_transport = tcp::tokio::Transport::new(tcp::Config::default().nodelay(true))
             .upgrade(upgrade::Version::V1Lazy)
-            .authenticate(noise::Config::new(&id_keys).expect("signing libp2p-noise static keypair"))
+            .authenticate(
+                noise::Config::new(&id_keys).expect("signing libp2p-noise static keypair"),
+            )
             .multiplex(yamux::Config::default())
             .timeout(std::time::Duration::from_secs(20))
             .boxed();
@@ -126,62 +122,67 @@ impl Transporter for P2PTransporter {
             SwarmBuilder::with_tokio_executor(transport, behaviour, local_peer_id).build()
         };
 
-
         // Listen on all interfaces and whatever port the OS assigns
         swarm.listen_on("/ip4/0.0.0.0/udp/0/quic-v1".parse()?)?;
         swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse()?)?;
 
         debug!("Enter messages via STDIN and they will be sent to connected peers using Gossipsub");
 
-
-        self.send(TransportStatus::Started).await;
+        self.send(TransportStatus::Info("Started".to_string())).await;
         loop {
             tokio::select! {
-            message = self.rx.recv() => {
-                if let Some(message) = message {
-                        debug!("[Application] Sent Dispatch Message to [Transporter]-2: {}", message.clone());
-                        let server_message = TransportMessage::using_bytes(message.clone());
-                    if let Err(e) = swarm
-                    .behaviour_mut().gossipsub
-                    .publish(topic.clone(),server_message) {
-                    debug!("Publish error: {e:?}");
-                }
-                }
-            }
-
-            event = swarm.select_next_some() => match event {
-                SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
-                    for (peer_id, _multiaddr) in list {
-                        let status = format!("{peer_id}");
-                        self.send(TransportStatus::PeerDiscovered(status)).await;
-                        swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
+                message = self.rx.recv() => {
+                    if let Some(message) = message {
+                            debug!("[Application] Sent Dispatch Message to [Transporter]-2: {}", message.clone());
+                            let server_message = TransportMessage::using_bytes(message.clone());
+                        if let Err(e) = swarm
+                        .behaviour_mut().gossipsub
+                        .publish(topic.clone(),server_message) {
+                            debug!("Publish error: {e:?}");
+                            self.send(TransportStatus::Error(format!("{e:?}"))).await;
+                        }
                     }
-                },
-                SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
-                    for (peer_id, _multiaddr) in list {
-                        let status = format!("{peer_id}");
-                       self.send(TransportStatus::PeerDisconnected(status)).await;
-                        swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
+                }
 
-                    }
-                },
-                SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Message {
-                    propagation_source: _peer_id,
-                    message_id: _id,
-                    message,})) => {
-                        let data_message = TransportMessage::from_bytes(message.data);
-
-                        let status =data_message.data;
-                                debug!("[Transporter] Received Income Message from [Agent]-1: {}", status.clone());
-                        self.send(TransportStatus::Data(status)).await;
+                event = swarm.select_next_some() => match event {
+                    SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
+                        for (peer_id, _multiaddr) in list {
+                            let status = format!("{peer_id}");
+                            self.send(TransportStatus::PeerDiscovered(status)).await;
+                            swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
+                            self.connected_peers.push(peer_id);
+                            if self.connected_peers.len() == 1 {
+                                self.send(TransportStatus::Started).await;
+                            }
+                        }
                     },
-                SwarmEvent::NewListenAddr { address, .. } => {
-                        let status = format!("{address}");
-                        self.send(TransportStatus::PeerConnected(status)).await;
+                    SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
+                        for (peer_id, _multiaddr) in list {
+                            let status = format!("{peer_id}");
+                           self.send(TransportStatus::PeerDisconnected(status)).await;
+                            swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
+                            self.connected_peers.remove(self.connected_peers.iter().position(|x| x == &peer_id).unwrap());
+                            if self.connected_peers.len() == 0 {
+                                self.send(TransportStatus::Stopped).await;
+                            }
+                        }
+                    },
+                    SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Message {
+                        propagation_source: _peer_id,
+                        message_id: _id,
+                        message,})) => {
+                            let data_message = TransportMessage::from_bytes(message.data);
+                            let status =data_message.data;
+                                    debug!("[Transporter] Received Income Message from [Agent]-1: {}", status.clone());
+                            self.send(TransportStatus::Data(status)).await;
+                        },
+                    SwarmEvent::NewListenAddr { address, .. } => {
+                            let status = format!("{address}");
+                            self.send(TransportStatus::PeerConnected(status)).await;
+                    }
+                    _ => {}
                 }
-                _ => {}
             }
-        }
         }
     }
 }
