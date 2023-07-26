@@ -5,6 +5,8 @@ use log::{debug, info};
 use pyo3::{pyclass, pymethods};
 // pyO3 module
 use pyo3::prelude::*;
+use crate::transport::p2p::P2PTransporter;
+use crate::transport::Transporter;
 
 use crate::types::{EventProcessor, FunctionInfo};
 
@@ -103,7 +105,7 @@ impl Server {
             application.initialize(task_locals.clone());
 
             tokio::runtime::Runtime::new().unwrap().block_on(async move {
-                application.start().await;
+                application.start::<P2PTransporter>().await;
             })
         });
 

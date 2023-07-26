@@ -1,3 +1,4 @@
+use libp2p::Transport;
 use log::{debug, info};
 use pyo3::{IntoPy, Python};
 use pyo3_asyncio::TaskLocals;
@@ -6,7 +7,7 @@ use crate::executor::execute_process_function;
 use crate::transport::Transporter;
 use crate::types::{Event, EventProcessor, EventType, OriginatorType, TransportStatus};
 
-pub(crate) struct Application {
+pub struct Application {
     name: String,
     event_processors: Vec<EventProcessor>,
     task_locals: Option<TaskLocals>,
@@ -23,13 +24,13 @@ impl Application {
         }
     }
 
-    pub async fn start(&mut self) {
+    pub async fn start<T: Transporter>(&mut self) {
         debug!("Starting application: {}", self.name);
         let task_locals_copy = self.task_locals.clone().unwrap();
         let message_handlers = self.event_processors.clone();
 
         let (tx, mut rx) = tokio::sync::mpsc::channel(100);
-        let mut msg_porter = Transporter::new(tx.clone(), self.name.clone());
+        let mut msg_porter = T::new(tx.clone(), self.name.clone());
         let tx = msg_porter.get_tx();
 
         let mut msg_server_rx = self.msg_server_rx.clone();
