@@ -1,8 +1,5 @@
 import asyncio
-import functools
 import logging
-import random
-import types
 import uuid
 from multiprocessing import allow_connection_pickling
 from threading import Thread
@@ -66,11 +63,10 @@ class AgentWrapper:
         self.publisher = MessageProcessor()
 
         ProcessorWrapper.fill_agent(self.agent)
-
         for dm in self.agent.decorated_methods:
             name, args, event_type, function = dm
             fnc_info = FunctionInfo(function, True, len(args))
-            ep = EventProcessor(name, fnc_info, event_type)
+            ep = EventProcessor(name, f"{self.id}", fnc_info, event_type)
             self.server.add_event_processor(ep)
         self.publisher = MessageProcessor()
         self.publisher.start()
@@ -81,7 +77,6 @@ class AgentWrapper:
 
     def start(self):
         self.__start__()
-        # asyncio.run(self.__start__())
 
     def stop(self):
         evt = asyncio.get_event_loop()
@@ -119,10 +114,10 @@ class AgentManager:
             t.start()
             agents_thread.append(t)
 
-        try:
-            while True:
-                pass
-        except KeyboardInterrupt:
-            print("Stopping Rakun...")
-            for agent in self.agents:
-                agent.stop()
+        # try:
+        #     while True:
+        #         pass
+        # except KeyboardInterrupt:
+        #     print("Stopping Rakun...")
+        #     for agent in self.agents:
+        #         agent.stop()

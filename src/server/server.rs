@@ -46,13 +46,13 @@ impl MessageProcessor {
     }
 
     fn publish(&mut self, message: String) {
-        debug!(
+        info!(
             "[Agent] Sent Dispatch Message to [MessageProcessor]-0: {}",
             message
         );
-        match self.msg_tx.send(message) {
+        match self.msg_tx.send(message.clone()) {
             Ok(_) => {
-                debug!("Sent message");
+                info!("Sent message to [MessageProcessor]");
             }
             Err(e) => {
                 debug!("error 33 {}", e);

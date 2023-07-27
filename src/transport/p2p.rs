@@ -14,7 +14,7 @@ use libp2p::{
     tcp, yamux, PeerId, Transport,
 };
 use libp2p_quic as quic;
-use log::{debug, error};
+use log::{debug, error, info};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
 
@@ -70,7 +70,7 @@ impl Transporter for P2PTransporter {
         // Create a random PeerId
         let id_keys = identity::Keypair::generate_ed25519();
         let local_peer_id = PeerId::from(id_keys.public());
-        debug!("Local peer id: {local_peer_id} {owner}");
+        info!("Local peer id: {local_peer_id} {owner}");
 
         // Set up an encrypted DNS-enabled TCP Transport over the yamux protocol.
         let tcp_transport = tcp::tokio::Transport::new(tcp::Config::default().nodelay(true))
@@ -150,8 +150,9 @@ impl Transporter for P2PTransporter {
                             let status = format!("{peer_id}");
                             self.send(TransportStatus::PeerDiscovered(status)).await;
                             swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
+                            let is_connected = self.connected_peers.contains(&peer_id);
                             self.connected_peers.push(peer_id);
-                            if self.connected_peers.len() == 1 {
+                            if self.connected_peers.len() == 1 && !is_connected {
                                 self.send(TransportStatus::Started).await;
                             }
                         }
@@ -172,10 +173,11 @@ impl Transporter for P2PTransporter {
                         message_id: _id,
                         message,})) => {
                             let data_message_log = TransportMessage::from_bytes(message.data.clone());
-                            debug!("[Transporter] Received Income Message from [Agent]-1: {}", data_message_log.data.clone());
-
-                            let data_message = TransportMessage::from_bytes(message.data.clone());
-                            self.send(TransportStatus::Data(data_message.clone())).await;
+                            if data_message_log.sender_id != local_peer_id.to_string() {
+                                info!("[Transporter] Received Income Message from [Agent]-1: {} {}", data_message_log.sender_id,local_peer_id.to_string());
+                                let data_message = TransportMessage::from_bytes(message.data.clone());
+                                self.send(TransportStatus::Data(data_message.clone())).await;
+                            }
                         },
                     SwarmEvent::NewListenAddr { address, .. } => {
                             let status = format!("{address}");

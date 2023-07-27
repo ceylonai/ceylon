@@ -30,6 +30,7 @@ impl FunctionInfo {
 #[pyclass]
 #[derive(Debug, Clone)]
 pub struct EventProcessor {
+    pub owner_id: String,
     pub name: String,
     pub function: FunctionInfo,
     pub event: EventType,
@@ -38,8 +39,9 @@ pub struct EventProcessor {
 #[pymethods]
 impl EventProcessor {
     #[new]
-    pub fn new(name: String, function: FunctionInfo, event: EventType) -> Self {
+    pub fn new(name: String, id: String, function: FunctionInfo, event: EventType) -> Self {
         Self {
+            owner_id: id,
             name,
             function,
             event,

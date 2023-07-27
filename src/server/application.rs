@@ -24,7 +24,7 @@ impl Application {
     }
 
     pub async fn start<T: Transporter>(&mut self) {
-        debug!("Starting application: {}", self.name);
+        info!("Starting application: {}", self.name);
         let task_locals_copy = self.task_locals.clone().unwrap();
         let message_handlers = self.event_processors.clone();
 
@@ -85,13 +85,15 @@ impl Application {
                 };
 
                 let input = Python::with_gil(|py| event.clone().into_py(py));
+                let mut threads = Vec::new();
                 for mp in message_processors.iter() {
                     // println!("Processing message {:?}, {:?} , {:?}", event.event_type, mp.event, mp.event != event.event_type);
                     if mp.event != event.event_type { continue; }
+                    info!("Processing message {:?}, {:?} , {:?} {} - {}", event.event_type, mp.event, mp.event != event.event_type, event.creator_id, mp.owner_id);
                     let input_copy = input.clone();
                     let tlc = task_locals_copy.clone();
                     let mp2 = mp.clone();
-                    tokio::spawn(async move {
+                    let t1 = tokio::spawn(async move {
                         match execute_process_function(input_copy.clone(), &mp2.function, &tlc)
                             .await
                         {
@@ -99,6 +101,11 @@ impl Application {
                             Err(e) => (debug!("error 55 {}", e), ),
                         };
                     });
+                    threads.push(t1);
+                }
+                for t in threads {
+                    println!("Waiting for thread");
+                    t.await.unwrap();
                 }
                 debug!("Processing message released");
             }
