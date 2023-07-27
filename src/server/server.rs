@@ -1,36 +1,38 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use lazy_static::lazy_static;
 use log::{debug, info};
-use pyo3::{pyclass, pymethods, PyResult, Python};
-// pyO3 module
+use pyo3::{PyAny, pyclass, pymethods, PyResult, Python};
+use tokio::sync::Mutex;
 
 use crate::server::application;
 use crate::transport::p2p::P2PTransporter;
 use crate::types::EventProcessor;
 
+// pyO3 module
+
 lazy_static! {
     pub static ref RX_TX: Arc<
-        Mutex<(
-            std::sync::mpsc::Sender<String>,
-            std::sync::mpsc::Receiver<String>
+        std::sync::Mutex<(
+            tokio::sync::mpsc::Sender<String>,
+            tokio::sync::mpsc::Receiver<String>
         )>,
-    > = Arc::new(Mutex::new(std::sync::mpsc::channel::<String>()));
+    > = Arc::new( std::sync::Mutex::new(tokio::sync::mpsc::channel::<String>(100)));
 }
 
 #[pyclass]
 pub struct MessageProcessor {
-    pub msg_tx: std::sync::mpsc::Sender<String>,
-    pub msg_rx: Arc<Mutex<std::sync::mpsc::Receiver<String>>>,
+    pub msg_tx: Arc<Mutex<tokio::sync::mpsc::Sender<String>>>,
+    pub msg_rx: Arc<Mutex<tokio::sync::mpsc::Receiver<String>>>,
 }
 
 #[pymethods]
 impl MessageProcessor {
     #[new]
     fn new() -> Self {
-        let (msg_tx, msg_rx) = std::sync::mpsc::channel::<String>();
+        let (msg_tx, msg_rx) = tokio::sync::mpsc::channel::<String>(100);
         Self {
-            msg_tx,
+            msg_tx: Arc::new(Mutex::new(msg_tx)),
             msg_rx: Arc::new(Mutex::new(msg_rx)),
         }
     }
@@ -39,32 +41,33 @@ impl MessageProcessor {
         let app_rx = self.msg_rx.clone();
         let app_tx = RX_TX.lock().unwrap().0.clone();
         std::thread::spawn(move || {
-            while let Ok(msg) = app_rx.lock().unwrap().recv() {
-                app_tx.send(msg).unwrap();
-            }
+            tokio::runtime::Runtime::new().unwrap().block_on(async move {
+                let mut app_rx = app_rx.lock().await;
+                while let msg = app_rx.recv().await.unwrap() {
+                    app_tx.send(msg).await.unwrap();
+                }
+            })
         });
     }
 
-    fn publish(&mut self, message: String) {
+    pub fn publish<'a>(&'a mut self, py: Python<'a>, message: String) -> PyResult<&'a PyAny> {
         info!(
             "[Agent] Sent Dispatch Message to [MessageProcessor]-0: {}",
             message
         );
-        match self.msg_tx.send(message.clone()) {
-            Ok(_) => {
-                info!("Sent message to [MessageProcessor]");
-            }
-            Err(e) => {
-                debug!("error 33 {}", e);
-            }
-        };
+
+        let msg_server_rx = self.msg_tx.clone();
+        pyo3_asyncio::tokio::future_into_py(py, async move {
+            msg_server_rx.lock().await.send(message.clone()).await.unwrap();
+            Ok(Python::with_gil(|py| py.None()))
+        })
     }
 }
 
 #[pyclass]
 pub struct Server {
-    application: Arc<Mutex<application::Application>>,
-    msg_tx: Arc<Mutex<tokio::sync::watch::Sender<String>>>,
+    application: Arc<std::sync::Mutex<application::Application>>,
+    msg_tx: Arc<std::sync::Mutex<tokio::sync::watch::Sender<String>>>,
 }
 
 #[pymethods]
@@ -73,27 +76,29 @@ impl Server {
     pub fn new(name: &str) -> Self {
         let (msg_tx, msg_rx) = tokio::sync::watch::channel::<String>("".to_string());
         Self {
-            application: Arc::new(Mutex::new(application::Application::new(name, msg_rx))),
-            msg_tx: Arc::new(Mutex::new(msg_tx)),
+            application: Arc::new(std::sync::Mutex::new(application::Application::new(name, msg_rx))),
+            msg_tx: Arc::new(std::sync::Mutex::new(msg_tx)),
         }
     }
     pub fn start(&mut self, py: Python) -> PyResult<()> {
         let application = self.application.clone();
         let asyncio = py.import("asyncio")?;
         let event_loop = asyncio.call_method0("new_event_loop")?;
-        asyncio.call_method1("set_event_loop", (event_loop,))?;
+        asyncio.call_method1("set_event_loop", (event_loop, ))?;
 
         let task_locals = pyo3_asyncio::TaskLocals::new(event_loop).copy_context(py)?;
 
         let msg_tx = self.msg_tx.clone();
         std::thread::spawn(move || {
-            while let Ok(msg) = RX_TX.lock().unwrap().1.recv() {
-                debug!(
-                    "[MessageProcessor] Sent Dispatch Message to [Server]-1: {}",
-                    msg.clone()
-                );
-                msg_tx.lock().unwrap().send(msg).unwrap();
-            }
+            tokio::runtime::Runtime::new().unwrap().block_on(async move {
+                while let msg = RX_TX.lock().unwrap().1.recv().await.unwrap() {
+                    debug!(
+                        "[MessageProcessor] Sent Dispatch Message to [Server]-1: {}",
+                        msg.clone()
+                    );
+                    msg_tx.lock().unwrap().send(msg).unwrap();
+                }
+            })
         });
 
         std::thread::spawn(move || {
@@ -109,7 +114,7 @@ impl Server {
 
         let event_loop = (*event_loop).call_method0("run_forever");
         if event_loop.is_err() {
-            debug!("Ctrl c handler");
+            println!("Ctrl c handler");
             info!("{}", event_loop.err().unwrap());
 
             let mut application = self.application.lock().unwrap();

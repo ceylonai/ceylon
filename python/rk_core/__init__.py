@@ -3,6 +3,7 @@ import logging
 import uuid
 from multiprocessing import allow_connection_pickling
 from threading import Thread
+from time import sleep
 
 from rk_core.rk_core import FunctionInfo, EventProcessor, MessageProcessor, Server, EventType, Event
 
@@ -16,6 +17,10 @@ logging.basicConfig(level=logging.CRITICAL)
 
 rakun_version = rk_core.get_version()
 logging.info(f"Rakun version: {rakun_version}")
+
+import tracemalloc
+
+tracemalloc.start()
 
 
 class ProcessorWrapper:
@@ -58,6 +63,8 @@ class AgentWrapper:
         self.id = uuid.uuid4()
         self.agent = agent
         self.start_time = None
+
+        self.publisher = MessageProcessor()
         self.server = Server(agent.name)
         self.agent.decorated_methods = []
         self.publisher = MessageProcessor()
@@ -68,7 +75,6 @@ class AgentWrapper:
             fnc_info = FunctionInfo(function, True, len(args))
             ep = EventProcessor(name, f"{self.id}", fnc_info, event_type)
             self.server.add_event_processor(ep)
-        self.publisher = MessageProcessor()
         self.publisher.start()
         self.agent.publisher = self.publisher
 
@@ -113,6 +119,7 @@ class AgentManager:
             t = Thread(target=agent.start)
             t.start()
             agents_thread.append(t)
+            # sleep(1)
 
         # try:
         #     while True:
