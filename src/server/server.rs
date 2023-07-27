@@ -1,7 +1,7 @@
-use std::sync::Arc;
+use std::sync::{Arc, LockResult};
 
 use lazy_static::lazy_static;
-use log::{debug, info};
+use log::{debug, error, info};
 use pyo3::{PyAny, pyclass, pymethods, PyResult, Python};
 use tokio::sync::Mutex;
 
@@ -42,8 +42,7 @@ impl MessageProcessor {
         let app_tx = RX_TX.lock().unwrap().0.clone();
         std::thread::spawn(move || {
             tokio::runtime::Runtime::new().unwrap().block_on(async move {
-                let mut app_rx = app_rx.lock().await;
-                while let msg = app_rx.recv().await.unwrap() {
+                while let msg = app_rx.lock().await.recv().await.unwrap() {
                     app_tx.send(msg).await.unwrap();
                 }
             })
@@ -96,7 +95,22 @@ impl Server {
                         "[MessageProcessor] Sent Dispatch Message to [Server]-1: {}",
                         msg.clone()
                     );
-                    msg_tx.lock().unwrap().send(msg).unwrap();
+                    match msg_tx.lock() {
+                        Ok(mstx) => {
+                            match mstx.send(msg.clone())
+                            {
+                                Ok(_) => {
+                                    debug!("Sent message-1");
+                                }
+                                Err(e) => {
+                                    error!("error {}", e);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            error!("error {}", e);
+                        }
+                    };
                 }
             })
         });
@@ -115,7 +129,7 @@ impl Server {
         let event_loop = (*event_loop).call_method0("run_forever");
         if event_loop.is_err() {
             println!("Ctrl c handler");
-            info!("{}", event_loop.err().unwrap());
+            error!("{}", event_loop.err().unwrap());
 
             let mut application = self.application.lock().unwrap();
             application.shutdown();

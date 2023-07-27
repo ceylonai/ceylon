@@ -133,12 +133,12 @@ impl Transporter for P2PTransporter {
             tokio::select! {
                 message = self.rx.recv() => {
                     if let Some(message) = message {
-                            debug!("[Application] Sent Dispatch Message to [Transporter]-2: {}", message.clone());
+                            info!("[Application] Sent Dispatch Message to [Transporter]-3: {}", message.clone());
                             let server_message = TransportMessage::using_bytes(message.clone(),local_peer_id.to_string(),owner.clone());
                         if let Err(e) = swarm
                         .behaviour_mut().gossipsub
                         .publish(topic.clone(),server_message) {
-                            debug!("Publish error: {e:?}");
+                            error!("Publish error: {e:?}");
                             self.send(TransportStatus::Error(format!("{e:?}"))).await;
                         }
                     }
@@ -174,7 +174,7 @@ impl Transporter for P2PTransporter {
                         message,})) => {
                             let data_message_log = TransportMessage::from_bytes(message.data.clone());
                             if data_message_log.sender_id != local_peer_id.to_string() {
-                                info!("[Transporter] Received Income Message from [Agent]-1: {} {}", data_message_log.sender_id,local_peer_id.to_string());
+                                debug!("[Transporter] Received Income Message from [Agent]-1: {} {}", data_message_log.sender_id,local_peer_id.to_string());
                                 let data_message = TransportMessage::from_bytes(message.data.clone());
                                 self.send(TransportStatus::Data(data_message.clone())).await;
                             }

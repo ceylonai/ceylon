@@ -2,9 +2,10 @@ import logging
 
 from rk_core import Event, Processor, EventType, AgentManager
 
+
 # import names
 
-logging.basicConfig(level=logging.CRITICAL)
+# logging.basicConfig(level=logging.INFO)
 
 
 class EchoAgent:
@@ -18,7 +19,7 @@ class EchoAgent:
 
     @Processor(event_type=EventType.Data)
     async def act(self, event: Event):
-        print(f"{self.name} received: {event.content}")
+        print(f"-------{self.name} received: {event.content}")
 
 
 class GreetingAgent:
@@ -27,11 +28,11 @@ class GreetingAgent:
 
     @Processor(event_type=EventType.Start)
     async def start(self, event: Event):
-        print(f"{self.name} started on {event.creator} {event.event_type}")
+        print(f"-------{self.name} started on {event.creator} {event.event_type}")
 
     @Processor(event_type=EventType.Data)
     async def act(self, event: Event):
-        print(f"{self.name} says: {event.content} {event.creator} {event.event_type}")
+        print(f"-------{self.name} received: {event.content}")
         message = "GreetingAgent Say Hi How Are you doing?"
         await self.publisher.publish(message)
 

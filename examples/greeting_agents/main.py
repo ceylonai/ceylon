@@ -12,12 +12,12 @@ class EchoAgent:
         self.name = name
 
     @Processor(event_type=EventType.Start)
-    def start(self, event: Event):
-        print(f"{self.name} started")
-        self.publisher.publish("Hello, world!")
+    async def start(self, event: Event):
+        print(f"{self.name} started on {event.creator} {event.event_type}")
+        await self.publisher.publish("Hello, world!")
 
     @Processor(event_type=EventType.Data)
-    def act(self, event: Event):
+    async def act(self, event: Event):
         print(f"{self.name} received: {event.content}")
 
 
@@ -25,11 +25,15 @@ class GreetingAgent:
     def __init__(self, name):
         self.name = name
 
+    @Processor(event_type=EventType.Start)
+    async def start(self, event: Event):
+        print(f"{self.name} started on {event.creator} {event.event_type}")
+
     @Processor(event_type=EventType.Data)
-    def act(self, event: Event):
-        print(f"{self.name} says: {event.content} {event.creator_id}")
-        message = "Hi How Are you doing?"
-        self.publisher.publish(message)
+    async def act(self, event: Event):
+        print(f"{self.name} says: {event.content} {event.creator} {event.event_type}")
+        message = "GreetingAgent Say Hi How Are you doing?"
+        await self.publisher.publish(message)
 
 
 if __name__ == "__main__":

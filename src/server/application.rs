@@ -1,4 +1,4 @@
-use log::{debug, info};
+use log::{debug, info, error};
 use pyo3::{IntoPy, Python};
 use pyo3_asyncio::TaskLocals;
 
@@ -40,18 +40,18 @@ impl Application {
                         match msg {
                     Ok(_msg) => {
                         let data = msg_server_rx.borrow().to_string();
-                        debug!("[Server] Sent Dispatch Message to [Application]-2: {}", data.clone());
+                        debug!("Server->Application: {}", data.clone());
                         match tx.send(data).await {
                             Ok(_) => {
                                 debug!("Sent message");
                             }
                             Err(e) => {
-                                debug!("error 33 {}", e);
+                                error!("Error on sending message at Server->Application (49) {}", e);
                             }
                         }
                     }
                     Err(e) => {
-                        debug!("error 44 {}", e);
+                       error!("Error on sending message at Server->Application (54) {}", e);
                     }
                 }
                     }
@@ -89,7 +89,7 @@ impl Application {
                 for mp in message_processors.iter() {
                     // println!("Processing message {:?}, {:?} , {:?}", event.event_type, mp.event, mp.event != event.event_type);
                     if mp.event != event.event_type { continue; }
-                    info!("Processing message {:?}, {:?} , {:?} {} - {}", event.event_type, mp.event, mp.event != event.event_type, event.creator_id, mp.owner_id);
+                    // info!("Processing message {:?}, {:?} , {:?} {} - {}", event.event_type, mp.event, mp.event != event.event_type, event.creator_id, mp.owner_id);
                     let input_copy = input.clone();
                     let tlc = task_locals_copy.clone();
                     let mp2 = mp.clone();
@@ -98,13 +98,13 @@ impl Application {
                             .await
                         {
                             Ok(_) => (info!("Server starting..."), ),
-                            Err(e) => (debug!("error 55 {}", e), ),
+                            Err(e) => (error!("Error on processing message {:?}", e), )
                         };
                     });
                     threads.push(t1);
                 }
                 for t in threads {
-                    println!("Waiting for thread");
+                    debug!("Waiting for thread");
                     t.await.unwrap();
                 }
                 debug!("Processing message released");
@@ -116,7 +116,7 @@ impl Application {
                 info!("Message Porter started");
             }
             Err(e) => {
-                debug!("Message Porter error 66 {}", e);
+                error!("Message Porter failed to start{:?}", e);
             }
         };
     }
