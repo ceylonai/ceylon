@@ -121,6 +121,16 @@ patchelf = ["patchelf"]
 zig = ["ziglang (>=0.10.0,<0.11.0)"]
 
 [[package]]
+name = "names"
+version = "0.3.0"
+description = "Generate random names"
+optional = false
+python-versions = "*"
+files = [
+    {file = "names-0.3.0.tar.gz", hash = "sha256:726e46254f2ed03f1ffb5d941dae3bc67c35123941c29becd02d48d0caa2a671"},
+]
+
+[[package]]
 name = "packaging"
 version = "23.1"
 description = "Core utilities for Python packages"
@@ -200,4 +210,4 @@ histogram = ["pygal", "pygaljs"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "7ecf26cae8d8575dedcf8880e15aba9cd47e6309fbfd6f765835ccea213cd1ef"
+content-hash = "12bbbeb33a748c9f70519abc8deba53388a76cacb7347127ab13d1288a646c7b"

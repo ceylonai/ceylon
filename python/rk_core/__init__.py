@@ -74,7 +74,6 @@ class AgentWrapper:
             self.server.add_event_processor(ep)
         self.publisher = MessageProcessor()
         self.publisher.start()
-
         self.agent.publisher = self.publisher
 
     def __start__(self):
