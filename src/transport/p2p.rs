@@ -134,7 +134,7 @@ impl Transporter for P2PTransporter {
                 message = self.rx.recv() => {
                     if let Some(message) = message {
                             debug!("[Application] Sent Dispatch Message to [Transporter]-2: {}", message.clone());
-                            let server_message = TransportMessage::using_bytes(message.clone(),owner.clone(),local_peer_id.to_string());
+                            let server_message = TransportMessage::using_bytes(message.clone(),local_peer_id.to_string(),owner.clone());
                         if let Err(e) = swarm
                         .behaviour_mut().gossipsub
                         .publish(topic.clone(),server_message) {

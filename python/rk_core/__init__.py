@@ -1,12 +1,15 @@
 import asyncio
+import functools
 import logging
+import random
+import types
 import uuid
 from multiprocessing import allow_connection_pickling
-import random
 from threading import Thread
 
-from rk_core import rk_core
 from rk_core.rk_core import FunctionInfo, EventProcessor, MessageProcessor, Server, EventType, Event
+
+from rk_core import rk_core
 
 __doc__ = rk_core.__doc__
 if hasattr(rk_core, "__all__"):
@@ -18,36 +21,61 @@ rakun_version = rk_core.get_version()
 logging.info(f"Rakun version: {rakun_version}")
 
 
+class ProcessorWrapper:
+    def __init__(self, func, event_type):
+        self.name = func.__qualname__
+        self.event_type = event_type
+        self.is_decorated = True  # identifiable attribute
+        self.args = func.__code__.co_varnames
+        self.func = func
+
+    def function(self, instance):
+        def function(*args, **kwargs):
+            return self.func(instance, *args, **kwargs)
+
+        return function
+
+    @classmethod
+    def fill_agent(cls, agent):
+        agent.decorated_methods = []
+        for fn in dir(agent):
+            attr = getattr(agent, fn)
+            if isinstance(attr, ProcessorWrapper):
+                name = attr.name
+                args = attr.args
+                event_type = attr.event_type
+                function = attr.function(agent)  # Agent Instance need to call with function
+                agent.decorated_methods.append((name, args, event_type, function))
+
+
+class Processor:
+    def __init__(self, event_type):
+        self.event_type = event_type
+
+    def __call__(self, func):
+        return ProcessorWrapper(func, self.event_type)
+
+
 class AgentWrapper:
     def __init__(self, agent):
         self.id = uuid.uuid4()
         self.agent = agent
         self.start_time = None
         self.server = Server(agent.name)
-        self.count = 0
-        self.server.add_event_processor(
-            EventProcessor("__event__processor__",
-                           FunctionInfo(self.__event__processor__, True, 1),
-                           EventType.Start))
-        self.server.add_event_processor(
-            EventProcessor("__data__processor__",
-                           FunctionInfo(self.__data__processor__, True, 1),
-                           EventType.Data))
+        self.agent.decorated_methods = []
+        self.publisher = MessageProcessor()
+
+        ProcessorWrapper.fill_agent(self.agent)
+
+        for dm in self.agent.decorated_methods:
+            name, args, event_type, function = dm
+            fnc_info = FunctionInfo(function, True, len(args))
+            ep = EventProcessor(name, fnc_info, event_type)
+            self.server.add_event_processor(ep)
         self.publisher = MessageProcessor()
         self.publisher.start()
 
-    async def __event__processor__(self, data: Event):
-        print(
-            f"Received message to {self.agent.name}: {data.content} {data.creator} {data.event_type} {data.origin_type}")
-
-        while True:
-            self.publisher.publish(f"Greeting from {self.id} {self.agent.name}")
-            sleep_time = random.randint(5, 15)
-            await asyncio.sleep(sleep_time)
-
-    async def __data__processor__(self, data: Event):
-        print(
-            f"Received message to Data Processor {self.agent.name}: {data.content} {data.creator} {data.event_type} {data.origin_type}")
+        self.agent.publisher = self.publisher
 
     def __start__(self):
         self.server.start()

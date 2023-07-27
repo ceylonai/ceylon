@@ -83,6 +83,9 @@ pub struct Event {
     pub creator: String,
 
     #[pyo3(get, set)]
+    pub creator_id: String,
+
+    #[pyo3(get, set)]
     pub dispatch_time: String,
 }
 
@@ -93,6 +96,7 @@ impl Event {
         content: String,
         event_type: EventType,
         creator: String,
+        creator_id: String,
         origin_type: OriginatorType,
     ) -> Self {
         let dispatch_time = chrono::Utc::now().to_rfc3339();
@@ -100,6 +104,7 @@ impl Event {
             content,
             event_type,
             creator,
+            creator_id,
             dispatch_time,
             origin_type,
         }

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 import rk_core
@@ -10,24 +11,20 @@ class AgentBasic:
     def __init__(self, name):
         self.name = name
 
-    async def __state__(self, state):
-        logging.info(f"Agent:{self.name} State: {state}")
+    @rk_core.Processor(event_type=rk_core.EventType.Start)
+    async def on_start(self, event: rk_core.Event):
+        print(f"Agendddddddt:{self.name} Start {event.content}")
+        while True:
+            self.publisher.publish("hello")
+            await asyncio.sleep(1)
 
-    async def __process__(self, message):
-        pass
-
-    async def background(self):
-        pass
-
-    async def process_message(self, message):
-        pass
+    @rk_core.Processor(event_type=rk_core.EventType.Data)
+    async def on_data(self, event: rk_core.Event):
+        print(f"Agentssssssss:{self.name} Data {event.content} from {event.creator}")
 
 
 if __name__ == '__main__':
     agent_manager = rk_core.AgentManager()
     agent_manager.register_agent(AgentBasic("AGENT1"))
     agent_manager.register_agent(AgentBasic("AGENT2"))
-    agent_manager.register_agent(AgentBasic("AGENT3"))
-    agent_manager.register_agent(AgentBasic("AGENT4"))
-    agent_manager.register_agent(AgentBasic("AGENT5"))
     agent_manager.start()

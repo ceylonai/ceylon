@@ -64,7 +64,9 @@ impl Application {
             let _mh = message_handlers.clone();
             while let Some(tr_status) = rx.recv().await {
                 let event = if let TransportStatus::Data(message) = tr_status {
-                    Event::new(message.data, EventType::Data, message.sender, OriginatorType::Agent)
+                    Event::new(message.data, EventType::Data, message.sender,
+                               message.sender_id,
+                               OriginatorType::Agent)
                 } else {
                     let (msg, status) = match tr_status {
                         TransportStatus::Data(data) => (data.sender, EventType::Data),
@@ -76,7 +78,10 @@ impl Application {
                         TransportStatus::Stopped => ("Stopped".to_string(), EventType::Stop),
                         TransportStatus::Started => ("Ready".to_string(), EventType::Start),
                     };
-                    Event::new(msg, status, "SYSTEM".to_string(), OriginatorType::System)
+                    Event::new(msg, status,
+                               "SYSTEM".to_string(),
+                               "SYSTEM".to_string(),
+                               OriginatorType::System)
                 };
 
                 let input = Python::with_gil(|py| event.clone().into_py(py));
