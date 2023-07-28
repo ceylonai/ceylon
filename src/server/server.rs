@@ -1,6 +1,5 @@
-use std::sync::{Arc, LockResult};
+use std::sync::Arc;
 
-use lazy_static::lazy_static;
 use log::{debug, error, info};
 use pyo3::{PyAny, pyclass, pymethods, PyResult, Python};
 use tokio::sync::Mutex;
@@ -11,44 +10,13 @@ use crate::types::EventProcessor;
 
 // pyO3 module
 
-lazy_static! {
-    pub static ref RX_TX: Arc<
-        std::sync::Mutex<(
-            tokio::sync::mpsc::Sender<String>,
-            tokio::sync::mpsc::Receiver<String>
-        )>,
-    > = Arc::new( std::sync::Mutex::new(tokio::sync::mpsc::channel::<String>(100)));
-}
-
 #[pyclass]
 pub struct MessageProcessor {
     pub msg_tx: Arc<Mutex<tokio::sync::mpsc::Sender<String>>>,
-    pub msg_rx: Arc<Mutex<tokio::sync::mpsc::Receiver<String>>>,
 }
 
 #[pymethods]
 impl MessageProcessor {
-    #[new]
-    fn new() -> Self {
-        let (msg_tx, msg_rx) = tokio::sync::mpsc::channel::<String>(100);
-        Self {
-            msg_tx: Arc::new(Mutex::new(msg_tx)),
-            msg_rx: Arc::new(Mutex::new(msg_rx)),
-        }
-    }
-
-    fn start(&mut self) {
-        let app_rx = self.msg_rx.clone();
-        let app_tx = RX_TX.lock().unwrap().0.clone();
-        std::thread::spawn(move || {
-            tokio::runtime::Runtime::new().unwrap().block_on(async move {
-                while let msg = app_rx.lock().await.recv().await.unwrap() {
-                    app_tx.send(msg).await.unwrap();
-                }
-            })
-        });
-    }
-
     pub fn publish<'a>(&'a mut self, py: Python<'a>, message: String) -> PyResult<&'a PyAny> {
         info!(
             "[Agent] Sent Dispatch Message to [MessageProcessor]-0: {}",
@@ -67,6 +35,8 @@ impl MessageProcessor {
 pub struct Server {
     application: Arc<std::sync::Mutex<application::Application>>,
     msg_tx: Arc<std::sync::Mutex<tokio::sync::watch::Sender<String>>>,
+    app_rx: Arc<Mutex<tokio::sync::mpsc::Receiver<String>>>,
+    app_tx: tokio::sync::mpsc::Sender<String>,
 }
 
 #[pymethods]
@@ -74,9 +44,12 @@ impl Server {
     #[new]
     pub fn new(name: &str) -> Self {
         let (msg_tx, msg_rx) = tokio::sync::watch::channel::<String>("".to_string());
+        let (app_tx, app_rx) = tokio::sync::mpsc::channel::<String>(100);
         Self {
             application: Arc::new(std::sync::Mutex::new(application::Application::new(name, msg_rx))),
             msg_tx: Arc::new(std::sync::Mutex::new(msg_tx)),
+            app_rx: Arc::new(Mutex::new(app_rx)),
+            app_tx,
         }
     }
     pub fn start(&mut self, py: Python) -> PyResult<()> {
@@ -88,9 +61,11 @@ impl Server {
         let task_locals = pyo3_asyncio::TaskLocals::new(event_loop).copy_context(py)?;
 
         let msg_tx = self.msg_tx.clone();
+        let app_rx = self.app_rx.clone();
         std::thread::spawn(move || {
+            // let mut app_rx = CHANNEL_PAIR.with(|cp| cp.borrow().rx.resubscribe());
             tokio::runtime::Runtime::new().unwrap().block_on(async move {
-                while let msg = RX_TX.lock().unwrap().1.recv().await.unwrap() {
+                while let msg = app_rx.lock().await.recv().await.unwrap() {
                     debug!(
                         "[MessageProcessor] Sent Dispatch Message to [Server]-1: {}",
                         msg.clone()
@@ -137,6 +112,12 @@ impl Server {
         }
 
         Ok(())
+    }
+
+    pub fn publisher(&mut self, py: Python) -> MessageProcessor {
+        MessageProcessor {
+            msg_tx: Arc::new(Mutex::new(self.app_tx.clone())),
+        }
     }
 
     pub fn add_event_processor(&mut self, mp: EventProcessor) {

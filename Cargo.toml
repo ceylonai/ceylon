@@ -28,3 +28,6 @@ env_logger = "0.10.0"
 futures = "0.3.28"
 libp2p = { version = "0.52.1", features = ["tokio", "gossipsub", "mdns", "noise", "macros", "tcp", "yamux"] }
 libp2p-quic = { version = "0.8.0-alpha", features = ["tokio"] }
+
+redis = { version = "0.23.0", features = ["tokio-comp"] }
+nanoid = "0.4.0"

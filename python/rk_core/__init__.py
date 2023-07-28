@@ -62,10 +62,10 @@ class AgentWrapper:
         self.agent = agent
         self.start_time = None
 
-        self.publisher = MessageProcessor()
+        # self.publisher = MessageProcessor()
         self.server = Server(agent.name)
         self.agent.decorated_methods = []
-        self.publisher = MessageProcessor()
+        # self.publisher = self.server.publisher
 
         ProcessorWrapper.fill_agent(self.agent)
         for dm in self.agent.decorated_methods:
@@ -74,8 +74,8 @@ class AgentWrapper:
             ep = EventProcessor(name, f"{self.id}", fnc_info, event_type)
             self.server.add_event_processor(ep)
 
-        self.publisher.start()
-        self.agent.publisher = self.publisher
+        # self.publisher.start()
+        self.agent.publisher = self.server.publisher()
 
     def __start__(self):
         self.server.start()
