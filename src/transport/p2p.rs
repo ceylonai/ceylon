@@ -171,6 +171,7 @@ impl Transporter for P2PTransporter {
                             let is_connected = self.connected_peers.contains(&peer_id);
                             self.connected_peers.push(peer_id);
                             if self.connected_peers.len() == 1 && !is_connected {
+                            println!("{owner} START NOW");
                                 self.send(TransportStatus::Started).await;
                             }
                     },

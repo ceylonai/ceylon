@@ -40,8 +40,10 @@ class GreetingAgent:
 if __name__ == "__main__":
     echo_agent = EchoAgent("EchoAgent")
     greeting_agent = GreetingAgent("GreetingAgent")
+    greeting_agent2 = GreetingAgent("GreetingAgent2")
 
     agent_manager = AgentManager()
     agent_manager.register_agent(echo_agent)
     agent_manager.register_agent(greeting_agent)
+    agent_manager.register_agent(greeting_agent2)
     agent_manager.start()
