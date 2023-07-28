@@ -97,7 +97,7 @@ impl Application {
                         match execute_process_function(input_copy.clone(), &mp2.function, &tlc)
                             .await
                         {
-                            Ok(_) => (info!("Server starting..."), ),
+                            Ok(_) => (debug!("Server starting..."), ),
                             Err(e) => (error!("Error on processing message {:?}", e), )
                         };
                     });

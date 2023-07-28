@@ -3,6 +3,7 @@ import logging
 import uuid
 from multiprocessing import allow_connection_pickling
 from threading import Thread
+from time import sleep
 
 from rk_core.rk_core import FunctionInfo, EventProcessor, MessageProcessor, Server, EventType, Event
 
@@ -98,32 +99,35 @@ class AgentManager:
     def __init__(self):
         self.agents = []
 
-    def register_agent(self, agent):
-        self.agents.append(AgentWrapper(agent))
+    def register(self, agent, order=0):
+        """"
+        Register an agent
+        :param agent:
+        :param order: Highest on start first
+        """
+        self.agents.append({
+            "agent": AgentWrapper(agent),
+            "order": order
+        })
 
-    def unregister_agent(self, agent):
-        # using id remove the agent
-        self.agents = [agent for agent in self.agents if agent.id != agent.id]
+    def unregister(self, agent):
+        self.agents = list(filter(lambda x: x["agent"].agent.name != agent.name, self.agents))
 
     def get_agents(self):
-        return [agent.agent for agent in self.agents]
+        return [x["agent"] for x in self.agents]
 
     def start(self):
         logging.info("Starting Rakun.")
         allow_connection_pickling()
 
-        agents_thread = []
-        for agent in self.agents:
-            # agent.start()
-            t = Thread(target=agent.start)
-            t.start()
-            agents_thread.append(t)
-            # sleep(1)
+        ordered_agents = reversed(sorted(self.agents, key=lambda x: x["order"]))
+        ordered_agents = [x["agent"] for x in ordered_agents]
 
-        # try:
-        #     while True:
-        #         pass
-        # except KeyboardInterrupt:
-        #     print("Stopping Rakun...")
-        #     for agent in self.agents:
-        #         agent.stop()
+        agents_thread = []
+        for agent in ordered_agents:
+            logging.info(("Starting agent", agent.agent.name))
+            t = Thread(target=agent.start)
+            agents_thread.append(t)
+            t.start()
+            sleep(5)
+        logging.info("Waiting for agents")
