@@ -6,6 +6,7 @@ use tokio::sync::Mutex;
 
 use crate::server::application;
 use crate::transport::p2p::P2PTransporter;
+use crate::transport::redis::RedisTransporter;
 use crate::types::EventProcessor;
 
 // pyO3 module
@@ -63,7 +64,6 @@ impl Server {
         let msg_tx = self.msg_tx.clone();
         let app_rx = self.app_rx.clone();
         std::thread::spawn(move || {
-            // let mut app_rx = CHANNEL_PAIR.with(|cp| cp.borrow().rx.resubscribe());
             tokio::runtime::Runtime::new().unwrap().block_on(async move {
                 while let msg = app_rx.lock().await.recv().await.unwrap() {
                     debug!(
@@ -114,7 +114,7 @@ impl Server {
         Ok(())
     }
 
-    pub fn publisher(&mut self, py: Python) -> MessageProcessor {
+    pub fn publisher(&mut self) -> MessageProcessor {
         MessageProcessor {
             msg_tx: Arc::new(Mutex::new(self.app_tx.clone())),
         }

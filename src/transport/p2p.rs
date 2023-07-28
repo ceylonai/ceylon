@@ -70,7 +70,7 @@ impl Transporter for P2PTransporter {
         // Create a random PeerId
         let id_keys = identity::Keypair::generate_ed25519();
         let local_peer_id = PeerId::from(id_keys.public());
-        println!("Local peer id: {local_peer_id} {owner}");
+        info!("Local peer id: {local_peer_id} {owner}");
 
         // Set up an encrypted DNS-enabled TCP Transport over the yamux protocol.
         let tcp_transport = tcp::tokio::Transport::new(tcp::Config::default().nodelay(true))
@@ -166,19 +166,19 @@ impl Transporter for P2PTransporter {
 
                     SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Subscribed{peer_id,topic})) => {
                         let status = format!("{peer_id}");
-                        println!("Subscribed to {owner} {topic} {status}");
+                        debug!("Subscribed to {owner} {topic} {status}");
 
                             let is_connected = self.connected_peers.contains(&peer_id);
                             self.connected_peers.push(peer_id);
                             if self.connected_peers.len() == 1 && !is_connected {
-                            println!("{owner} START NOW");
+                            debug!("{owner} START NOW");
                                 self.send(TransportStatus::Started).await;
                             }
                     },
 
                     SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Unsubscribed{peer_id,topic})) => {
                         let status = format!("{peer_id}");
-                        println!("Subscribed to {owner} {topic} {status}");
+                        debug!("Subscribed to {owner} {topic} {status}");
 
                             self.connected_peers.remove(self.connected_peers.iter().position(|x| x == &peer_id).unwrap());
                             if self.connected_peers.len() == 0 {

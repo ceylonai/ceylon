@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use futures::StreamExt;
-use log::{debug, error};
+use log::{debug, error, info};
 use redis::{Commands, PubSubCommands};
 use tokio::sync::{mpsc, Mutex};
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -56,7 +56,7 @@ impl Transporter for RedisTransporter {
         let peer_id = self.peer_id.clone();
         let name = self.owner.clone();
 
-        println!("Agent {} Stared at: {}", name, peer_id);
+        info!("Agent {} Stared at: {}", name, peer_id);
 
         let msg_tx = self.msg_tx.clone();
         let t1 = tokio::spawn(async move {
@@ -72,10 +72,10 @@ impl Transporter for RedisTransporter {
                 let data = TransportMessage::from_bytes(payload.clone());
                 let data_log = TransportMessage::from_bytes(payload);
                 if data.sender_id == name { continue; }
-                println!("Received message from Agent: {:?}-{}-{}", data_log.data, data_log.sender_id, name);
+                debug!("Received message from Agent: {:?}-{}-{}", data_log.data, data_log.sender_id, name);
                 SendStatus(msg_tx.clone(), TransportStatus::Data(data)).await;
             }
-            println!("Listening for messages end");
+            debug!("Listening for messages end");
         });
 
         let rx = self.rx.clone();
@@ -98,7 +98,7 @@ impl Transporter for RedisTransporter {
                         };
                         let server_message = TransportMessage::using_bytes(message.clone(),owner_name.to_string(),owner_name.clone());
                         let _: () = conn.publish(&channel_name, &server_message).unwrap();
-                        println!("Publish message from Agent {}: {:?}", owner_name,message);
+                        debug!("Publish message from Agent {}: {:?}", owner_name,message);
                     }
                 }
             }
@@ -107,10 +107,10 @@ impl Transporter for RedisTransporter {
 
         tokio::select! {
             _ = t2 => {
-                println!("Listening for messages");
+                debug!("Listening for t2");
             }
         _ = t1 => {
-            println!("Listening for messages");
+            debug!("Listening for t1");
         }
     }
         Ok(())
