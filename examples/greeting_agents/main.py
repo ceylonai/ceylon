@@ -1,7 +1,8 @@
+import asyncio
 import logging
 
 logging.basicConfig(level=logging.INFO)
-from rk_core import Event, Processor, EventType, AgentManager
+from rk_core import Event, Processor, EventType, AgentManager, startup, shutdown
 
 
 # import names
@@ -12,11 +13,22 @@ class EchoAgent:
         self.name = name
         self.count = 0
 
+    @Processor(event_type=EventType.OnBoot)
+    async def on_start(self):
+        while True:
+            print(f"EchoAgent Hello, world! {self.count}")
+            self.count += 1
+            await asyncio.sleep(1)
+        print(f"EchoAgent Finished, world! {self.count}")
+
+    @Processor(event_type=EventType.OnShutdown)
+    async def on_shutdown(self):
+        print(f"EchoAgent Bye, world! {self.count}")
+
     @Processor(event_type=EventType.Start)
     async def start1(self, event: Event):
         print(f"{self.name} started on {event.creator} {event.event_type}")
         await self.publisher.publish(f"EchoAgent Hello, world! {self.count}")
-        self.count += 1
 
     @Processor(event_type=EventType.Data)
     async def act1(self, event: Event):
@@ -43,10 +55,7 @@ class GreetingAgent:
 if __name__ == "__main__":
     echo_agent = EchoAgent("EchoAgent")
     greeting_agent = GreetingAgent("GreetingAgent")
-    # greeting_agent2 = GreetingAgent("GreetingAgent2")
-
     agent_manager = AgentManager()
-    agent_manager.register(echo_agent)
-    agent_manager.register(greeting_agent)
-    # agent_manager.register_agent(greeting_agent2)
+    agent_manager.register(greeting_agent, 1)
+    agent_manager.register(echo_agent, 2)
     agent_manager.start()
