@@ -1,32 +1,33 @@
 use std::sync::Arc;
 
 use log::{debug, error, info};
-use pyo3::{PyAny, pyclass, pymethods, PyResult, Python};
+use pyo3::{pyclass, pymethods, PyAny, PyResult, Python};
 use tokio::sync::Mutex;
 
 use crate::server::application;
 use crate::transport::p2p::P2PTransporter;
-use crate::transport::redis::RedisTransporter;
-use crate::types::{EventProcessor, FunctionInfo};
+use crate::types::EventProcessor;
 
 // pyO3 module
 
 #[pyclass]
 pub struct MessageProcessor {
-    pub msg_tx: Arc<Mutex<tokio::sync::mpsc::Sender<String>>>,
+    pub msg_tx: Arc<Mutex<tokio::sync::mpsc::Sender<Vec<u8>>>>,
 }
 
 #[pymethods]
 impl MessageProcessor {
-    pub fn publish<'a>(&'a mut self, py: Python<'a>, message: String) -> PyResult<&'a PyAny> {
-        info!(
-            "[Agent] Sent Dispatch Message to [MessageProcessor]-0: {}",
-            message
-        );
+    pub fn publish<'a>(&'a mut self, py: Python<'a>, message: Vec<u8>) -> PyResult<&'a PyAny> {
+        info!("[Agent] Sent Dispatch Message to [MessageProcessor]-0:");
 
         let msg_server_rx = self.msg_tx.clone();
         pyo3_asyncio::tokio::future_into_py(py, async move {
-            msg_server_rx.lock().await.send(message.clone()).await.unwrap();
+            msg_server_rx
+                .lock()
+                .await
+                .send(message.clone())
+                .await
+                .unwrap();
             Ok(Python::with_gil(|py| py.None()))
         })
     }
@@ -35,19 +36,21 @@ impl MessageProcessor {
 #[pyclass]
 pub struct Server {
     application: Arc<std::sync::Mutex<application::Application>>,
-    msg_tx: Arc<std::sync::Mutex<tokio::sync::watch::Sender<String>>>,
-    app_rx: Arc<Mutex<tokio::sync::mpsc::Receiver<String>>>,
-    app_tx: tokio::sync::mpsc::Sender<String>,
+    msg_tx: Arc<std::sync::Mutex<tokio::sync::watch::Sender<Vec<u8>>>>,
+    app_rx: Arc<Mutex<tokio::sync::mpsc::Receiver<Vec<u8>>>>,
+    app_tx: tokio::sync::mpsc::Sender<Vec<u8>>,
 }
 
 #[pymethods]
 impl Server {
     #[new]
     pub fn new(name: &str) -> Self {
-        let (msg_tx, msg_rx) = tokio::sync::watch::channel::<String>("".to_string());
-        let (app_tx, app_rx) = tokio::sync::mpsc::channel::<String>(100);
+        let (msg_tx, msg_rx) = tokio::sync::watch::channel::<Vec<u8>>(Vec::new());
+        let (app_tx, app_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
         Self {
-            application: Arc::new(std::sync::Mutex::new(application::Application::new(name, msg_rx))),
+            application: Arc::new(std::sync::Mutex::new(application::Application::new(
+                name, msg_rx,
+            ))),
             msg_tx: Arc::new(std::sync::Mutex::new(msg_tx)),
             app_rx: Arc::new(Mutex::new(app_rx)),
             app_tx,
@@ -57,37 +60,33 @@ impl Server {
         let application = self.application.clone();
         let asyncio = py.import("asyncio")?;
         let event_loop = asyncio.call_method0("new_event_loop")?;
-        asyncio.call_method1("set_event_loop", (event_loop, ))?;
+        asyncio.call_method1("set_event_loop", (event_loop,))?;
 
         let task_locals = pyo3_asyncio::TaskLocals::new(event_loop).copy_context(py)?;
 
         let msg_tx = self.msg_tx.clone();
         let app_rx = self.app_rx.clone();
         std::thread::spawn(move || {
-            tokio::runtime::Runtime::new().unwrap().block_on(async move {
-                while let msg = app_rx.lock().await.recv().await.unwrap() {
-                    debug!(
-                        "[MessageProcessor] Sent Dispatch Message to [Server]-1: {}",
-                        msg.clone()
-                    );
-                    match msg_tx.lock() {
-                        Ok(mstx) => {
-                            match mstx.send(msg.clone())
-                            {
+            tokio::runtime::Runtime::new()
+                .unwrap()
+                .block_on(async move {
+                    while let msg = app_rx.lock().await.recv().await.unwrap() {
+                        debug!("[MessageProcessor] Sent Dispatch Message to [Server]-1:");
+                        match msg_tx.lock() {
+                            Ok(mstx) => match mstx.send(msg.clone()) {
                                 Ok(_) => {
                                     debug!("Sent message-1");
                                 }
                                 Err(e) => {
                                     error!("error {}", e);
                                 }
+                            },
+                            Err(e) => {
+                                error!("error {}", e);
                             }
-                        }
-                        Err(e) => {
-                            error!("error {}", e);
-                        }
-                    };
-                }
-            })
+                        };
+                    }
+                })
         });
 
         std::thread::spawn(move || {
@@ -111,7 +110,6 @@ impl Server {
                     });
 
                     application.start::<P2PTransporter>().await;
-
 
                     let t2 = tokio::spawn(async move {
                         match shutdown {

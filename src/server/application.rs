@@ -1,16 +1,18 @@
-use log::{debug, info, error};
+use log::{debug, error, info};
 use pyo3::{IntoPy, Python};
 use pyo3_asyncio::TaskLocals;
 
 use crate::executor::{execute_process_function, execute_process_function_only};
 use crate::transport::Transporter;
-use crate::types::{Event, EventProcessor, EventType, FunctionInfo, OriginatorType, TransportStatus};
+use crate::types::{
+    Event, EventProcessor, EventType, FunctionInfo, OriginatorType, TransportStatus,
+};
 
 pub struct Application {
     name: String,
     event_processors: Vec<EventProcessor>,
     task_locals: Option<TaskLocals>,
-    msg_server_rx: tokio::sync::watch::Receiver<String>,
+    msg_server_rx: tokio::sync::watch::Receiver<Vec<u8>>,
     startup_handler: Option<FunctionInfo>,
     shutdown_handler: Option<FunctionInfo>,
 }
@@ -24,17 +26,15 @@ impl FunctionExecutor {
     pub async fn execute(&mut self) {
         let task_locals_copy = self.locals.clone();
         let function = self.function.clone();
-        match execute_process_function_only(&function, &task_locals_copy)
-            .await
-        {
-            Ok(_) => (debug!("Server starting..."), ),
-            Err(e) => (error!("Error on processing message {:?}", e), )
+        match execute_process_function_only(&function, &task_locals_copy).await {
+            Ok(_) => (debug!("Server starting..."),),
+            Err(e) => (error!("Error on processing message {:?}", e),),
         };
     }
 }
 
 impl Application {
-    pub fn new(name: &str, msg_rx: tokio::sync::watch::Receiver<String>) -> Self {
+    pub fn new(name: &str, msg_rx: tokio::sync::watch::Receiver<Vec<u8>>) -> Self {
         Self {
             name: name.to_string(),
             event_processors: Vec::new(),
@@ -51,7 +51,7 @@ impl Application {
             _ => Some(FunctionExecutor {
                 function: self.startup_handler.clone().unwrap(),
                 locals: self.task_locals.clone().unwrap(),
-            })
+            }),
         }
     }
 
@@ -61,7 +61,7 @@ impl Application {
             _ => Some(FunctionExecutor {
                 function: self.shutdown_handler.clone().unwrap(),
                 locals: self.task_locals.clone().unwrap(),
-            })
+            }),
         }
     }
 
@@ -81,8 +81,8 @@ impl Application {
                     msg = msg_server_rx.changed() => {
                         match msg {
                     Ok(_msg) => {
-                        let data = msg_server_rx.borrow().to_string();
-                        debug!("Server->Application: {}", data.clone());
+                        let data = msg_server_rx.borrow().clone();
+                        debug!("Server->Application:");
                         match tx.send(data).await {
                             Ok(_) => {
                                 debug!("Sent message");
@@ -106,31 +106,48 @@ impl Application {
             let _mh = message_handlers.clone();
             while let Some(tr_status) = rx.recv().await {
                 let event = if let TransportStatus::Data(message) = tr_status {
-                    Event::new(message.data, EventType::Data, message.sender,
-                               message.sender_id,
-                               OriginatorType::Agent)
+                    Event::new(
+                        message.data,
+                        EventType::Data,
+                        message.sender,
+                        message.sender_id,
+                        OriginatorType::Agent,
+                    )
                 } else {
                     let (msg, status) = match tr_status {
-                        TransportStatus::Data(data) => (data.sender, EventType::Data),
+                        // TransportStatus::Data(data) => (data.sender, EventType::Data),
                         TransportStatus::Error(err) => (err, EventType::Error),
                         TransportStatus::Info(info) => (info, EventType::Message),
-                        TransportStatus::PeerDiscovered(peer_id) => (peer_id, EventType::SystemEvent),
-                        TransportStatus::PeerConnected(peer_id) => (peer_id, EventType::SystemEvent),
-                        TransportStatus::PeerDisconnected(peer_id) => (peer_id, EventType::SystemEvent),
+                        TransportStatus::PeerDiscovered(peer_id) => {
+                            (peer_id, EventType::SystemEvent)
+                        }
+                        TransportStatus::PeerConnected(peer_id) => {
+                            (peer_id, EventType::SystemEvent)
+                        }
+                        TransportStatus::PeerDisconnected(peer_id) => {
+                            (peer_id, EventType::SystemEvent)
+                        }
                         TransportStatus::Stopped => ("Stopped".to_string(), EventType::Stop),
                         TransportStatus::Started => ("Ready".to_string(), EventType::Start),
+
+                        _ => ("".to_string(), EventType::Null),
                     };
-                    Event::new(msg, status,
-                               "SYSTEM".to_string(),
-                               "SYSTEM".to_string(),
-                               OriginatorType::System)
+                    Event::new(
+                        msg.into_bytes(),
+                        status,
+                        "SYSTEM".to_string(),
+                        "SYSTEM".to_string(),
+                        OriginatorType::System,
+                    )
                 };
 
                 let input = Python::with_gil(|py| event.clone().into_py(py));
                 let mut threads = Vec::new();
                 for mp in message_processors.iter() {
                     // println!("Processing message {:?}, {:?} , {:?}", event.event_type, mp.event, mp.event != event.event_type);
-                    if mp.event != event.event_type { continue; }
+                    if mp.event != event.event_type {
+                        continue;
+                    }
                     // info!("Processing message {:?}, {:?} , {:?} {} - {}", event.event_type, mp.event, mp.event != event.event_type, event.creator_id, mp.owner_id);
                     let input_copy = input.clone();
                     let tlc = task_locals_copy.clone();
@@ -139,8 +156,8 @@ impl Application {
                         match execute_process_function(input_copy.clone(), &mp2.function, &tlc)
                             .await
                         {
-                            Ok(_) => (debug!("Server starting..."), ),
-                            Err(e) => (error!("Error on processing message {:?}", e), )
+                            Ok(_) => (debug!("Server starting..."),),
+                            Err(e) => (error!("Error on processing message {:?}", e),),
                         };
                     });
                     threads.push(t1);

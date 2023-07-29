@@ -68,6 +68,7 @@ pub enum EventType {
     SystemEvent,
     Data,
     Error,
+    Null,
 }
 
 #[pyclass]
@@ -75,7 +76,7 @@ pub enum EventType {
 pub struct Event {
     /// Event Data Message
     #[pyo3(get, set)]
-    pub content: String,
+    pub content: Vec<u8>,
 
     #[pyo3(get, set)]
     pub event_type: EventType,
@@ -97,7 +98,7 @@ pub struct Event {
 impl Event {
     #[new]
     pub fn new(
-        content: String,
+        content: Vec<u8>,
         event_type: EventType,
         creator: String,
         creator_id: String,
@@ -131,14 +132,14 @@ pub struct TransportMessage {
     pub sender_id: String,
     pub sender: String,
     pub unique_id: String,
-    pub data: String,
+    pub data: Vec<u8>,
     pub dispatch_time: String,
 }
 
 impl TransportMessage {
-    fn new(data: String, sender_id: String, sender: String) -> Self {
+    fn new(data: Vec<u8>, sender_id: String, sender: String) -> Self {
         let dispatch_time = chrono::Utc::now().to_rfc3339();
-        let unique_id = calculate_hash(&format!("{dispatch_time}{data}")).to_string();
+        let unique_id = calculate_hash(&format!("{dispatch_time}-{sender}")).to_string();
         Self {
             sender_id,
             sender,
@@ -148,7 +149,7 @@ impl TransportMessage {
         }
     }
 
-    pub fn using_bytes(data: String, sender_id: String, sender: String) -> Vec<u8> {
+    pub fn using_bytes(data: Vec<u8>, sender_id: String, sender: String) -> Vec<u8> {
         let server_message = TransportMessage::new(data, sender_id, sender);
         let message_str = serde_json::to_string(&server_message).unwrap();
         message_str.into_bytes()

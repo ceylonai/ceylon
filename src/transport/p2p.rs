@@ -29,8 +29,8 @@ struct MyBehaviour {
 
 pub struct P2PTransporter {
     owner: String,
-    rx: Receiver<String>,
-    tx: Sender<String>,
+    rx: Receiver<Vec<u8>>,
+    tx: Sender<Vec<u8>>,
     msg_tx: Sender<TransportStatus>,
     connected_peers: Vec<PeerId>,
 }
@@ -61,7 +61,7 @@ impl Transporter for P2PTransporter {
         }
     }
 
-    fn get_tx(&mut self) -> Sender<String> {
+    fn get_tx(&mut self) -> Sender<Vec<u8>> {
         self.tx.clone()
     }
 
@@ -128,13 +128,14 @@ impl Transporter for P2PTransporter {
 
         debug!("Enter messages via STDIN and they will be sent to connected peers using Gossipsub");
 
-        self.send(TransportStatus::Info("Started".to_string())).await;
+        self.send(TransportStatus::Info("Started".to_string()))
+            .await;
         loop {
             tokio::select! {
                 message = self.rx.recv() => {
                     if let Some(message) = message {
-                            info!("[Application] Sent Dispatch Message to [Transporter]-3: {}", message.clone());
-                            let server_message = TransportMessage::using_bytes(message.clone(),local_peer_id.to_string(),owner.clone());
+                            info!("[Application] Sent Dispatch Message to [Transporter]-3:");
+                            let server_message = TransportMessage::using_bytes(message,local_peer_id.to_string(),owner.clone());
                         if let Err(e) = swarm
                         .behaviour_mut().gossipsub
                         .publish(topic.clone(),server_message) {
@@ -151,6 +152,7 @@ impl Transporter for P2PTransporter {
                         propagation_source: _peer_id,
                         message_id: _id,
                         message,})) => {
+                        debug!("Received message: {message:?}");
                             let data_message_log = TransportMessage::from_bytes(message.data.clone());
                             if data_message_log.sender_id != local_peer_id.to_string() {
                                 debug!("[Transporter] Received Income Message from [Agent]-1: {} {}", data_message_log.sender_id,local_peer_id.to_string());

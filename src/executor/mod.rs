@@ -16,10 +16,10 @@ pub async fn execute_process_function(
         Python::with_gil(|py| {
             pyo3_asyncio::into_future_with_locals(
                 task_locals,
-                function.handler.as_ref(py).call1((input.to_object(py), ))?,
+                function.handler.as_ref(py).call1((input.to_object(py),))?,
             )
         })?
-            .await?;
+        .await?;
     } else {
         debug!("Process event handler");
         Python::with_gil(|py| function.handler.call0(py))?;
@@ -35,12 +35,9 @@ pub async fn execute_process_function_only(
     if function.is_async {
         debug!("Process event handler async");
         Python::with_gil(|py| {
-            pyo3_asyncio::into_future_with_locals(
-                task_locals,
-                function.handler.as_ref(py).call0()?,
-            )
+            pyo3_asyncio::into_future_with_locals(task_locals, function.handler.as_ref(py).call0()?)
         })?
-            .await?;
+        .await?;
     } else {
         debug!("Process event handler");
         Python::with_gil(|py| function.handler.call0(py))?;

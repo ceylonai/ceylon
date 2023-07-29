@@ -16,10 +16,9 @@ class EchoAgent:
     @Processor(event_type=EventType.OnBoot)
     async def on_start(self):
         while True:
-            print(f"EchoAgent Hello, world! {self.count}")
             self.count += 1
             await asyncio.sleep(1)
-        print(f"EchoAgent Finished, world! {self.count}")
+            print(f"{self.name} on_start")
 
     @Processor(event_type=EventType.OnShutdown)
     async def on_shutdown(self):

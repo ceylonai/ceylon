@@ -15,10 +15,10 @@ class EchoAgent:
 
     @Processor(event_type=EventType.OnBoot)
     async def on_start(self):
-        while True:
-            print(f"EchoAgent Hello, world! {self.count}")
-            self.count += 1
-            await asyncio.sleep(1)
+        # while True:
+        print(f"EchoAgent Hello, world! {self.count}")
+        self.count += 1
+        await asyncio.sleep(1)
         print(f"EchoAgent Finished, world! {self.count}")
 
     @Processor(event_type=EventType.OnShutdown)
@@ -28,7 +28,7 @@ class EchoAgent:
     @Processor(event_type=EventType.Start)
     async def start1(self, event: Event):
         print(f"{self.name} started on {event.creator} {event.event_type}")
-        await self.publisher.publish(f"EchoAgent Hello, world! {self.count}")
+        await self.publisher.publish(bytes(f"EchoAgent Hello, world! {self.count}", encoding='utf-8'))
 
     @Processor(event_type=EventType.Data)
     async def act1(self, event: Event):
@@ -47,7 +47,7 @@ class GreetingAgent:
     @Processor(event_type=EventType.Data)
     async def act2(self, event: Event):
         message = f"GreetingAgent Say Hi How Are you doing? {self.count}"
-        await self.publisher.publish(message)
+        await self.publisher.publish(bytes(message, encoding='utf-8'))
         self.count += 1
         print(f"-------{self.name} received:  ඵ්{event.creator} {event.content}")
 

@@ -3,11 +3,11 @@ use async_trait::async_trait;
 use std::error::Error;
 use tokio::sync::mpsc::Sender;
 pub mod p2p;
-pub mod redis;
+// pub mod redis;
 
 #[async_trait]
 pub trait Transporter {
     fn new(tx: Sender<TransportStatus>, owner: String) -> Self;
-    fn get_tx(&mut self) -> Sender<String>;
+    fn get_tx(&mut self) -> Sender<Vec<u8>>;
     async fn message_processor(&mut self) -> Result<(), Box<dyn Error>>;
 }
