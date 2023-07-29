@@ -23,34 +23,20 @@ import tracemalloc
 tracemalloc.start()
 
 
-class BackgroundProcessorWrapper:
-    def __init__(self, func, event_type):
-        self.name = func.__qualname__
-        self.event_type = event_type
-        self.is_decorated = True  # identifiable attribute
-        self.args = func.__code__.co_varnames
-        self.func = func
+def startup(func):
+    def wrapper(self, *args, **kwargs):
+        self.startup = func
+        return func(self, *args, **kwargs)
 
-    def function(self, instance):
-        async def function(*args, **kwargs):
-            return await self.func(instance, *args, **kwargs)
+    return wrapper
 
-        return function
 
-    @classmethod
-    def fill_events(cls, agent):
-        agent.startup = None
-        agent.shudown = None
-        for fn in dir(agent):
-            attr = getattr(agent, fn)
-            if isinstance(attr, BackgroundProcessorWrapper):
-                event_type = attr.event_type
-                function = attr.function(agent)  # Agent Instance need to call with function
-                if event_type == BackgroundEvent.START.value:
-                    agent.startup = function
-                elif event_type == BackgroundEvent.SHUTDOWN.value:
-                    agent.shudown = function
-        print(agent.name, agent.startup, agent.shudown)
+def shutdown(func):
+    def wrapper(self, *args, **kwargs):
+        self.shutdown = func
+        return func(self, *args, **kwargs)
+
+    return wrapper
 
 
 class EventProcessorWrapper:
@@ -76,7 +62,7 @@ class EventProcessorWrapper:
                 name = attr.name
                 args = attr.args
                 event_type = attr.event_type
-                function = attr.function(agent)  # Agent Instance need to call with function
+                function = attr.function(agent)  # Agent Instance need to call with functio
                 agent.decorated_methods.append((name, args, event_type, function))
 
 
@@ -86,22 +72,6 @@ class Processor:
 
     def __call__(self, func):
         return EventProcessorWrapper(func, self.event_type)
-
-
-class BackgroundEvent(enum.Enum):
-    START = 1
-    SHUTDOWN = 2
-
-    def __eq__(self, other):
-        return self.__class__ is other.__class__ and other.value == self.value
-
-
-class BackgroundProcessor:
-    def __init__(self, event_type: BackgroundEvent):
-        self.event_type = event_type
-
-    def __call__(self, func):
-        return BackgroundProcessorWrapper(func, self.event_type)
 
 
 class AgentWrapper:
@@ -120,30 +90,20 @@ class AgentWrapper:
             name, args, event_type, function = dm
             fnc_info = FunctionInfo(function, True, len(args))
             ep = EventProcessor(name, f"{self.id}", fnc_info, event_type)
-            self.server.add_event_processor(ep)
+
+            if event_type == EventType.OnBoot:
+                self.server.add_startup_handler(ep)
+            elif event_type == EventType.OnShutdown:
+                self.server.add_shutdown_handler(ep)
+            else:
+                self.server.add_event_processor(ep)
 
         # self.publisher.start()
         self.agent.publisher = self.server.publisher()
 
-        # BackgroundProcessorWrapper.fill_events(self.agent)
-
-        async def on_statup():
-            if self.agent.startup:
-                try:
-                    await self.agent.startup()
-                except Exception as e:
-                    print(e)
-            print(f"Agent {self.id} started")
-
-        async def on_shutdown():
-            if self.agent.shutdown:
-                await self.agent.shudown()
-
-        self.server.add_startup_handler(FunctionInfo(on_statup, True, 0))
-        self.server.add_shutdown_handler(FunctionInfo(on_shutdown, True, 0))
-
     def __start__(self):
         self.server.start()
+        pass
 
     def start(self):
         self.__start__()

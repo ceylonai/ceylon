@@ -97,17 +97,31 @@ impl Server {
             tokio::runtime::Runtime::new()
                 .unwrap()
                 .block_on(async move {
-                    let mut boot = application.boot();
-                    let mut shutdown = application.shutdown();
+                    let boot = application.boot();
+                    let shutdown = application.shutdown();
                     let t1 = tokio::spawn(async move {
-                        boot.execute().await;
+                        match boot {
+                            Some(mut a) => {
+                                a.execute().await;
+                            }
+                            None => {
+                                debug!("Boot completed");
+                            }
+                        };
                     });
 
                     application.start::<P2PTransporter>().await;
 
 
                     let t2 = tokio::spawn(async move {
-                        shutdown.execute().await;
+                        match shutdown {
+                            Some(mut a) => {
+                                a.execute().await;
+                            }
+                            None => {
+                                debug!("Shutdown completed");
+                            }
+                        };
                     });
 
                     tokio::select! {
@@ -140,13 +154,13 @@ impl Server {
         }
     }
 
-    pub fn add_startup_handler(&mut self, mp: FunctionInfo) {
+    pub fn add_startup_handler(&mut self, mp: EventProcessor) {
         let mut application = self.application.lock().unwrap();
-        application.add_startup_handler(mp);
+        application.add_startup_handler(mp.function);
     }
-    pub fn add_shutdown_handler(&mut self, mp: FunctionInfo) {
+    pub fn add_shutdown_handler(&mut self, mp: EventProcessor) {
         let mut application = self.application.lock().unwrap();
-        application.add_shutdown_handler(mp);
+        application.add_shutdown_handler(mp.function);
     }
 
     pub fn add_event_processor(&mut self, mp: EventProcessor) {

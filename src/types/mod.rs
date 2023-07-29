@@ -59,6 +59,8 @@ pub enum OriginatorType {
 #[pyclass]
 #[derive(Debug, Clone, PartialOrd, PartialEq)]
 pub enum EventType {
+    OnBoot,
+    OnShutdown,
     Start,
     Stop,
     Ready,

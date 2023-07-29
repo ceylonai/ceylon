@@ -45,18 +45,24 @@ impl Application {
         }
     }
 
-    pub fn boot(&mut self) -> FunctionExecutor {
-        return FunctionExecutor {
-            function: self.startup_handler.clone().unwrap(),
-            locals: self.task_locals.clone().unwrap(),
-        };
+    pub fn boot(&mut self) -> Option<FunctionExecutor> {
+        match self.startup_handler {
+            None => None,
+            _ => Some(FunctionExecutor {
+                function: self.startup_handler.clone().unwrap(),
+                locals: self.task_locals.clone().unwrap(),
+            })
+        }
     }
 
-    pub fn shutdown(&mut self) -> FunctionExecutor {
-        return FunctionExecutor {
-            function: self.shutdown_handler.clone().unwrap(),
-            locals: self.task_locals.clone().unwrap(),
-        };
+    pub fn shutdown(&mut self) -> Option<FunctionExecutor> {
+        match self.shutdown_handler {
+            None => None,
+            _ => Some(FunctionExecutor {
+                function: self.shutdown_handler.clone().unwrap(),
+                locals: self.task_locals.clone().unwrap(),
+            })
+        }
     }
 
     pub async fn start<T: Transporter>(&mut self) {

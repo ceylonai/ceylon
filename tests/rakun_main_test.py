@@ -2,7 +2,7 @@ import asyncio
 import logging
 
 logging.basicConfig(level=logging.INFO)
-from rk_core import Event, Processor, EventType, AgentManager, BackgroundProcessor
+from rk_core import Event, Processor, EventType, AgentManager, startup, shutdown
 
 
 # import names
@@ -13,9 +13,7 @@ class EchoAgent:
         self.name = name
         self.count = 0
 
-        self.startup = self.on_start
-        self.shudown = self.on_shutdown
-    # @BackgroundProcessor(event_type=EventType.Start)
+    @Processor(event_type=EventType.OnBoot)
     async def on_start(self):
         while True:
             print(f"EchoAgent Hello, world! {self.count}")
@@ -23,18 +21,18 @@ class EchoAgent:
             await asyncio.sleep(1)
         print(f"EchoAgent Finished, world! {self.count}")
 
-    # @BackgroundProcessor(event_type=EventType.Stop)
+    @Processor(event_type=EventType.OnShutdown)
     async def on_shutdown(self):
         print(f"EchoAgent Bye, world! {self.count}")
 
     @Processor(event_type=EventType.Start)
     async def start1(self, event: Event):
-        logging.info(f"{self.name} started on {event.creator} {event.event_type}")
+        print(f"{self.name} started on {event.creator} {event.event_type}")
         await self.publisher.publish(f"EchoAgent Hello, world! {self.count}")
 
     @Processor(event_type=EventType.Data)
     async def act1(self, event: Event):
-        logging.info(f"-------{self.name} ඈඇ received: {event.content}")
+        print(f"-------{self.name} ඈඇ received: {event.content}")
 
 
 class GreetingAgent:
@@ -44,14 +42,14 @@ class GreetingAgent:
 
     @Processor(event_type=EventType.Start)
     async def start2(self, event: Event):
-        logging.info(f"-------{self.name} started on {event.creator} {event.event_type}")
+        print(f"-------{self.name} started on {event.creator} {event.event_type}")
 
     @Processor(event_type=EventType.Data)
     async def act2(self, event: Event):
         message = f"GreetingAgent Say Hi How Are you doing? {self.count}"
         await self.publisher.publish(message)
         self.count += 1
-        logging.info(f"-------{self.name} received:  ඵ්{event.creator} {event.content}")
+        print(f"-------{self.name} received:  ඵ්{event.creator} {event.content}")
 
 
 if __name__ == "__main__":
