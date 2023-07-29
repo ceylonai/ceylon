@@ -2,15 +2,35 @@ use log::{debug, info, error};
 use pyo3::{IntoPy, Python};
 use pyo3_asyncio::TaskLocals;
 
-use crate::executor::execute_process_function;
+use crate::executor::{execute_process_function, execute_process_function_only};
 use crate::transport::Transporter;
-use crate::types::{Event, EventProcessor, EventType, OriginatorType, TransportStatus};
+use crate::types::{Event, EventProcessor, EventType, FunctionInfo, OriginatorType, TransportStatus};
 
 pub struct Application {
     name: String,
     event_processors: Vec<EventProcessor>,
     task_locals: Option<TaskLocals>,
     msg_server_rx: tokio::sync::watch::Receiver<String>,
+    startup_handler: Option<FunctionInfo>,
+    shutdown_handler: Option<FunctionInfo>,
+}
+
+pub struct FunctionExecutor {
+    function: FunctionInfo,
+    locals: TaskLocals,
+}
+
+impl FunctionExecutor {
+    pub async fn execute(&mut self) {
+        let task_locals_copy = self.locals.clone();
+        let function = self.function.clone();
+        match execute_process_function_only(&function, &task_locals_copy)
+            .await
+        {
+            Ok(_) => (debug!("Server starting..."), ),
+            Err(e) => (error!("Error on processing message {:?}", e), )
+        };
+    }
 }
 
 impl Application {
@@ -20,7 +40,23 @@ impl Application {
             event_processors: Vec::new(),
             task_locals: None,
             msg_server_rx: msg_rx,
+            startup_handler: None,
+            shutdown_handler: None,
         }
+    }
+
+    pub fn boot(&mut self) -> FunctionExecutor {
+        return FunctionExecutor {
+            function: self.startup_handler.clone().unwrap(),
+            locals: self.task_locals.clone().unwrap(),
+        };
+    }
+
+    pub fn shutdown(&mut self) -> FunctionExecutor {
+        return FunctionExecutor {
+            function: self.shutdown_handler.clone().unwrap(),
+            locals: self.task_locals.clone().unwrap(),
+        };
     }
 
     pub async fn start<T: Transporter>(&mut self) {
@@ -125,7 +161,12 @@ impl Application {
         self.task_locals = Some(task_local);
     }
 
-    pub fn shutdown(&mut self) {}
+    pub fn add_startup_handler(&mut self, mp: FunctionInfo) {
+        self.startup_handler = Some(mp);
+    }
+    pub fn add_shutdown_handler(&mut self, mp: FunctionInfo) {
+        self.shutdown_handler = Some(mp);
+    }
 
     pub fn add_event_processor(&mut self, mp: EventProcessor) {
         self.event_processors.push(mp);

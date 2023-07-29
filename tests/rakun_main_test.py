@@ -2,7 +2,7 @@ import asyncio
 import logging
 
 logging.basicConfig(level=logging.INFO)
-from rk_core import Event, Processor, EventType, AgentManager
+from rk_core import Event, Processor, EventType, AgentManager, BackgroundProcessor
 
 
 # import names
@@ -13,13 +13,24 @@ class EchoAgent:
         self.name = name
         self.count = 0
 
+        self.startup = self.on_start
+        self.shudown = self.on_shutdown
+    # @BackgroundProcessor(event_type=EventType.Start)
+    async def on_start(self):
+        while True:
+            print(f"EchoAgent Hello, world! {self.count}")
+            self.count += 1
+            await asyncio.sleep(1)
+        print(f"EchoAgent Finished, world! {self.count}")
+
+    # @BackgroundProcessor(event_type=EventType.Stop)
+    async def on_shutdown(self):
+        print(f"EchoAgent Bye, world! {self.count}")
+
     @Processor(event_type=EventType.Start)
     async def start1(self, event: Event):
         logging.info(f"{self.name} started on {event.creator} {event.event_type}")
-        while True:
-            await self.publisher.publish(f"EchoAgent Hello, world! {self.count}")
-            self.count += 1
-            await asyncio.sleep(5)
+        await self.publisher.publish(f"EchoAgent Hello, world! {self.count}")
 
     @Processor(event_type=EventType.Data)
     async def act1(self, event: Event):

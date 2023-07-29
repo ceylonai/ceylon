@@ -7,7 +7,7 @@ use tokio::sync::Mutex;
 use crate::server::application;
 use crate::transport::p2p::P2PTransporter;
 use crate::transport::redis::RedisTransporter;
-use crate::types::EventProcessor;
+use crate::types::{EventProcessor, FunctionInfo};
 
 // pyO3 module
 
@@ -97,7 +97,27 @@ impl Server {
             tokio::runtime::Runtime::new()
                 .unwrap()
                 .block_on(async move {
+                    let mut boot = application.boot();
+                    let mut shutdown = application.shutdown();
+                    let t1 = tokio::spawn(async move {
+                        boot.execute().await;
+                    });
+
                     application.start::<P2PTransporter>().await;
+
+
+                    let t2 = tokio::spawn(async move {
+                        shutdown.execute().await;
+                    });
+
+                    tokio::select! {
+                        _ = t1 => {
+                            debug!("Boot completed");
+                        },
+                        _ = t2 => {
+                            debug!("Shutdown completed");
+                        },
+                    }
                 })
         });
 
@@ -118,6 +138,15 @@ impl Server {
         MessageProcessor {
             msg_tx: Arc::new(Mutex::new(self.app_tx.clone())),
         }
+    }
+
+    pub fn add_startup_handler(&mut self, mp: FunctionInfo) {
+        let mut application = self.application.lock().unwrap();
+        application.add_startup_handler(mp);
+    }
+    pub fn add_shutdown_handler(&mut self, mp: FunctionInfo) {
+        let mut application = self.application.lock().unwrap();
+        application.add_shutdown_handler(mp);
     }
 
     pub fn add_event_processor(&mut self, mp: EventProcessor) {

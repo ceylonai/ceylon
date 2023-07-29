@@ -46,7 +46,7 @@ if __name__ == "__main__":
     # greeting_agent2 = GreetingAgent("GreetingAgent2")
 
     agent_manager = AgentManager()
-    agent_manager.register_agent(echo_agent)
-    agent_manager.register_agent(greeting_agent)
+    agent_manager.register(echo_agent)
+    agent_manager.register(greeting_agent)
     # agent_manager.register_agent(greeting_agent2)
     agent_manager.start()
