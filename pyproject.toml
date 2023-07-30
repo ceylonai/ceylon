@@ -22,6 +22,10 @@ build-backend = "maturin"
 [project]
 name = "rk-core"
 requires-python = ">=3.7"
+dependencies = [
+    "orjson==3.9.2",
+    "pydantic==2.1.1",
+]
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",

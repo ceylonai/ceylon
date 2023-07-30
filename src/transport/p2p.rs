@@ -109,7 +109,7 @@ impl Transporter for P2PTransporter {
             gossipsub::MessageAuthenticity::Signed(id_keys),
             gossipsub_config,
         )
-            .expect("Correct configuration");
+        .expect("Correct configuration");
         // Create a Gossipsub topic
         let topic = gossipsub::IdentTopic::new("message-topic");
         // subscribes to our topic
@@ -147,45 +147,44 @@ impl Transporter for P2PTransporter {
 
                 event = swarm.select_next_some() => match event {
 
-
                     SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Message {
                         propagation_source: _peer_id,
                         message_id: _id,
                         message,})) => {
                         debug!("Received message: {message:?}");
-                            let data_message_log = TransportMessage::from_bytes(message.data.clone());
-                            if data_message_log.sender_id != local_peer_id.to_string() {
-                                debug!("[Transporter] Received Income Message from [Agent]-1: {} {}", data_message_log.sender_id,local_peer_id.to_string());
-                                let data_message = TransportMessage::from_bytes(message.data.clone());
-                                self.send(TransportStatus::Data(data_message.clone())).await;
-                            }
+                        let data_message_log = TransportMessage::from_bytes(message.data.clone());
+                        if data_message_log.sender_id != local_peer_id.to_string() {
+                            debug!("[Transporter] Received Income Message from [Agent]-1: {} {}", data_message_log.sender_id,local_peer_id.to_string());
+                            let data_message = TransportMessage::from_bytes(message.data.clone());
+                            self.send(TransportStatus::Data(data_message.clone())).await;
+                        }
                         },
                      SwarmEvent::NewListenAddr { address, .. } => {
                             let status = format!("{address}");
-                            self.send(TransportStatus::PeerConnected(status)).await;
+                            debug!("Listening on {owner} {status}");
+                            // self.send(TransportStatus::PeerConnected(status)).await;
                     },
 
 
                     SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Subscribed{peer_id,topic})) => {
                         let status = format!("{peer_id}");
                         debug!("Subscribed to {owner} {topic} {status}");
-
-                            let is_connected = self.connected_peers.contains(&peer_id);
-                            self.connected_peers.push(peer_id);
-                            if self.connected_peers.len() == 1 && !is_connected {
+                        self.send(TransportStatus::PeerConnected(status)).await;
+                        let is_connected = self.connected_peers.contains(&peer_id);
+                        self.connected_peers.push(peer_id);
+                        if self.connected_peers.len() == 1 && !is_connected {
                             debug!("{owner} START NOW");
-                                self.send(TransportStatus::Started).await;
-                            }
+                            self.send(TransportStatus::Started).await;
+                        }
                     },
 
                     SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Unsubscribed{peer_id,topic})) => {
                         let status = format!("{peer_id}");
                         debug!("Subscribed to {owner} {topic} {status}");
-
-                            self.connected_peers.remove(self.connected_peers.iter().position(|x| x == &peer_id).unwrap());
-                            if self.connected_peers.len() == 0 {
-                                self.send(TransportStatus::Stopped).await;
-                            }
+                        self.connected_peers.remove(self.connected_peers.iter().position(|x| x == &peer_id).unwrap());
+                        if self.connected_peers.len() == 0 {
+                            self.send(TransportStatus::Stopped).await;
+                        }
                     },
 
                     SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
@@ -203,8 +202,6 @@ impl Transporter for P2PTransporter {
 
                         }
                     },
-
-
                     _ => {}
                 }
             }

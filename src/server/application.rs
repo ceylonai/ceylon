@@ -122,10 +122,10 @@ impl Application {
                             (peer_id, EventType::SystemEvent)
                         }
                         TransportStatus::PeerConnected(peer_id) => {
-                            (peer_id, EventType::SystemEvent)
+                            (peer_id, EventType::AgentConnected)
                         }
                         TransportStatus::PeerDisconnected(peer_id) => {
-                            (peer_id, EventType::SystemEvent)
+                            (peer_id, EventType::AgentDisconnected)
                         }
                         TransportStatus::Stopped => ("Stopped".to_string(), EventType::Stop),
                         TransportStatus::Started => ("Ready".to_string(), EventType::Start),
@@ -145,7 +145,7 @@ impl Application {
                 let mut threads = Vec::new();
                 for mp in message_processors.iter() {
                     // println!("Processing message {:?}, {:?} , {:?}", event.event_type, mp.event, mp.event != event.event_type);
-                    if mp.event != event.event_type {
+                    if mp.event != EventType::Any && mp.event != event.event_type {
                         continue;
                     }
                     // info!("Processing message {:?}, {:?} , {:?} {} - {}", event.event_type, mp.event, mp.event != event.event_type, event.creator_id, mp.owner_id);

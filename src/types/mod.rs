@@ -66,9 +66,12 @@ pub enum EventType {
     Ready,
     Message,
     SystemEvent,
+    AgentConnected,
+    AgentDisconnected,
     Data,
     Error,
     Null,
+    Any,
 }
 
 #[pyclass]
