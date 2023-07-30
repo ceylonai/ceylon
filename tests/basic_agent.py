@@ -10,14 +10,14 @@ class BasicAgent(rk_core.agent.abstract_agent.AbsAgent):
         super().__init__(name)
         print("BasicAgent created.")
 
-    @Processor(event_type=EventType.OnBoot)
-    async def on_start(self):
-        print(f"{self.name} started")
-        await self.publish({"hello": f"Greeting From {self.name} - world"})
-
-    @Processor(event_type=EventType.Data)
-    async def on_data(self, event: Event):
-        print(f"{self.name} received: {event.content}")
+    # @Processor(event_type=EventType.OnBoot)
+    # async def on_start(self):
+    #     print(f"{self.name} started")
+    #     await self.publish({"hello": f"Greeting From {self.name} - world"})
+    #
+    # @Processor(event_type=EventType.Data)
+    # async def on_data(self, event: Event):
+    #     print(f"{self.name} received: {event.content}")
 
 
 if __name__ == '__main__':

@@ -128,7 +128,7 @@ impl Transporter for P2PTransporter {
 
         debug!("Enter messages via STDIN and they will be sent to connected peers using Gossipsub");
 
-        self.send(TransportStatus::Info("Started".to_string()))
+        self.send(TransportStatus::Started(local_peer_id.to_string()))
             .await;
         loop {
             tokio::select! {
@@ -147,6 +147,18 @@ impl Transporter for P2PTransporter {
 
                 event = swarm.select_next_some() => match event {
 
+                    // on Connect with a peer (Agent-X)
+                    SwarmEvent::ConnectionEstablished { peer_id, .. } => {
+                            let peer_id_string = peer_id.to_string();
+                            let local_peer_id = local_peer_id.to_string();
+                            debug!("PeerDiscovered to {owner} {topic} {peer_id_string} {}", local_peer_id.clone());
+                            let is_connected = self.connected_peers.contains(&peer_id.clone());
+                            if !is_connected {
+                                self.send(TransportStatus::PeerConnected(peer_id_string.clone())).await;
+                                self.connected_peers.push(peer_id.clone());
+                            }
+                    },
+
                     SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Message {
                         propagation_source: _peer_id,
                         message_id: _id,
@@ -162,44 +174,33 @@ impl Transporter for P2PTransporter {
                      SwarmEvent::NewListenAddr { address, .. } => {
                             let status = format!("{address}");
                             debug!("Listening on {owner} {status}");
-                            // self.send(TransportStatus::PeerConnected(status)).await;
                     },
 
 
                     SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Subscribed{peer_id,topic})) => {
                         let status = format!("{peer_id}");
-                        debug!("Subscribed to {owner} {topic} {status}");
-                        self.send(TransportStatus::PeerConnected(status)).await;
-                        let is_connected = self.connected_peers.contains(&peer_id);
-                        self.connected_peers.push(peer_id);
-                        if self.connected_peers.len() == 1 && !is_connected {
-                            debug!("{owner} START NOW");
-                            self.send(TransportStatus::Started).await;
-                        }
+                        debug!("Subscribed to {owner} {topic} {status} {}", peer_id.clone());
                     },
 
                     SwarmEvent::Behaviour(MyBehaviourEvent::Gossipsub(gossipsub::Event::Unsubscribed{peer_id,topic})) => {
                         let status = format!("{peer_id}");
                         debug!("Subscribed to {owner} {topic} {status}");
                         self.connected_peers.remove(self.connected_peers.iter().position(|x| x == &peer_id).unwrap());
-                        if self.connected_peers.len() == 0 {
-                            self.send(TransportStatus::Stopped).await;
-                        }
                     },
 
                     SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Discovered(list))) => {
                         for (peer_id, _multiaddr) in list {
                             let status = format!("{peer_id}");
-                            self.send(TransportStatus::PeerDiscovered(status)).await;
+                            self.send(TransportStatus::PeerDiscovered(status.clone())).await;
                             swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
                         }
                     },
                     SwarmEvent::Behaviour(MyBehaviourEvent::Mdns(mdns::Event::Expired(list))) => {
                         for (peer_id, _multiaddr) in list {
                             let status = format!("{peer_id}");
-                           self.send(TransportStatus::PeerDisconnected(status)).await;
+                            self.send(TransportStatus::PeerDisconnected(status)).await;
                             swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
-
+                            self.connected_peers.remove(self.connected_peers.iter().position(|x| x == &peer_id).unwrap());
                         }
                     },
                     _ => {}

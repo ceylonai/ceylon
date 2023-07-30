@@ -127,8 +127,8 @@ impl Application {
                         TransportStatus::PeerDisconnected(peer_id) => {
                             (peer_id, EventType::AgentDisconnected)
                         }
-                        TransportStatus::Stopped => ("Stopped".to_string(), EventType::Stop),
-                        TransportStatus::Started => ("Ready".to_string(), EventType::Start),
+                        TransportStatus::Stopped(peer_id) => (peer_id, EventType::Stop),
+                        TransportStatus::Started(peer_id) => (peer_id, EventType::Start),
 
                         _ => ("".to_string(), EventType::Null),
                     };

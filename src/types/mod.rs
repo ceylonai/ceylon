@@ -120,8 +120,8 @@ impl Event {
 }
 
 pub enum TransportStatus {
-    Started,
-    Stopped,
+    Started(String),
+    Stopped(String),
     Data(TransportMessage),
     Error(String),
     Info(String),
