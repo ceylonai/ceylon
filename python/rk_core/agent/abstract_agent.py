@@ -9,11 +9,12 @@ from rk_core import Processor, EventType, Event
 
 class MessageType(enum.StrEnum):
     AGENT_IDENTIFICATION_DETAIL_REQUEST = "AGENT_IDENTIFICATION_DETAIL_REQUEST"
+    AGENT_IDENTIFICATION_DETAIL_RESPONSE = "AGENT_IDENTIFICATION_DETAIL_RESPONSE"
 
 
 class AgentDetail(BaseModel):
     name: str
-    id: str
+    peer_id: str
 
 
 class Message(BaseModel):
@@ -56,12 +57,30 @@ class AbsAgent(abc.ABC):
         ).model_dump_json())
 
     @Processor(event_type=EventType.Data)
+    async def register_agent(self, event: Event):
+        data = orjson.loads(bytes(event.content).decode('utf-8'))
+        message = Message.model_validate_json(data)
+        if message.title == MessageType.AGENT_IDENTIFICATION_DETAIL_RESPONSE.value:
+            request = AgentDetail.model_validate(message.data)
+            self.other_agents[request.peer_id] = request
+            print(f"{request.name}----{request.peer_id} connected with {self.name}----{self.id}")
+
+    @Processor(event_type=EventType.Data)
     async def response_detail(self, event: Event):
         data = orjson.loads(bytes(event.content).decode('utf-8'))
         message = Message.model_validate_json(data)
         if message.title == MessageType.AGENT_IDENTIFICATION_DETAIL_REQUEST.value:
             request = DetailRequest.model_validate(message.data)
-            print(f"DETAIL REQUEST RECEIVED FROM {self.name} {message.sender_id} {request.peer_id} {self.id}")
+            if request.peer_id == self.id:
+                await self.publish(Message(
+                    sender_id=self.id,
+                    thread_id=message.thread_id,
+                    title=MessageType.AGENT_IDENTIFICATION_DETAIL_RESPONSE,
+                    data=AgentDetail(
+                        name=self.name,
+                        peer_id=self.id
+                    )
+                ).model_dump_json())
 
     async def publish(self, message):
         msg = orjson.dumps(message)
