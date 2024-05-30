@@ -1,33 +1,4 @@
-[package]
-name = "rk-core"
-version = "0.1.14"
-edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-[lib]
-name = "rk_core"
-crate-type = ["cdylib"]
-
-[dependencies]
-pyo3 = { version = "0.18.1", features = ["extension-module"] }
-pyo3-asyncio = { version = "0.18.0", features = ["attributes", "tokio-runtime"] }
-pyo3-log = "0.8.3"
-log = "0.4.19"
-tokio = { version = "1.29.1", features = ["full"] }
-chrono = "0.4.26"
-anyhow = "1.0.72"
-uuid = "1.4.1"
-
-lazy_static = "1.4.0"
-serde = { version = "1.0.171", features = ["derive"] }
-serde_json = "1.0.93"
-
-
-async-trait = "0.1"
-env_logger = "0.10.0"
-futures = "0.3.28"
-libp2p = { version = "0.52.1", features = ["tokio", "gossipsub", "mdns", "noise", "macros", "tcp", "yamux"] }
-libp2p-quic = { version = "0.8.0-alpha", features = ["tokio"] }
-
-redis = { version = "0.23.0", features = ["tokio-comp"] }
-nanoid = "0.4.0"
+[workspace]
+members = [
+    "libs/ceylonai"
+]
