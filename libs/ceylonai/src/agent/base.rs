@@ -1,4 +1,4 @@
-use crate::agent::Task;
+use crate::tasks::Task;
 
 pub struct BaseAgent<Tt, Rt> {
     pub name: String,
