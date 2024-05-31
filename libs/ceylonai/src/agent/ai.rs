@@ -1,60 +1,73 @@
+use std::error::Error;
+use async_trait::async_trait;
+use serde_json::Value;
 use crate::agent::base::BaseAgent;
 use crate::tasks::llm_task::LLMTask;
 use crate::tasks::Task;
 
-pub struct LLMAgent<Tt, Rt>
-    where
-        Tt: Send + Sync,
-        Rt: Send + Sync,
-{
-    base: BaseAgent<Tt, Rt>,
-    pub model: String,
+pub struct LLMAgent {
+    pub role: String,
+    pub responsibility: String,
+    pub instructions: String,
+    task: LLMTask,
 }
 
-impl<Tt, Rt> LLMAgent<Tt, Rt>
-    where
-        Tt: Send + Sync,
-        Rt: Send + Sync, LLMTask: Task<Tt, Rt>
-{
-    pub fn new(name: String, role: String, api_key: String) -> Self {
+impl LLMAgent {
+    pub fn new(role: String, responsibility: String, api_key: String, model: String) -> Self {
         Self {
-            base: BaseAgent::new(name, role, Box::new(LLMTask::new(api_key))),
-            model: "gpt-3.5-turbo".to_string(),
+            role,
+            responsibility,
+            instructions: "Respond to the following user input.".to_string(),
+            task: LLMTask::new(api_key, model),
         }
     }
+}
 
-    pub async fn execute_task(&self, input: Tt) -> Result<Rt, Box<dyn std::error::Error>> {
-        self.base.execute_task(input).await
+#[async_trait]
+impl BaseAgent for LLMAgent {
+    fn get_role(&self) -> String {
+        self.role.clone()
+    }
+
+    fn get_responsibility(&self) -> String {
+        self.responsibility.clone()
+    }
+
+    fn get_instructions(&self) -> String {
+        self.instructions.clone()
+    }
+
+    async fn execute_task(&self, input: Value) -> Result<Value, Box<dyn Error>> {
+        self.task.execute(input).await
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
     use crate::common::setup_env;
 
     use super::*;
 
     #[tokio::test]
-    async fn test_base_agent_with_ai_task() {
-        setup_env();
-        // Create a BaseAgent
-        let agent: BaseAgent<String, String, > = BaseAgent::new(
-            "Agent1".to_string(),
-            "AI Role".to_string(),
-            Box::new(LLMTask::new(std::env::var("OPENAI_API_KEY").unwrap())),
-        );
-
-
-        // Execute the task and notify listeners
-        let result = agent.execute_task("Some input".to_string()).await;
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
     async fn test_llm_agent() {
         setup_env();
-        let agent = LLMAgent::new("Agent1".to_string(), "AI Role".to_string(), std::env::var("OPENAI_API_KEY").unwrap());
-        let result = agent.execute_task("Some input".to_string()).await;
-        assert!(result.is_ok());
+        let agent = LLMAgent::new(
+            "Agent1".to_string(),
+            "AI Role".to_string(),
+            std::env::var("OPENAI_API_KEY").unwrap(),
+            "gpt-3.5-turbo".to_string());
+        // Execute the task and notify listeners
+        let result = agent.execute_task(json!({
+            "content": "Hello, AI! How are you?"
+        })).await;
+        match result {
+            Ok(result) => {
+                assert_eq!(result["content"], "Hello! I don't have feelings, but I'm here and ready to assist you. How can I help you today?");
+            }
+            Err(e) => {
+                panic!("Error: {}", e);
+            }
+        }
     }
 }

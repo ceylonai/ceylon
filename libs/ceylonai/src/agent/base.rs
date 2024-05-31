@@ -1,22 +1,9 @@
-use crate::tasks::Task;
+use async_trait::async_trait;
 
-pub struct BaseAgent<Tt, Rt> {
-    pub name: String,
-    pub role: String,
-    task: Box<dyn Task<Tt, Rt> + Send + Sync>,
-}
-
-impl<Tt: Send + Sync, Rt: Send + Sync> BaseAgent<Tt, Rt> {
-    pub fn new(name: String, role: String, task: Box<dyn Task<Tt, Rt> + Send + Sync>) -> Self {
-        Self {
-            name,
-            role,
-            task,
-        }
-    }
-
-    pub async fn execute_task(&self, input: Tt) -> Result<Rt, Box<dyn std::error::Error>> {
-        let result = self.task.execute(input).await;
-        Ok(result)
-    }
-}
+#[async_trait]
+pub trait BaseAgent {
+    fn get_role(&self) -> String;
+    fn get_responsibility(&self) -> String;
+    fn get_instructions(&self) -> String;
+    async fn execute_task(&self, input: serde_json::Value) -> Result<serde_json::Value, Box<dyn std::error::Error>>;
+} 

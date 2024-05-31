@@ -1,34 +1,52 @@
 use async_trait::async_trait;
-use crate::services::open_ai::{CompletionRequest, Message, open_ai_completion};
+use serde_json::json;
+
+use crate::services::open_ai::{CompletionRequestData, Message, open_ai_completion, OpenAICompletionRequest};
 use crate::tasks::Task;
 
 // Implement a concrete Task for AI requests
 pub struct LLMTask {
     pub api_key: String,
+    pub model: String,
 }
 
 impl LLMTask {
-    pub(crate) fn new(api_key: String) -> Self {
-        Self { api_key }
+    pub(crate) fn new(api_key: String, model: String) -> Self {
+        Self { api_key, model }
     }
 }
 
 #[async_trait]
-impl Task<String, String> for LLMTask {
-    async fn execute(&self, input: String) -> String {
-        let request_body = CompletionRequest {
+impl Task for LLMTask {
+    async fn execute(&self, input: serde_json::Value) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+        let content = input["content"].as_str().unwrap().to_string();
+        let request_body = OpenAICompletionRequest {
             api_key: self.api_key.to_string(),
-            model: "gpt-3.5-turbo".to_string(),
-            messages: vec![Message {
-                role: "user".to_string(),
-                content: input.clone(),
-            }],
-            temperature: 0.7,
+            data: CompletionRequestData {
+                model: self.model.to_string(),
+                messages: vec![Message {
+                    role: "user".to_string(),
+                    content,
+                }],
+                temperature: 0.7,
+            },
         };
 
-        match open_ai_completion(request_body).await {
-            Ok(response) => response.choices[0].message.content.clone(),
-            Err(_) => "Error occurred during AI completion".to_string(),
-        }
+        let response = open_ai_completion(request_body).await;
+        return match response {
+            Ok(response) => {
+                Ok(json!({
+                    "content": response.choices[0].message.content,
+                    "finish_reason": response.choices[0].message.finish_reason
+                }))
+            }
+            Err(e) => {
+                Err(
+                    Box::new(
+                        e
+                    )
+                )
+            }
+        };
     }
 }
