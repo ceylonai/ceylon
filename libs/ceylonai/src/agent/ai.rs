@@ -63,15 +63,13 @@ impl<Tt, Rt> LLMAgent<Tt, Rt>
 
 #[cfg(test)]
 mod tests {
-    use std::os;
+    use crate::common::setup_env;
     use super::*;
-
-
-    fn setup() {}
 
 
     #[tokio::test]
     async fn test_base_agent_with_ai_task() {
+        setup_env();
         // Create a BaseAgent
         let agent: BaseAgent<String, String, > = BaseAgent::new(
             "Agent1".to_string(),
@@ -87,6 +85,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_llm_agent() {
+        setup_env();
         let agent = LLMAgent::new("Agent1".to_string(), "AI Role".to_string(), std::env::var("OPENAI_API_KEY").unwrap());
         let result = agent.execute_task("Some input".to_string()).await;
         assert!(result.is_ok());
