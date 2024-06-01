@@ -1,3 +1,3 @@
-mod base;
-mod ai;
+pub mod base;
+pub mod ai;
 

@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use serde_json::json;
 
 use crate::services::open_ai::{CompletionRequestData, Message, open_ai_completion, OpenAICompletionRequest};
-use crate::tasks::Task;
+use crate::features::Feature;
 
 // Implement a concrete Task for AI requests
 pub struct LLMTask {
@@ -17,7 +17,7 @@ impl LLMTask {
 }
 
 #[async_trait]
-impl Task for LLMTask {
+impl Feature for LLMTask {
     async fn execute(&self, input: serde_json::Value) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
         let content = input["content"].as_str().unwrap().to_string();
         let request_body = OpenAICompletionRequest {

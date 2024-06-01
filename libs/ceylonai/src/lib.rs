@@ -1,7 +1,8 @@
-mod agent;
+pub mod agent;
 mod services;
 mod common;
-pub mod tasks;
+pub mod features;
+mod team;
 
 pub fn add(left: usize, right: usize) -> usize {
     left + right
