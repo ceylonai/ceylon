@@ -212,7 +212,7 @@ fn create_node(name: String, is_leader: bool) -> Node {
 mod tests {
     use std::hash::Hash;
 
-    use crate::connect::node::create_node;
+    use crate::node::node::create_node;
 
     #[test]
     fn test_ping() {

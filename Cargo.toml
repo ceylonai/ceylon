@@ -1,4 +1,6 @@
 [workspace]
 members = [
-    "libs/ceylonai"
-, "libs/utils/utils-random-names"]
+    "libs/sangedama",
+    "libs/utils/utils-random-names",
+    "bindings/python"
+]

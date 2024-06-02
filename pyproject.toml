@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "rk-core"
+version = "0.1.0"
+description = ""
+authors = ["dewmal <dewmal@syigen.com>"]
+readme = "README.md"
+packages = [{include = "rk_core"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

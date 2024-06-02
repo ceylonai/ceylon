@@ -1,0 +1,13 @@
+[package]
+name = "ceylonai"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "ceylonai"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.21.2", features = ["gil-refs", "full"] }
+sangedama = { version = "0.1.0", path = "../../libs/sangedama" }
