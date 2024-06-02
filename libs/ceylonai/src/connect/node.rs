@@ -43,9 +43,9 @@ struct Node {
 }
 
 impl Node {
-    pub fn connect(&mut self, port: u16) {
+    pub fn connect(&mut self, port: u16, topic_str: &str) {
         // Create a Gossipsub topic
-        let topic = gossipsub::IdentTopic::new("test-net");
+        let topic = gossipsub::IdentTopic::new(topic_str);
         // subscribes to our topic
         self.swarm
             .behaviour_mut()
@@ -123,19 +123,6 @@ impl Node {
                                 },
                             }
                         },
-
-
-                        // SwarmEvent::Behaviour(NetworkBehaviour::Gossipsub(gossipsub::Event::Subscribed { peer_id, topic })) => {
-                        //     println!("{:?} Subscribed to topic {:?}", self.name, topic);
-                        //     self.swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
-                        // },
-                        // SwarmEvent::Behaviour(NetworkBehaviour::Gossipsub(gossipsub::Event::Unsubscribed { peer_id, topic })) => {
-                        //     println!("{:?} Unsubscribed from topic {:?}", self.name, topic);
-                        //     self.swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
-                        // },
-                        // e => {
-                        //     println!("WILD CARD {:?} {:?}", self.name, e);
-                        // },
                         _ => {
                            println!( "{:?} WILD CARD", self.name);
                     }, // Wildcard pattern to cover all other cases
@@ -200,6 +187,7 @@ mod tests {
     #[test]
     fn test_ping() {
         let port_id = 8888;
+        let topic = "test_topic";
         let mut node_0 = create_node("node_0".to_string(), true);
         let mut node_1 = create_node("node_1".to_string(), false);
 
@@ -209,7 +197,7 @@ mod tests {
             .unwrap();
 
         runtime.spawn(async move {
-            node_0.connect(port_id);
+            node_0.connect(port_id,topic);
             node_0.run().await;
         });
 
@@ -217,7 +205,7 @@ mod tests {
             // wait for 1 event to make sure swarm0 is listening
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
-            node_1.connect(port_id);
+            node_1.connect(port_id,topic);
             node_1.run().await;
         });
     }
