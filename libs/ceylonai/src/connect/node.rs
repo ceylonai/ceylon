@@ -8,7 +8,7 @@ use libp2p::{
     Multiaddr, SwarmBuilder,
 };
 use libp2p_gossipsub::{MessageId, PublishError};
-use tokio::{io, io::AsyncBufReadExt, select};
+use tokio::{io, select};
 
 // We create a custom network behaviour that combines Gossipsub and Mdns.
 #[derive(NetworkBehaviour)]
