@@ -7,9 +7,8 @@ use libp2p::{
     swarm::{NetworkBehaviour, Swarm, SwarmEvent},
     Multiaddr, SwarmBuilder,
 };
-
+use libp2p_gossipsub::{MessageId, PublishError};
 use tokio::{io, io::AsyncBufReadExt, select};
-use tracing_subscriber::fmt::time;
 
 // We create a custom network behaviour that combines Gossipsub and Mdns.
 #[derive(NetworkBehaviour)]
@@ -40,6 +39,7 @@ struct Node {
     name: String,
     swarm: Swarm<NodeBehaviour>,
     is_leader: bool,
+    subscribed_topics: Vec<String>,
 }
 
 impl Node {
@@ -67,6 +67,22 @@ impl Node {
         }
     }
 
+    pub fn broadcast(&mut self, message: &[u8]) -> Result<Vec<MessageId>, PublishError> {
+        let mut message_ids = vec![];
+        for topic in self.subscribed_topics.clone() {
+            let topic = gossipsub::IdentTopic::new(topic);
+            match self.swarm.behaviour_mut().gossipsub.publish(topic, message) {
+                Ok(id) => {
+                    message_ids.push(id);
+                }
+                Err(e) => {
+                    return Err(e);
+                }
+            }
+        }
+        Ok(message_ids)
+    }
+
     async fn run(mut self) {
         loop {
             select! {
@@ -86,18 +102,31 @@ impl Node {
 
                             match event {
                                 gossipsub::Event::Message { propagation_source, message_id, message } => {
-                                    println!("{:?} Received message '{:?}' from {:?} on {:?}", self.name, String::from_utf8_lossy(&message.data), propagation_source, message_id);                                
-                                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-                                    self.swarm
-                                        .behaviour_mut().gossipsub
-                                        .publish(message.topic.clone(), format!( "Hi from {:?} at {:?}", self.name,SystemTime::now()  ).as_bytes()).unwrap();
+                                    println!("{:?} Received message '{:?}' from {:?} on {:?}", self.name, String::from_utf8_lossy(&message.data), propagation_source, message_id);
+                                    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                                match self.broadcast(format!("Hi from {:?} at {:?}", self.name,SystemTime::now()  ).as_bytes()){
+                                        Ok(id) => {
+                                            println!("{:?} Broadcasted message  on {:?}", self.name, id);
+                                        }
+                                        Err(e) => {
+                                            println!("{:?} Failed to broadcast message on {:?}", self.name, e);
+                                        }
+                                };
                                 },
 
                                 gossipsub::Event::Subscribed { peer_id, topic } => {
-                                    println!("{:?} Subscribed to topic {:?}", self.name, topic);
-                                    self.swarm
-                                        .behaviour_mut().gossipsub
-                                        .publish(topic.clone(), format!( "{:?} Subscribed to topic {:?}", self.name, topic).as_bytes()).unwrap();
+                                    println!("{:?} Subscribed to topic {:?}", self.name, topic.clone().into_string());
+                                    self.subscribed_topics.push(topic.into_string());
+
+                                    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                                    match self.broadcast( format!("Hi from {:?} at {:?}", self.name,SystemTime::now()  ).as_bytes() ){
+                                        Ok(id) => {
+                                            println!("{:?} Broadcasted message  on {:?}", self.name, id);
+                                        }
+                                        Err(e) => {
+                                            println!("{:?} Failed to broadcast message on {:?}", self.name, e);
+                                        }
+                                };
                                 },
 
                                 _ => {
@@ -174,6 +203,7 @@ fn create_node(name: String, is_leader: bool) -> Node {
         name,
         swarm,
         is_leader,
+        subscribed_topics: Vec::new(),
     }
 }
 
@@ -197,7 +227,7 @@ mod tests {
             .unwrap();
 
         runtime.spawn(async move {
-            node_0.connect(port_id,topic);
+            node_0.connect(port_id, topic);
             node_0.run().await;
         });
 
@@ -205,7 +235,7 @@ mod tests {
             // wait for 1 event to make sure swarm0 is listening
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
-            node_1.connect(port_id,topic);
+            node_1.connect(port_id, topic);
             node_1.run().await;
         });
     }
