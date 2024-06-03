@@ -1,10 +1,7 @@
+mod agent;
+
 use pyo3::prelude::*;
 
-/// Formats the sum of two numbers as string.
-#[pyfunction]
-fn sum_as_string(a: usize, b: usize) -> PyResult<String> {
-    Ok((a + b).to_string())
-}
 
 #[pyfunction]
 fn get_version() -> String {
@@ -15,6 +12,10 @@ fn get_version() -> String {
 #[pymodule]
 fn ceylonai(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_version, m)?)?;
-    m.add_function(wrap_pyfunction!(sum_as_string, m)?)?;
+
+
+    m.add_class::<agent::agent::AbstractAgent>()?;
+
+
     Ok(())
 }
