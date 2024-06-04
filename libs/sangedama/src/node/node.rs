@@ -8,7 +8,9 @@ use libp2p::{
     Multiaddr, SwarmBuilder,
 };
 use libp2p_gossipsub::{MessageId, PublishError};
-use tokio::{io, select};
+use serde_json::json;
+use tokio::sync::mpsc;
+use tokio::{io, select, spawn};
 
 // We create a custom network behaviour that combines Gossipsub and Mdns.
 #[derive(NetworkBehaviour)]
@@ -40,6 +42,9 @@ struct Node {
     swarm: Swarm<NodeBehaviour>,
     is_leader: bool,
     subscribed_topics: Vec<String>,
+
+    in_rx: tokio::sync::mpsc::Receiver<Vec<u8>>,
+    out_tx: tokio::sync::mpsc::Sender<Vec<u8>>,
 }
 
 impl Node {
@@ -84,8 +89,29 @@ impl Node {
     }
 
     async fn run(mut self) {
+        // let swarm_behaviour = self.swarm.behaviour_mut();
+        // let subscribed_topics = self.subscribed_topics.clone();
+        // while let Some(message) = self.in_rx.recv().await {
+        //     // println!("Received: {:?}", String::from_utf8_lossy(&message));
+        //
+        // }
+
         loop {
             select! {
+
+                message =  self.in_rx.recv() => match message {
+                    Some(message) => {
+                        println!("{:?} Received: {:?}", self.name, String::from_utf8_lossy(&message));
+                        self.broadcast( json!({
+                    "data": String::from_utf8_lossy(&message),
+                    "timestamp": SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis()
+                }).to_string().as_bytes()).unwrap();
+                    }
+                    None => {
+                        println!("{:?} Received: None", self.name);
+                    }
+                }  ,
+
                 event = self.swarm.select_next_some() => match event {
                          SwarmEvent::NewListenAddr { address, .. } => {
                             println!("{:?} Listening on {:?}", self.name, address);
@@ -104,29 +130,45 @@ impl Node {
                                 gossipsub::Event::Message { propagation_source, message_id, message } => {
                                     println!("{:?} Received message '{:?}' from {:?} on {:?}", self.name, String::from_utf8_lossy(&message.data), propagation_source, message_id);
                                     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-                                match self.broadcast(format!("Hi from {:?} at {:?}", self.name,SystemTime::now()  ).as_bytes()){
-                                        Ok(id) => {
-                                            println!("{:?} Broadcasted message  on {:?}", self.name, id);
-                                        }
-                                        Err(e) => {
-                                            println!("{:?} Failed to broadcast message on {:?}", self.name, e);
-                                        }
-                                };
+                                    self.out_tx.clone().send(
+                                    json!({
+                                         "data": String::from_utf8_lossy(&message.data),
+                                         "timestamp": SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis(),
+                                         "event": "onMessage",
+                                         "id": message_id.to_string(),
+                                         "peer": propagation_source.to_string()
+                                    }).to_string().as_bytes().to_vec()
+                                ).await.unwrap();
+                                // match self.broadcast(format!("Hi from {:?} at {:?}", self.name,SystemTime::now()  ).as_bytes()){
+                                //         Ok(id) => {
+                                //             println!("{:?} Broadcasted message  on {:?}", self.name, id);
+                                //         }
+                                //         Err(e) => {
+                                //             println!("{:?} Failed to broadcast message on {:?}", self.name, e);
+                                //         }
+                                // };
                                 },
 
                                 gossipsub::Event::Subscribed { peer_id, topic } => {
                                     println!("{:?} Subscribed to topic {:?}", self.name, topic.clone().into_string());
                                     self.subscribed_topics.push(topic.into_string());
-
                                     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-                                    match self.broadcast( format!("Hi from {:?} at {:?}", self.name,SystemTime::now()  ).as_bytes() ){
-                                        Ok(id) => {
-                                            println!("{:?} Broadcasted message  on {:?}", self.name, id);
-                                        }
-                                        Err(e) => {
-                                            println!("{:?} Failed to broadcast message on {:?}", self.name, e);
-                                        }
-                                };
+                                  self.out_tx.clone().send(
+                                    json!({
+                                         "data": "Subscribed",
+                                         "timestamp": SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis(),
+                                         "event": "onSubscribed",
+                                         "peer": "self"
+                                    }).to_string().as_bytes().to_vec()
+                                ).await.unwrap();
+                                //     match self.broadcast( format!("Hi from {:?} at {:?}", self.name,SystemTime::now()  ).as_bytes() ){
+                                //         Ok(id) => {
+                                //             println!("{:?} Broadcasted message  on {:?}", self.name, id);
+                                //         }
+                                //         Err(e) => {
+                                //             println!("{:?} Failed to broadcast message on {:?}", self.name, e);
+                                //         }
+                                // };
                                 },
 
                                 _ => {
@@ -153,7 +195,7 @@ impl Node {
                             }
                         },
                         _ => {
-                           println!( "{:?} WILD CARD", self.name);
+                           println!( "WILD CARD");
                     }, // Wildcard pattern to cover all other cases
                 }
             }
@@ -161,7 +203,11 @@ impl Node {
     }
 }
 
-fn create_node(name: String, is_leader: bool) -> Node {
+fn create_node(
+    name: String,
+    is_leader: bool,
+    in_rx: mpsc::Receiver<Vec<u8>>,
+) -> (Node, mpsc::Receiver<Vec<u8>>) {
     let swarm = SwarmBuilder::with_new_identity()
         .with_tokio()
         .with_tcp(
@@ -199,18 +245,27 @@ fn create_node(name: String, is_leader: bool) -> Node {
         })
         .unwrap()
         .build();
-    Node {
-        name,
-        swarm,
-        is_leader,
-        subscribed_topics: Vec::new(),
-    }
+
+    let (out_tx, _rx) = mpsc::channel(100);
+
+    (
+        Node {
+            name,
+            swarm,
+            is_leader,
+            subscribed_topics: Vec::new(),
+            in_rx,
+            out_tx,
+        },
+        _rx,
+    )
 }
 
 // Create test
 #[cfg(test)]
 mod tests {
     use std::hash::Hash;
+    use serde_json::json;
 
     use crate::node::node::create_node;
 
@@ -218,8 +273,12 @@ mod tests {
     fn test_ping() {
         let port_id = 8888;
         let topic = "test_topic";
-        let mut node_0 = create_node("node_0".to_string(), true);
-        let mut node_1 = create_node("node_1".to_string(), false);
+
+        let (tx_0, mut rx_0) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
+        let (tx_1, mut rx_1) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
+
+        let (mut node_0, mut rx_o_0) = create_node("node_0".to_string(), true, rx_0);
+        let (mut node_1, mut rx_o_1) = create_node("node_1".to_string(), false, rx_1);
 
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -229,6 +288,26 @@ mod tests {
         runtime.spawn(async move {
             node_0.connect(port_id, topic);
             node_0.run().await;
+        });
+
+        runtime.spawn(async move {
+            while let Some(message) = rx_o_0.recv().await {
+                println!("Node_0 Received: {}", String::from_utf8_lossy(&message));
+                tx_0.send(json!({
+                    "data": "Hi from Node_1",
+                }).to_string().as_bytes().to_vec()).await.unwrap();
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
+        });
+
+        runtime.spawn(async move {
+            while let Some(message) = rx_o_1.recv().await {
+                println!("Node_1 Received: {}", String::from_utf8_lossy(&message));
+                tx_1.send(json!({
+                    "data": "Hi from Node_2",
+                }).to_string().as_bytes().to_vec()).await.unwrap();
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
         });
 
         runtime.block_on(async move {

@@ -23,6 +23,9 @@ class AgentCy:
     async def publish(self, message: dict):
         await self.__agent__.send(json.dumps(message))
 
+    async def start(self):
+        await self.__agent__.start()
+
 
 async def start():
     agent_1 = AgentCy("agent_1")
@@ -33,10 +36,16 @@ async def start():
             await agent.publish(message)
             await asyncio.sleep(random.randint(10, 100) / 100)
 
+    async def start_agents(agent: AgentCy):
+        await agent.start()
+
+    s_t1 = asyncio.create_task(start_agents(agent_1))
+    s_t2 = asyncio.create_task(start_agents(agent_2))
+
     t1 = asyncio.create_task(test_func(agent_1, {"message": "hello11"}))
     t2 = asyncio.create_task(test_func(agent_2, {"message": "hello22"}))
 
-    await asyncio.gather(t1, t2)
+    await asyncio.gather(s_t1, s_t2, t1, t2)
 
 
 if __name__ == '__main__':

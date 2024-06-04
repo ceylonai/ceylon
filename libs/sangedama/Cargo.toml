@@ -17,3 +17,5 @@ libp2p-gossipsub = "0.46.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing = "0.1.40"
 futures = "0.3.30"
+log = "0.4.21"
+env_logger = "0.11.3"

@@ -26,12 +26,13 @@ impl AbstractAgent {
         Ok(())
     }
 
-    // pub async fn start(&mut self) {
-    //     // self.node.connect(8888, "test_topic");
-    //     // async_std::task::block_on(async move {
-    //     //     self.node.run().await;
-    //     // });
-    // }
+    pub async fn start(&mut self) {
+        println!("{:?} start ", self.name);
+        // self.node.connect(8888, "test_topic");
+        // async_std::task::block_on(async move {
+        //     self.node.run().await;
+        // });
+    }
     //
     // pub async fn send_message(&mut self, message: &str) {
     //     // self.node.broadcast(message.as_bytes()).unwrap();
