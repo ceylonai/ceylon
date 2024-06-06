@@ -1,7 +1,7 @@
 use pyo3::{pyclass, pymethods, Py, PyObject, PyResult};
 use pyo3::types::PyFunction;
-use crossbeam::channel::{unbounded, Sender, Receiver};
-use std::thread;
+use async_std::channel::{unbounded, Sender, Receiver};
+use async_std::task;
 
 #[pyclass]
 pub struct AbstractAgent {
@@ -28,8 +28,8 @@ impl AbstractAgent {
     pub fn send(&self, message: PyObject) -> PyResult<()> {
         println!("{:?} send message {:?} ", self.name, message);
         let sender = self.sender.clone();
-        thread::spawn(move || {
-            sender.send(message).unwrap();  // Send the message
+        task::spawn(async move {
+            sender.send(message).await.unwrap();  // Send the message
         });
         Ok(())
     }
@@ -38,11 +38,11 @@ impl AbstractAgent {
         println!("{:?} start ", self.name);
         if let Some(receiver) = self.receiver.take() {
             let name = self.name.clone();
-            thread::spawn(move || {
+            task::spawn(async move {
                 loop {
-                    match receiver.recv() {
+                    match receiver.recv().await {
                         Ok(message) => {
-                            println!("{:?} received message {:?}", name, message);
+                            println!("{:?} received 1 message {:?}", name, message);
                             // Here you can process the message
                         }
                         Err(err) => {
@@ -54,5 +54,22 @@ impl AbstractAgent {
             });
         }
         Ok(())
+    }
+}
+
+impl AbstractAgent {
+    async fn receive_messages(&self, receiver: Receiver<PyObject>, name: String) {
+        loop {
+            match receiver.recv().await {
+                Ok(message) => {
+                    println!("{:?} received message {:?}", name, message);
+                    // Here you can process the message
+                }
+                Err(err) => {
+                    println!("Error receiving message: {:?}", err);
+                    break;
+                }
+            }
+        }
     }
 }
