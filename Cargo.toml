@@ -2,5 +2,5 @@
 members = [
     "libs/sangedama",
     "libs/utils/utils-random-names",
-    "bindings/python"
+    "bindings/python",
 ]

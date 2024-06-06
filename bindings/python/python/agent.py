@@ -21,10 +21,10 @@ class AgentCy:
         print(self.name, sender, message)
 
     async def publish(self, message: dict):
-        await self.__agent__.send(json.dumps(message))
+        self.__agent__.send(json.dumps(message))
 
     async def start(self):
-        await self.__agent__.start()
+        self.__agent__.start()
 
 
 async def start():
