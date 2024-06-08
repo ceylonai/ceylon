@@ -1,7 +1,8 @@
-use pyo3::{pyclass, pymethods, Py, PyObject, PyResult};
+use pyo3::{pyclass, pymethods, Py, PyObject, PyResult, Python};
 use pyo3::types::PyFunction;
 use async_std::channel::{unbounded, Sender, Receiver};
 use async_std::task;
+use pyo3::exceptions::asyncio;
 
 #[pyclass]
 pub struct AbstractAgent {
@@ -38,12 +39,16 @@ impl AbstractAgent {
         println!("{:?} start ", self.name);
         if let Some(receiver) = self.receiver.take() {
             let name = self.name.clone();
+            let fnc = self.fnc.clone();
             task::spawn(async move {
                 loop {
+                    let name_clone = name.clone();
                     match receiver.recv().await {
                         Ok(message) => {
-                            println!("{:?} received 1 message {:?}", name, message);
-                            // Here you can process the message
+                            println!("{:?} received 1 message {:?}", name_clone.clone(), message);
+                            Python::with_gil(|py| {
+                                let _ = fnc.call1(py, (name_clone, message, ));
+                            });
                         }
                         Err(err) => {
                             println!("Error receiving message: {:?}", err);
