@@ -505,6 +505,7 @@ checksum = "41c270e7540d725e65ac7f1b212ac8ce349719624d7bcff99f8e2e488e8cf03f"
 name = "ceylon"
 version = "0.11.0"
 dependencies = [
+ "async-trait",
  "sangedama",
  "serde_json",
  "thiserror",

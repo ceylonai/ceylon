@@ -6,10 +6,22 @@ namespace ceylon {
 };
 
 interface AgentCore{
-    constructor(string id,string name,string workspace_id,boolean is_leader);
+    constructor(string id,string name,string workspace_id,boolean is_leader, MessageHandler on_message, Processor processor);
 
     string id();
     string name();
     string workspace_id();
     boolean is_leader();
+
+    [Async]
+    void broadcast(string message);
+};
+
+callback interface MessageHandler {
+  void on_message(string agent_id,string message);
+};
+
+callback interface Processor {
+    [Async]
+    string run();
 };

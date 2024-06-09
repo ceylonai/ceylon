@@ -1,13 +1,29 @@
 import asyncio
+import time
 
 from ceylon import *
 
 print(version())
 
 
+class Agent(AgentCore, MessageHandler, Processor):
+    def __init__(self, id, name, is_leader, workspace_id):
+        super().__init__(id=id, name=name, is_leader=is_leader, workspace_id=workspace_id, on_message=self,
+                         processor=self)
+
+    def on_message(self, agent_id, message):
+        print(f"{self.name()} Received message from = '{agent_id}' message= {message}", agent_id, message)
+
+    async def run(self):
+        while True:
+            await self.broadcast("Hi from " + self.name() + " at " + str(time.time()))
+            print(f"{self.name()} Broadcasted message")
+            await asyncio.sleep(1)
+
+
 async def main():
-    agent1 = AgentCore(name="ceylon-ai-1", is_leader=True, id="ceylon-ai-1", workspace_id="ceylon-ai")
-    agent2 = AgentCore(name="ceylon-ai-2", is_leader=False, id="ceylon-ai-2", workspace_id="ceylon-ai")
+    agent1 = Agent(name="ceylon-ai-1", is_leader=True, id="ceylon-ai-1", workspace_id="ceylon-ai")
+    agent2 = Agent(name="ceylon-ai-2", is_leader=False, id="ceylon-ai-2", workspace_id="ceylon-ai")
 
     await run_workspace([agent1, agent2])
 

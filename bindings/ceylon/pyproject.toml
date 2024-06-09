@@ -10,7 +10,4 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
-[tool.maturin]
-python-source = "python"
-module-name = "ceylon.ceylon"
 

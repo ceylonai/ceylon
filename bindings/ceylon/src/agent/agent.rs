@@ -1,29 +1,44 @@
-use std::sync::Arc;
-use serde_json::json;
+use tokio::sync::{Mutex};
+use std::sync::{Arc};
 use tokio::runtime::Runtime;
 
 use sangedama::node::node::create_node;
 
 // The call-answer, callback interface.
-pub trait MessageHandler {
+pub trait MessageHandler: Send + Sync {
     fn on_message(&self, agent_id: String, message: String);
 }
 
-#[derive(Debug, Default, Clone)]
+// The call-answer, callback interface.
+
+#[async_trait::async_trait]
+pub trait Processor: Send + Sync {
+    async fn run(&self);
+}
+
 pub struct AgentCore {
     _name: String,
     _is_leader: bool,
     _id: String,
     _workspace_id: String,
+    _processor: Arc<Mutex<Box<dyn Processor>>>,
+    _on_message: Arc<Mutex<Box<dyn MessageHandler>>>,
+    rx_0: Arc<Mutex<tokio::sync::mpsc::Receiver<Vec<u8>>>>,
+    tx_0: tokio::sync::mpsc::Sender<Vec<u8>>,
 }
 
 impl AgentCore {
-    pub fn new( id: String,name: String, workspace_id: String,is_leader: bool) -> Self {
+    pub fn new(id: String, name: String, workspace_id: String, is_leader: bool, on_message: Box<dyn MessageHandler>, processor: Box<dyn Processor>) -> Self {
+        let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
         Self {
             _name: name,
             _is_leader: is_leader,
             _id: id,
             _workspace_id: workspace_id,
+            _on_message: Arc::new(Mutex::new(on_message)),
+            _processor: Arc::new(Mutex::new(processor)),
+            rx_0: Arc::new(Mutex::new(rx_0)),
+            tx_0,
         }
     }
 
@@ -42,6 +57,10 @@ impl AgentCore {
     pub fn workspace_id(&self) -> String {
         self._workspace_id.clone()
     }
+
+    pub async fn broadcast(&self, message: String) {
+        self.tx_0.send(message.to_string().as_bytes().to_vec()).await.unwrap();
+    }
 }
 
 impl AgentCore {
@@ -51,21 +70,32 @@ impl AgentCore {
 
         let agent_name = self._name.clone();
         let workspace_id = self._workspace_id.clone();
-        let (tx_0, mut rx_0) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
 
+
+        let (tx_0, mut rx_0) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
         let (mut node_0, mut rx_o_0) = create_node(agent_name.clone(), true, rx_0);
+        let on_message = self._on_message.clone();
 
         tokio::spawn(async move {
-            while let Some(message) = rx_o_0.recv().await {
-                println!("{:?} Received: {}", agent_name, String::from_utf8_lossy(&message));
-                tx_0.send(json!({
-                    "data": format!("Hi from {}", agent_name),
-                }).to_string().as_bytes().to_vec()).await.unwrap();
-                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-            }
+            node_0.connect(port_id, topic);
+            node_0.run().await;
         });
-        node_0.connect(port_id, topic);
-        node_0.run().await;
+
+        let processor = self._processor.clone();
+        tokio::spawn(async move {
+            processor.lock().await.run();
+        });
+
+        let rx = Arc::clone(&self.rx_0);
+        loop {
+            if let Some(message) = rx.lock().await.recv().await {
+                tx_0.send(message).await.unwrap();
+            }
+
+            if let Some(message) = rx_o_0.recv().await {
+                on_message.lock().await.on_message(agent_name.clone(), String::from_utf8_lossy(&message).to_string());
+            }
+        }
     }
 }
 
@@ -74,7 +104,7 @@ pub async fn run_workspace(agents: Vec<Arc<AgentCore>>) {
     let mut rt = Runtime::new().unwrap();
     let mut tasks = vec![];
     for agent in agents.iter() {
-        let mut agent = agent.clone();
+        let agent = agent.clone();
         let task = rt.spawn(async move {
             agent.start().await;
         });
