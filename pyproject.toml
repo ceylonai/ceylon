@@ -4,7 +4,8 @@ version = "0.1.0"
 description = ""
 authors = ["dewmal <dewmal@syigen.com>"]
 readme = "README.md"
-packages = [{include = "rk_core"}]
+packages = [
+]
 
 [tool.poetry.dependencies]
 python = "^3.11"

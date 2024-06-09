@@ -1,0 +1,15 @@
+[package]
+name = "ceylon"
+version = "0.11.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "ceylon"
+crate-type = ["cdylib"]
+
+[dependencies]
+uniffi = "0.27.3"
+
+[build-dependencies]
+uniffi = { version = "0.27.3", features = ["build"] }

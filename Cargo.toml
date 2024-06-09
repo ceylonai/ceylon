@@ -2,5 +2,8 @@
 members = [
     "libs/sangedama",
     "libs/utils/utils-random-names",
-    "bindings/python",
+    "bindings/ceylon-ai",
+]
+exclude = [
+    "bindings/ceylon-ai-old"
 ]
