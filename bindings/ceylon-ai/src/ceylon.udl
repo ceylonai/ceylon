@@ -2,13 +2,14 @@ namespace ceylon {
   string version();
 
   [Async]
-  void run_workspace(sequence<Agent> agents,string workspace_id);
+  void run_workspace(sequence<AgentCore> agents);
 };
 
-dictionary Agent{
-    string name;
-    boolean is_leader=false;
-    string? id = "";
-    string? workspace_id = "";
-};
+interface AgentCore{
+    constructor(string id,string name,string workspace_id,boolean is_leader);
 
+    string id();
+    string name();
+    string workspace_id();
+    boolean is_leader();
+};

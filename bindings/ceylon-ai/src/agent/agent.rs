@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use serde_json::json;
 use tokio::runtime::Runtime;
 
@@ -9,24 +10,47 @@ pub trait MessageHandler {
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct Agent {
-    pub name: String,
-    pub is_leader: bool,
-    pub id: Option<String>,
-    pub workspace_id: Option<String>,
+pub struct AgentCore {
+    _name: String,
+    _is_leader: bool,
+    _id: String,
+    _workspace_id: String,
 }
 
-impl Agent {
-    fn is_valid(&self) -> bool {
-        self.id.is_some() && self.workspace_id.is_some() && !self.name.is_empty()
+impl AgentCore {
+    pub fn new( id: String,name: String, workspace_id: String,is_leader: bool) -> Self {
+        Self {
+            _name: name,
+            _is_leader: is_leader,
+            _id: id,
+            _workspace_id: workspace_id,
+        }
     }
 
+    pub fn name(&self) -> String {
+        self._name.clone()
+    }
+
+    pub fn is_leader(&self) -> bool {
+        self._is_leader
+    }
+
+    pub fn id(&self) -> String {
+        self._id.clone()
+    }
+
+    pub fn workspace_id(&self) -> String {
+        self._workspace_id.clone()
+    }
+}
+
+impl AgentCore {
     async fn start(&self) {
         let port_id = 8888;
         let topic = "test_topic";
 
-        let agent_name = self.name.clone();
-        let workspace_id = self.workspace_id.clone().unwrap();
+        let agent_name = self._name.clone();
+        let workspace_id = self._workspace_id.clone();
         let (tx_0, mut rx_0) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
 
         let (mut node_0, mut rx_o_0) = create_node(agent_name.clone(), true, rx_0);
@@ -46,19 +70,15 @@ impl Agent {
 }
 
 
-
-pub async fn run_workspace(agents: Vec<Agent>, workspace_id: String) {
+pub async fn run_workspace(agents: Vec<Arc<AgentCore>>) {
     let mut rt = Runtime::new().unwrap();
     let mut tasks = vec![];
     for agent in agents.iter() {
         let mut agent = agent.clone();
-        agent.workspace_id = Some(workspace_id.clone());
-        if agent.is_valid() {
-            let task = rt.spawn(async move {
-                agent.start().await;
-            });
-            tasks.push(task);
-        }
+        let task = rt.spawn(async move {
+            agent.start().await;
+        });
+        tasks.push(task);
     }
 
     for task in tasks {

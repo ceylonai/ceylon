@@ -5,7 +5,7 @@ fn version() -> String {
 }
 
 pub use agent::{agent::{
-    Agent,
+    AgentCore,
     run_workspace
 }};
 
