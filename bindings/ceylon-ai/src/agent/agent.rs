@@ -1,6 +1,7 @@
-use std::sync::Arc;
 use serde_json::json;
-use sangedama::node::node::{create_node, Node};
+use tokio::runtime::Runtime;
+
+use sangedama::node::node::create_node;
 
 #[derive(Debug, Default, Clone)]
 pub struct Agent {
@@ -14,76 +15,47 @@ impl Agent {
     fn is_valid(&self) -> bool {
         self.id.is_some() && self.workspace_id.is_some() && !self.name.is_empty()
     }
-}
 
-#[derive(Debug, thiserror::Error)]
-pub enum AgentConnectionError {
-    #[error("InvalidDestination")]
-    InvalidDestination
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum AgentStartError {
-    #[error("InternalError")]
-    InternalError
-}
-
-pub struct AgentRunner {
-    agent: Arc<Agent>,
-}
-
-impl AgentRunner {
-    pub fn new(agent: Agent, workspace_id: String) -> Self {
-        let id = uuid::Uuid::new_v4().to_string();
-        let mut agent = agent.clone();
-        agent.id = Some(id);
-        agent.workspace_id = Some(workspace_id);
-        Self {
-            agent: Arc::new(agent),
-        }
-    }
-
-    pub async fn connect(&self, url: String) -> Result<String, AgentConnectionError> {
-        // if self.agent.is_valid() || url.is_empty() {
-        //     return Err(AgentConnectionError::InvalidDestination);
-        // }
-        Ok(url)
-    }
-    pub async fn start(&self) -> Result<(), AgentStartError> {
-        println!("Starting {:?}", self.agent);
-
+    async fn start(&self) {
         let port_id = 8888;
         let topic = "test_topic";
 
-        let agent_name = self.agent.name.clone();
-        let workspace_id = self.agent.workspace_id.clone().unwrap();
+        let agent_name = self.name.clone();
+        let workspace_id = self.workspace_id.clone().unwrap();
         let (tx_0, mut rx_0) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
 
-        let (mut node_0, mut rx_o_0) = create_node("node_0".to_string(), true, rx_0);
+        let (mut node_0, mut rx_o_0) = create_node(agent_name.clone(), true, rx_0);
 
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap();
-
-
-        runtime.spawn(async move {
+        tokio::spawn(async move {
             while let Some(message) = rx_o_0.recv().await {
-                println!("Node_0 Received: {}", String::from_utf8_lossy(&message));
+                println!("{:?} Received: {}", agent_name, String::from_utf8_lossy(&message));
                 tx_0.send(json!({
-                    "data": "Hi from Node_1",
+                    "data": format!("Hi from {}", agent_name),
                 }).to_string().as_bytes().to_vec()).await.unwrap();
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             }
         });
-
-        let rt =  runtime.spawn(async move {
-            node_0.connect(port_id, topic);
-            node_0.run().await;
-        });
-
-        rt.await.unwrap();
-        
-        Ok(())
+        node_0.connect(port_id, topic);
+        node_0.run().await;
     }
 }
+
+pub async fn run_workspace(agents: Vec<Agent>, workspace_id: String) {
+    let mut rt = Runtime::new().unwrap();
+    let mut tasks = vec![];
+    for agent in agents.iter() {
+        let mut agent = agent.clone();
+        agent.workspace_id = Some(workspace_id.clone());
+        if agent.is_valid() {
+            let task = rt.spawn(async move {
+                agent.start().await;
+            });
+            tasks.push(task);
+        }
+    }
+
+    for task in tasks {
+        task.await.unwrap();
+    }
+}
+
