@@ -52,22 +52,22 @@ impl AgentRunner {
     pub async fn start(&self) -> Result<(), AgentStartError> {
         println!("Starting {:?}", self.agent);
 
+        let port_id = 8888;
+        let topic = "test_topic";
+
         let agent_name = self.agent.name.clone();
         let workspace_id = self.agent.workspace_id.clone().unwrap();
         let (tx_0, mut rx_0) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
-        let (mut node, mut rx_o_0) = create_node(agent_name, self.agent.is_leader, rx_0);
+
+        let (mut node_0, mut rx_o_0) = create_node("node_0".to_string(), true, rx_0);
 
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .unwrap();
 
-        runtime.spawn(async move {
-            node.connect(8888, workspace_id.as_str());
-            node.run().await;
-        });
 
-        let t1 = runtime.spawn(async move {
+        runtime.spawn(async move {
             while let Some(message) = rx_o_0.recv().await {
                 println!("Node_0 Received: {}", String::from_utf8_lossy(&message));
                 tx_0.send(json!({
@@ -77,10 +77,13 @@ impl AgentRunner {
             }
         });
 
-        runtime.block_on(async move {
-            t1.await.expect("Error");
+        let rt =  runtime.spawn(async move {
+            node_0.connect(port_id, topic);
+            node_0.run().await;
         });
 
+        rt.await.unwrap();
+        
         Ok(())
     }
 }
