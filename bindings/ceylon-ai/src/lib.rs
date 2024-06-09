@@ -6,7 +6,7 @@ fn version() -> String {
 
 pub use agent::{agent::{
     Agent,
-    run_workspace,
+    run_workspace
 }};
 
 uniffi::include_scaffolding!("ceylon");

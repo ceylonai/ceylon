@@ -3,6 +3,11 @@ use tokio::runtime::Runtime;
 
 use sangedama::node::node::create_node;
 
+// The call-answer, callback interface.
+pub trait MessageHandler {
+    fn on_message(&self, agent_id: String, message: String);
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct Agent {
     pub name: String,
@@ -39,6 +44,8 @@ impl Agent {
         node_0.run().await;
     }
 }
+
+
 
 pub async fn run_workspace(agents: Vec<Agent>, workspace_id: String) {
     let mut rt = Runtime::new().unwrap();
