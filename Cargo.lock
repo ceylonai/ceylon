@@ -492,7 +492,10 @@ checksum = "41c270e7540d725e65ac7f1b212ac8ce349719624d7bcff99f8e2e488e8cf03f"
 name = "ceylon"
 version = "0.11.0"
 dependencies = [
+ "serde_json",
+ "thiserror",
  "uniffi",
+ "uuid",
 ]
 
 [[package]]
@@ -3739,6 +3742,15 @@ name = "utils-random-names"
 version = "0.1.0"
 dependencies = [
  "rand",
+]
+
+[[package]]
+name = "uuid"
+version = "1.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a183cf7feeba97b4dd1c0d46788634f6221d87fa961b305bed08c851829efcc0"
+dependencies = [
+ "getrandom",
 ]
 
 [[package]]

@@ -5,6 +5,11 @@ fn version() -> String {
 }
 
 
-pub use agent::{agent::Agent};
+pub use agent::{agent::{
+    Agent,
+    AgentRunner,
+    AgentConnectionError,
+    AgentStartError
+}};
 
 uniffi::include_scaffolding!("ceylon");

@@ -4,6 +4,3 @@ members = [
     "libs/utils/utils-random-names",
     "bindings/ceylon-ai",
 ]
-exclude = [
-    "bindings/ceylon-ai-old"
-]

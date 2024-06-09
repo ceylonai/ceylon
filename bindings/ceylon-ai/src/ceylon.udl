@@ -2,8 +2,29 @@ namespace ceylon {
   string version();
 };
 
-dictionary  Agent{
+dictionary Agent{
     string name;
-    string id;
-    string workspace_id;
+    string? id = "";
+    string? workspace_id = "";
+};
+
+
+[Error]
+enum AgentConnectionError {
+  "InvalidDestination"
+};
+
+[Error]
+enum AgentStartError {
+  "InternalError"
+};
+
+interface AgentRunner {
+  constructor(Agent agent ,string workspace_id);
+
+  [Throws=AgentConnectionError,Async]
+  string connect(string url);
+
+  [Throws=AgentStartError,Async]
+  void start();
 };

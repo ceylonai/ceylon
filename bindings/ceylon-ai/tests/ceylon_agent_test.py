@@ -1,13 +1,22 @@
+import asyncio
+
 from ceylon import *
 
 print(version())
 
-agent = Agent(
-    id="test",
-    name="test",
-    workspace_id="1.0.0",
-)
 
-print(agent.name)
-print(agent.id)
-print(agent.workspace_id)
+async def main():
+    agent = Agent(name="ceylon-ai")
+
+    print(agent.name)
+    print(agent.id)
+    print(agent.workspace_id)
+
+    agent_runner = AgentRunner(agent, "ceylon-ai-article-writer")
+
+    await agent_runner.connect("http://localhost:8080")
+    await agent_runner.start()
+
+
+if __name__ == '__main__':
+    asyncio.run(main())
