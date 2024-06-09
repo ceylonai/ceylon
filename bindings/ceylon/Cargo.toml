@@ -1,0 +1,20 @@
+[package]
+name = "ceylon"
+version = "0.11.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "ceylon"
+crate-type = ["cdylib"]
+
+[dependencies]
+uniffi = { version = "0.27.3", features = ["tokio", "bindgen", "default"] }
+thiserror = "1.0.61"
+uuid = { version = "1.8.0", features = ["v4"] }
+serde_json = "1.0.117"
+sangedama = { path = "../../libs/sangedama" }
+tokio = { version = "1.38.0", features = ["full"] }
+
+[build-dependencies]
+uniffi = { version = "0.27.3", features = ["build"] }
