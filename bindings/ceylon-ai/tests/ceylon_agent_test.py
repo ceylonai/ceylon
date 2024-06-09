@@ -6,16 +6,18 @@ print(version())
 
 
 async def main():
-    agent = Agent(name="ceylon-ai")
+    agent1 = Agent(name="ceylon-ai", is_leader=True)
+    agent2 = Agent(name="ceylon-ai-2")
 
-    print(agent.name)
-    print(agent.id)
-    print(agent.workspace_id)
+    agent_runner1 = AgentRunner(agent1, "ceylon-ai-article-writer")
 
-    agent_runner = AgentRunner(agent, "ceylon-ai-article-writer")
+    await agent_runner1.connect("http://localhost:8080")
+    await agent_runner1.start()
 
-    await agent_runner.connect("http://localhost:8080")
-    await agent_runner.start()
+    agent_runner2 = AgentRunner(agent2, "ceylon-ai-article-writer")
+
+    await agent_runner2.connect("http://localhost:8080")
+    await agent_runner2.start()
 
 
 if __name__ == '__main__':

@@ -37,7 +37,7 @@ impl From<mdns::Event> for Event {
     }
 }
 
-struct Node {
+pub struct Node {
     name: String,
     swarm: Swarm<NodeBehaviour>,
     is_leader: bool,
@@ -88,7 +88,7 @@ impl Node {
         Ok(message_ids)
     }
 
-    async fn run(mut self) {
+    pub async fn run(mut self) {
         // let swarm_behaviour = self.swarm.behaviour_mut();
         // let subscribed_topics = self.subscribed_topics.clone();
         // while let Some(message) = self.in_rx.recv().await {
@@ -203,7 +203,7 @@ impl Node {
     }
 }
 
-fn create_node(
+pub fn create_node(
     name: String,
     is_leader: bool,
     in_rx: mpsc::Receiver<Vec<u8>>,
