@@ -66,8 +66,7 @@ impl AgentCore {
 }
 
 impl AgentCore {
-    async fn start(&self) { 
-        
+    async fn start(&self) {
         let port_id = 8888;
         let topic = "test_topic";
 
@@ -84,24 +83,22 @@ impl AgentCore {
             node_0.run().await;
         });
 
-        let processor = self._processor.clone();
-        tokio::spawn(async move {
-            processor.lock().await.run().await;
-        });
-
         let rx = Arc::clone(&self.rx_0);
-        loop {
-            if let Some(message) = rx.lock().await.recv().await {
-                tx_0.send(message).await.unwrap();
-            }
+        tokio::spawn(async move {
+            loop {
+                if let Some(message) = rx.lock().await.recv().await {
+                    tx_0.clone().send(message).await.unwrap();
+                }
 
-            if let Some(message) = rx_o_0.recv().await {
-                on_message.lock().await.on_message(agent_name.clone(), String::from_utf8_lossy(&message).to_string()).await;
+                if let Some(message) = rx_o_0.recv().await {
+                    on_message.lock().await.on_message(agent_name.clone(), String::from_utf8_lossy(&message).to_string()).await;
+                }
             }
-        }
+        });
+        let processor = self._processor.clone();
+        processor.lock().await.run().await;
     }
 }
-
 
 pub async fn run_workspace(agents: Vec<Arc<AgentCore>>) {
     let mut rt = Runtime::new().unwrap();
