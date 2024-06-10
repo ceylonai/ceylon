@@ -114,7 +114,8 @@ pub struct Node {
 }
 
 impl Node {
-    pub fn connect(&mut self, port: u16, topic_str: &str) {
+    pub fn connect(&mut self, url: &str, topic_str: &str) {
+        println!("Connecting to {} with topic {}", url, topic_str);
         // Create a Gossipsub topic
         let topic = gossipsub::IdentTopic::new(topic_str);
         // subscribes to our topic
@@ -125,12 +126,12 @@ impl Node {
             .unwrap();
         if self.is_leader {
             self.swarm
-                .listen_on(format!("/ip4/0.0.0.0/tcp/{}", port).parse().unwrap())
+                .listen_on(url.to_string().parse().unwrap())
                 .unwrap();
         } else {
             self.swarm
                 .dial(
-                    format!("/ip4/0.0.0.0/tcp/{}", port)
+                    url.to_string()
                         .parse::<Multiaddr>()
                         .unwrap(),
                 )
@@ -338,6 +339,8 @@ mod tests {
         let port_id = 8888;
         let topic = "test_topic";
 
+        let url = format!("/ip4/0.0.0.0/tcp/{}", port_id);
+
         let (tx_0, mut rx_0) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
         let (tx_1, mut rx_1) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
 
@@ -387,15 +390,17 @@ mod tests {
                 tokio::time::sleep(std::time::Duration::from_millis(3000)).await;
             }
         });
+        let url_ = url.clone();
         runtime.spawn(async move {
-            node_0.connect(port_id, topic);
+            node_0.connect(url_.clone().as_str(), topic);
             node_0.run().await;
         });
+        let url_ = url.clone();
         runtime.block_on(async move {
             // wait for 1 event to make sure swarm0 is listening
             tokio::time::sleep(std::time::Duration::from_millis(10000)).await;
 
-            node_1.connect(port_id, topic);
+            node_1.connect(url_.clone().as_str(), topic);
             node_1.run().await;
         });
     }

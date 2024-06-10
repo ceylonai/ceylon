@@ -11,7 +11,8 @@ pub use agent::{
         Processor,
     },
     workspace::{
-        Workspace
+        Workspace,
+        WorkspaceConfig,
     },
 };
 

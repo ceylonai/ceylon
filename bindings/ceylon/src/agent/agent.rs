@@ -22,7 +22,7 @@ pub struct AgentCore {
     _name: String,
     _is_leader: bool,
     _id: String,
-    _workspace_id: String,
+    _workspace_id: Option<String>,
     _processor: Arc<Mutex<Arc<dyn Processor>>>,
     _on_message: Arc<Mutex<Arc<dyn MessageHandler>>>,
     rx_0: Arc<Mutex<tokio::sync::mpsc::Receiver<Vec<u8>>>>,
@@ -30,14 +30,14 @@ pub struct AgentCore {
 }
 
 impl AgentCore {
-    pub fn new(name: String, workspace_id: String, is_leader: bool, on_message: Arc<dyn MessageHandler>, processor: Arc<dyn Processor>) -> Self {
+    pub fn new(name: String, is_leader: bool, on_message: Arc<dyn MessageHandler>, processor: Arc<dyn Processor>) -> Self {
         let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
         let id = uuid::Uuid::new_v4().to_string();
         Self {
             _name: name,
             _is_leader: is_leader,
             _id: id,
-            _workspace_id: workspace_id,
+            _workspace_id: None,
             _on_message: Arc::new(Mutex::new(on_message)),
             _processor: Arc::new(Mutex::new(processor)),
             rx_0: Arc::new(Mutex::new(rx_0)),
@@ -58,7 +58,11 @@ impl AgentCore {
     }
 
     pub fn workspace_id(&self) -> String {
-        self._workspace_id.clone()
+        self._workspace_id.clone().unwrap_or("".to_string())
+    }
+
+    pub fn set_workspace_id(&mut self, workspace_id: String) {
+        self._workspace_id = Option::from(workspace_id);
     }
 
     pub async fn broadcast(&self, message: String) {
@@ -67,20 +71,14 @@ impl AgentCore {
 }
 
 impl AgentCore {
-    pub(crate) async fn start(&self) {
-        let port_id = 8888;
-        let topic = "test_topic";
-
+    pub(crate) async fn start(&self, topic: String, url: String) {
         let agent_name = self._name.clone();
-        let workspace_id = self._workspace_id.clone();
-
-
-        let (tx_0, mut rx_0) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
+        let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
         let (mut node_0, mut rx_o_0) = create_node(agent_name.clone(), true, rx_0);
         let on_message = self._on_message.clone();
 
         tokio::spawn(async move {
-            node_0.connect(port_id, topic);
+            node_0.connect(url.as_str(), topic.as_str());
             node_0.run().await;
         });
 

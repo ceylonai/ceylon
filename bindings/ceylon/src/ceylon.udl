@@ -3,7 +3,7 @@ namespace ceylon {
 };
 
 interface AgentCore{
-    constructor(string name,string workspace_id,boolean is_leader, MessageHandler on_message, Processor processor);
+    constructor(string name,boolean is_leader, MessageHandler on_message, Processor processor);
 
     string id();
     string name();
@@ -26,10 +26,15 @@ interface Processor {
     void run();
 };
 
+dictionary WorkspaceConfig{
+    string name;
+    string host = "/ip4/0.0.0.0/tcp/";
+    u16 port = 8888;
+};
 
 interface Workspace{
-    constructor(sequence<AgentCore> agents);
+    constructor(sequence<AgentCore> agents,WorkspaceConfig config);
 
     [Async]
-    void run_workspace(record<string, string> inputs);
+    void run(record<string, string> inputs);
 };
