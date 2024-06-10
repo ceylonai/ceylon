@@ -8,7 +8,7 @@ use libp2p::{
     Multiaddr, SwarmBuilder,
 };
 use libp2p_gossipsub::{MessageId, PublishError};
-use log::{debug, info, log};
+use log::{debug, error, info, log};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::sync::mpsc;
@@ -138,12 +138,12 @@ impl Node {
         }
     }
 
-    pub fn broadcast(&mut self, message: &[u8]) -> Result<Vec<MessageId>, PublishError> {
+    pub fn broadcast(&mut self, message: Vec<u8>) -> Result<Vec<MessageId>, PublishError> {
         let mut message_ids = vec![];
         for topic in self.subscribed_topics.clone() {
             let topic = gossipsub::IdentTopic::new(topic);
 
-            let prep_message = Message::data(self.name.clone(), message.to_vec());
+            let prep_message = Message::data(self.name.clone(), message.clone());
 
             match self
                 .swarm
@@ -167,13 +167,16 @@ impl Node {
             select! {
                 message =  self.in_rx.recv() => match message {
                     Some(message) => {
-                        debug!("{:?} Received 111: {:?}", self.name, String::from_utf8_lossy(&message));
-                        let msg = json!({
-                                "from": self.name,
-                                "data": String::from_utf8_lossy(&message),
-                                "timestamp": SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis()
-                            }).to_string();
-                        self.broadcast(msg.as_bytes())                            .unwrap();
+                        debug!("{:?} Received To Broadcast: {:?}", self.name, String::from_utf8_lossy(&message));
+                        match self.broadcast(message){
+                            Ok(message_ids) => {
+                                debug!("{:?} Broadcasted message: {:?}", self.name, message_ids);
+                                
+                            }
+                            Err(e) => {
+                                error!("{:?} Failed to broadcast message: {:?}", self.name, e);
+                            }
+                        };
                     }
                None => {
                         debug!("{:?} Received: None", self.name);
@@ -282,8 +285,8 @@ pub fn create_node(
             // Set a custom gossipsub configuration
             let gossipsub_config = gossipsub::ConfigBuilder::default()
                 .heartbeat_initial_delay(Duration::from_secs(1))
-                .history_length( 10 )
-                .history_gossip( 10 )
+                .history_length(10)
+                .history_gossip(10)
                 .heartbeat_interval(Duration::from_secs(10)) // This is set to aid debugging by not cluttering the log space
                 .validation_mode(gossipsub::ValidationMode::Strict) // This sets the kind of message validation. The default is Strict (enforce message signing)
                 .message_id_fn(message_id_fn) // content-address messages. No two messages of the same content will be propagated.
@@ -346,7 +349,7 @@ mod tests {
             .build()
             .unwrap();
 
-     
+
         runtime.spawn(async move {
             while let Some(message) = rx_o_0.recv().await {
                 let message_str = String::from_utf8_lossy(&message);
