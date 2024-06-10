@@ -6,8 +6,8 @@ from ceylon import AgentCore, MessageHandler, Processor, uniffi_set_event_loop, 
 
 
 class Agent(AgentCore, MessageHandler, Processor):
-    def __init__(self, id, name, is_leader, workspace_id):
-        super().__init__(id=id, name=name, is_leader=is_leader, workspace_id=workspace_id, on_message=self,
+    def __init__(self, name, is_leader, workspace_id):
+        super().__init__(name=name, is_leader=is_leader, workspace_id=workspace_id, on_message=self,
                          processor=self)
 
     async def on_message(self, agent_id, message):
@@ -23,10 +23,10 @@ class Agent(AgentCore, MessageHandler, Processor):
 #
 async def main():
     uniffi_set_event_loop(asyncio.get_event_loop())
-    agent1 = Agent(name="ceylon-ai-1", is_leader=True, id="ceylon-ai-1", workspace_id="ceylon-ai")
-    agent2 = Agent(name="ceylon-ai-2", is_leader=False, id="ceylon-ai-2", workspace_id="ceylon-ai")
-    agent3 = Agent(name="ceylon-ai-3", is_leader=False, id="ceylon-ai-3", workspace_id="ceylon-ai")
-    agent4 = Agent(name="ceylon-ai-4", is_leader=False, id="ceylon-ai-4", workspace_id="ceylon-ai")
+    agent1 = Agent(name="ceylon-ai-1", is_leader=True, workspace_id="ceylon-ai")
+    agent2 = Agent(name="ceylon-ai-2", is_leader=False, workspace_id="ceylon-ai")
+    agent3 = Agent(name="ceylon-ai-3", is_leader=False, workspace_id="ceylon-ai")
+    agent4 = Agent(name="ceylon-ai-4", is_leader=False, workspace_id="ceylon-ai")
 
     workspace = Workspace(agents=[agent1, agent2, agent3, agent4])
     await workspace.run_workspace({

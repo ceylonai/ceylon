@@ -30,8 +30,9 @@ pub struct AgentCore {
 }
 
 impl AgentCore {
-    pub fn new(id: String, name: String, workspace_id: String, is_leader: bool, on_message: Arc<dyn MessageHandler>, processor: Arc<dyn Processor>) -> Self {
+    pub fn new(name: String, workspace_id: String, is_leader: bool, on_message: Arc<dyn MessageHandler>, processor: Arc<dyn Processor>) -> Self {
         let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
+        let id = uuid::Uuid::new_v4().to_string();
         Self {
             _name: name,
             _is_leader: is_leader,
