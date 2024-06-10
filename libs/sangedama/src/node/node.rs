@@ -4,13 +4,14 @@ use std::time::{Duration, SystemTime};
 use libp2p::{
     futures::StreamExt,
     gossipsub, mdns,
-    swarm::{NetworkBehaviour, Swarm, SwarmEvent},
-    Multiaddr, SwarmBuilder,
+    Multiaddr,
+    swarm::{NetworkBehaviour, Swarm, SwarmEvent}, SwarmBuilder,
 };
 use libp2p_gossipsub::{MessageId, PublishError};
+use log::{debug, info, log};
 use serde_json::json;
-use tokio::sync::mpsc;
 use tokio::{io, select, spawn};
+use tokio::sync::mpsc;
 
 // We create a custom network behaviour that combines Gossipsub and Mdns.
 #[derive(NetworkBehaviour)]
@@ -43,8 +44,8 @@ pub struct Node {
     is_leader: bool,
     subscribed_topics: Vec<String>,
 
-    in_rx: tokio::sync::mpsc::Receiver<Vec<u8>>,
-    out_tx: tokio::sync::mpsc::Sender<Vec<u8>>,
+    in_rx: mpsc::Receiver<Vec<u8>>,
+    out_tx: mpsc::Sender<Vec<u8>>,
 }
 
 impl Node {
@@ -89,46 +90,39 @@ impl Node {
     }
 
     pub async fn run(mut self) {
-        // let swarm_behaviour = self.swarm.behaviour_mut();
-        // let subscribed_topics = self.subscribed_topics.clone();
-        // while let Some(message) = self.in_rx.recv().await {
-        //     // println!("Received: {:?}", String::from_utf8_lossy(&message));
-        //
-        // }
-
         loop {
             select! {
 
                 message =  self.in_rx.recv() => match message {
                     Some(message) => {
-                        println!("{:?} Received: {:?}", self.name, String::from_utf8_lossy(&message));
+                        debug!("{:?} Received: {:?}", self.name, String::from_utf8_lossy(&message));
                         self.broadcast( json!({
                     "data": String::from_utf8_lossy(&message),
                     "timestamp": SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis()
                 }).to_string().as_bytes()).unwrap();
                     }
                     None => {
-                        println!("{:?} Received: None", self.name);
+                        debug!("{:?} Received: None", self.name);
                     }
                 }  ,
 
                 event = self.swarm.select_next_some() => match event {
                          SwarmEvent::NewListenAddr { address, .. } => {
-                            println!("{:?} Listening on {:?}", self.name, address);
+                            debug!("{:?} Listening on {:?}", self.name, address);
                         },
                         SwarmEvent::ConnectionEstablished { peer_id, .. } => {
-                            println!("{:?} Connected to {:?}", self.name, peer_id);
+                            debug!("{:?} Connected to {:?}", self.name, peer_id);
                         },
                         SwarmEvent::ConnectionClosed { peer_id, .. } => {
-                            println!("{:?} Disconnected from {:?}", self.name, peer_id);
+                            debug!("{:?} Disconnected from {:?}", self.name, peer_id);
                         },
 
                         SwarmEvent::Behaviour(Event::Gossipsub(event)) => {
-                            println!("GOSSIP {:?} {:?}", self.name, event);
+                            debug!("GOSSIP {:?} {:?}", self.name, event);
 
                             match event {
                                 gossipsub::Event::Message { propagation_source, message_id, message } => {
-                                    println!("{:?} Received message '{:?}' from {:?} on {:?}", self.name, String::from_utf8_lossy(&message.data), propagation_source, message_id);
+                                    debug!("{:?} Received message '{:?}' from {:?} on {:?}", self.name, String::from_utf8_lossy(&message.data), propagation_source, message_id);
                                     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
                                     self.out_tx.clone().send(
                                     json!({
@@ -139,18 +133,10 @@ impl Node {
                                          "peer": propagation_source.to_string()
                                     }).to_string().as_bytes().to_vec()
                                 ).await.unwrap();
-                                // match self.broadcast(format!("Hi from {:?} at {:?}", self.name,SystemTime::now()  ).as_bytes()){
-                                //         Ok(id) => {
-                                //             println!("{:?} Broadcasted message  on {:?}", self.name, id);
-                                //         }
-                                //         Err(e) => {
-                                //             println!("{:?} Failed to broadcast message on {:?}", self.name, e);
-                                //         }
-                                // };
                                 },
 
                                 gossipsub::Event::Subscribed { peer_id, topic } => {
-                                    println!("{:?} Subscribed to topic {:?}", self.name, topic.clone().into_string());
+                                    debug!("{:?} Subscribed to topic {:?}", self.name, topic.clone().into_string());
                                     self.subscribed_topics.push(topic.into_string());
                                     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
                                   self.out_tx.clone().send(
@@ -161,24 +147,16 @@ impl Node {
                                          "peer": "self"
                                     }).to_string().as_bytes().to_vec()
                                 ).await.unwrap();
-                                //     match self.broadcast( format!("Hi from {:?} at {:?}", self.name,SystemTime::now()  ).as_bytes() ){
-                                //         Ok(id) => {
-                                //             println!("{:?} Broadcasted message  on {:?}", self.name, id);
-                                //         }
-                                //         Err(e) => {
-                                //             println!("{:?} Failed to broadcast message on {:?}", self.name, e);
-                                //         }
-                                // };
                                 },
 
                                 _ => {
-                                 println!( "{:?}gossip WILD CARD {:?}", self.name, event);
+                                 debug!( "{:?}gossip WILD CARD {:?}", self.name, event);
                             }
                             }
                         },
 
                         SwarmEvent::Behaviour(Event::Mdns(event)) => {
-                            println!("MDNS {:?} {:?}", self.name, event);
+                            debug!("MDNS {:?} {:?}", self.name, event);
 
                             match event {
                                 mdns::Event::Discovered(list) => {
@@ -195,7 +173,7 @@ impl Node {
                             }
                         },
                         _ => {
-                           println!( "WILD CARD");
+                           debug!( "WILD CARD");
                     }, // Wildcard pattern to cover all other cases
                 }
             }
@@ -265,6 +243,8 @@ pub fn create_node(
 #[cfg(test)]
 mod tests {
     use std::hash::Hash;
+    use log::debug;
+
     use serde_json::json;
 
     use crate::node::node::create_node;
@@ -292,7 +272,7 @@ mod tests {
 
         runtime.spawn(async move {
             while let Some(message) = rx_o_0.recv().await {
-                println!("Node_0 Received: {}", String::from_utf8_lossy(&message));
+                debug!("Node_0 Received: {}", String::from_utf8_lossy(&message));
                 tx_0.send(json!({
                     "data": "Hi from Node_1",
                 }).to_string().as_bytes().to_vec()).await.unwrap();
@@ -302,7 +282,7 @@ mod tests {
 
         runtime.spawn(async move {
             while let Some(message) = rx_o_1.recv().await {
-                println!("Node_1 Received: {}", String::from_utf8_lossy(&message));
+                debug!("Node_1 Received: {}", String::from_utf8_lossy(&message));
                 tx_1.send(json!({
                     "data": "Hi from Node_2",
                 }).to_string().as_bytes().to_vec()).await.unwrap();
