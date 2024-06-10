@@ -2,9 +2,7 @@ import asyncio
 import random
 import time
 
-from ceylon import *
-
-print(version())
+from ceylon import AgentCore, MessageHandler, Processor, uniffi_set_event_loop, Workspace
 
 
 class Agent(AgentCore, MessageHandler, Processor):
@@ -22,6 +20,7 @@ class Agent(AgentCore, MessageHandler, Processor):
             await asyncio.sleep(random.randint(1, 5))
 
 
+#
 async def main():
     uniffi_set_event_loop(asyncio.get_event_loop())
     agent1 = Agent(name="ceylon-ai-1", is_leader=True, id="ceylon-ai-1", workspace_id="ceylon-ai")
@@ -29,7 +28,10 @@ async def main():
     agent3 = Agent(name="ceylon-ai-3", is_leader=False, id="ceylon-ai-3", workspace_id="ceylon-ai")
     agent4 = Agent(name="ceylon-ai-4", is_leader=False, id="ceylon-ai-4", workspace_id="ceylon-ai")
 
-    await run_workspace([agent1, agent2, agent3, agent4])
+    workspace = Workspace(agents=[agent1, agent2, agent3, agent4])
+    await workspace.run_workspace({
+        "title": "How to use AI for Machine Learning",
+    })
 
 
 if __name__ == '__main__':

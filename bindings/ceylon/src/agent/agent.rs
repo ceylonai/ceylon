@@ -66,7 +66,7 @@ impl AgentCore {
 }
 
 impl AgentCore {
-    async fn start(&self) {
+    pub(crate) async fn start(&self) {
         let port_id = 8888;
         let topic = "test_topic";
 
@@ -100,19 +100,4 @@ impl AgentCore {
     }
 }
 
-pub async fn run_workspace(agents: Vec<Arc<AgentCore>>) {
-    let mut rt = Runtime::new().unwrap();
-    let mut tasks = vec![];
-    for agent in agents.iter() {
-        let agent = agent.clone();
-        let task = rt.spawn(async move {
-            agent.start().await;
-        });
-        tasks.push(task);
-    }
-
-    for task in tasks {
-        task.await.unwrap();
-    }
-}
 

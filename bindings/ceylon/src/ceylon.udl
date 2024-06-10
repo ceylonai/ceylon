@@ -1,8 +1,5 @@
 namespace ceylon {
   string version();
-
-  [Async]
-  void run_workspace(sequence<AgentCore> agents);
 };
 
 interface AgentCore{
@@ -27,4 +24,12 @@ interface MessageHandler {
 interface Processor {
     [Async]
     void run();
+};
+
+
+interface Workspace{
+    constructor(sequence<AgentCore> agents);
+
+    [Async]
+    void run_workspace(record<string, string> inputs);
 };
