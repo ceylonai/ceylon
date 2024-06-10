@@ -11,7 +11,7 @@ class Agent(AgentCore, MessageHandler, Processor):
         super().__init__(id=id, name=name, is_leader=is_leader, workspace_id=workspace_id, on_message=self,
                          processor=self)
 
-    def on_message(self, agent_id, message):
+    async def on_message(self, agent_id, message):
         print(f"{self.name()} Received message from = '{agent_id}' message= {message}", agent_id, message)
 
     async def run(self):
@@ -22,6 +22,7 @@ class Agent(AgentCore, MessageHandler, Processor):
 
 
 async def main():
+    uniffi_set_event_loop(asyncio.get_event_loop())
     agent1 = Agent(name="ceylon-ai-1", is_leader=True, id="ceylon-ai-1", workspace_id="ceylon-ai")
     agent2 = Agent(name="ceylon-ai-2", is_leader=False, id="ceylon-ai-2", workspace_id="ceylon-ai")
 

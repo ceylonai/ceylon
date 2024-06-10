@@ -17,11 +17,14 @@ interface AgentCore{
     void broadcast(string message);
 };
 
-callback interface MessageHandler {
-  void on_message(string agent_id,string message);
+[Trait,WithForeign]
+interface MessageHandler {
+    [Async]
+    void on_message(string agent_id,string message);
 };
 
-callback interface Processor {
+[Trait,WithForeign]
+interface Processor {
     [Async]
-    string run();
+    void run();
 };

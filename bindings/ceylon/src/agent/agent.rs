@@ -5,8 +5,10 @@ use tokio::runtime::Runtime;
 use sangedama::node::node::create_node;
 
 // The call-answer, callback interface.
+
+#[async_trait::async_trait]
 pub trait MessageHandler: Send + Sync {
-    fn on_message(&self, agent_id: String, message: String);
+    async fn on_message(&self, agent_id: String, message: String);
 }
 
 // The call-answer, callback interface.
@@ -21,14 +23,14 @@ pub struct AgentCore {
     _is_leader: bool,
     _id: String,
     _workspace_id: String,
-    _processor: Arc<Mutex<Box<dyn Processor>>>,
-    _on_message: Arc<Mutex<Box<dyn MessageHandler>>>,
+    _processor: Arc<Mutex<Arc<dyn Processor>>>,
+    _on_message: Arc<Mutex<Arc<dyn MessageHandler>>>,
     rx_0: Arc<Mutex<tokio::sync::mpsc::Receiver<Vec<u8>>>>,
     tx_0: tokio::sync::mpsc::Sender<Vec<u8>>,
 }
 
 impl AgentCore {
-    pub fn new(id: String, name: String, workspace_id: String, is_leader: bool, on_message: Box<dyn MessageHandler>, processor: Box<dyn Processor>) -> Self {
+    pub fn new(id: String, name: String, workspace_id: String, is_leader: bool, on_message: Arc<dyn MessageHandler>, processor: Arc<dyn Processor>) -> Self {
         let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
         Self {
             _name: name,
@@ -64,7 +66,8 @@ impl AgentCore {
 }
 
 impl AgentCore {
-    async fn start(&self) {
+    async fn start(&self) { 
+        
         let port_id = 8888;
         let topic = "test_topic";
 
@@ -83,7 +86,7 @@ impl AgentCore {
 
         let processor = self._processor.clone();
         tokio::spawn(async move {
-            processor.lock().await.run();
+            processor.lock().await.run().await;
         });
 
         let rx = Arc::clone(&self.rx_0);
@@ -93,7 +96,7 @@ impl AgentCore {
             }
 
             if let Some(message) = rx_o_0.recv().await {
-                on_message.lock().await.on_message(agent_name.clone(), String::from_utf8_lossy(&message).to_string());
+                on_message.lock().await.on_message(agent_name.clone(), String::from_utf8_lossy(&message).to_string()).await;
             }
         }
     }
