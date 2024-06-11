@@ -20,15 +20,13 @@ permissions:
   contents: read
 
 jobs:
- linux:
+  linux:
    runs-on: ${{ matrix.platform.runner }}
    strategy:
      matrix:
        platform:
          - runner: ubuntu-latest
            target: x86_64
-         - runner: ubuntu-latest
-           target: x86
    steps:
      - uses: actions/checkout@v4
      - uses: actions/setup-python@v5
@@ -105,7 +103,7 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     if: "startsWith(github.ref, 'refs/tags/')"
-    needs: [windows, macos, sdist]
+    needs: [windows, linux]
     steps:
       - uses: actions/download-artifact@v4
       - name: Change Directory
