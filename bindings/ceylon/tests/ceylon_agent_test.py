@@ -13,7 +13,8 @@ class Agent(AgentCore, MessageHandler, Processor):
     async def on_message(self, agent_id, message):
         print(f"{self.name()} Received message from = '{agent_id}' message= {message}", agent_id, message)
 
-    async def run(self):
+    async def run(self, inputs):
+        print(f"{self.name()} run", inputs)
         while True:
             await self.broadcast("Hi from " + self.name() + " at " + str(time.time()))
             print(f"{self.name()} Broadcast message")
