@@ -5,6 +5,7 @@ import time
 from ceylon import AgentCore, MessageHandler, Processor, uniffi_set_event_loop, Workspace, WorkspaceConfig
 
 
+
 class Agent(AgentCore, MessageHandler, Processor):
     def __init__(self, name, is_leader):
         super().__init__(name=name, is_leader=is_leader, on_message=self, processor=self)
@@ -15,7 +16,7 @@ class Agent(AgentCore, MessageHandler, Processor):
     async def run(self):
         while True:
             await self.broadcast("Hi from " + self.name() + " at " + str(time.time()))
-            print(f"{self.name()} Broadcasted message")
+            print(f"{self.name()} Broadcast message")
             await asyncio.sleep(random.randint(1, 5))
 
 
@@ -26,6 +27,8 @@ async def main():
     agent2 = Agent(name="ceylon-ai-2", is_leader=False, )
     agent3 = Agent(name="ceylon-ai-3", is_leader=False, )
     agent4 = Agent(name="ceylon-ai-4", is_leader=False, )
+
+    LLMAgent(name="ceylon-ai-1", is_leader=True, on_message=agent1, processor=agent1)
 
     workspace = Workspace(agents=[agent1, agent2, agent3, agent4],
                           config=WorkspaceConfig(
