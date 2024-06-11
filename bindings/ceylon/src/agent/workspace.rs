@@ -39,12 +39,15 @@ impl Workspace {
     pub async fn run(&self, inputs: HashMap<String, String>) {
         let mut rt = Runtime::new().unwrap();
         let mut tasks = vec![];
+        let _inputs = inputs.clone();
         for agent in self._agents.iter() {
+            let _inputs = _inputs.clone();
             let url = format!("{}/{}", self.host, self.port);
             let topic = format!("workspace-{}", agent.workspace_id());
+            
             let agent = agent.clone();
             let task = rt.spawn(async move {
-                agent.start(topic, url).await;
+                agent.start(topic, url, _inputs).await;
             });
             tasks.push(task);
         }

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use tokio::sync::{Mutex};
 use std::sync::{Arc};
 use tokio::runtime::Runtime;
@@ -15,7 +16,7 @@ pub trait MessageHandler: Send + Sync {
 
 #[async_trait::async_trait]
 pub trait Processor: Send + Sync {
-    async fn run(&self);
+    async fn run(&self, message: HashMap<String, String>) -> ();
 }
 
 pub struct AgentCore {
@@ -71,7 +72,7 @@ impl AgentCore {
 }
 
 impl AgentCore {
-    pub(crate) async fn start(&self, topic: String, url: String) {
+    pub(crate) async fn start(&self, topic: String, url: String, inputs: HashMap<String, String>) {
         let agent_name = self._name.clone();
         let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
         let (mut node_0, mut rx_o_0) = create_node(agent_name.clone(), true, rx_0);
@@ -95,7 +96,7 @@ impl AgentCore {
             }
         });
         let processor = self._processor.clone();
-        processor.lock().await.run().await;
+        processor.lock().await.run(inputs).await;
     }
 }
 

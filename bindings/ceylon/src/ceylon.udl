@@ -23,7 +23,7 @@ interface MessageHandler {
 [Trait,WithForeign]
 interface Processor {
     [Async]
-    void run();
+    void run(record<string, string> inputs);
 };
 
 dictionary WorkspaceConfig{
