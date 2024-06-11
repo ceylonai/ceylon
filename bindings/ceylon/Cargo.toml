@@ -9,6 +9,8 @@ name = "ceylon"
 crate-type = ["cdylib"]
 
 [dependencies]
+openssl = { version = "0.10.64", features = ["vendored"] }
+openssl-sys = {version = "0.9.102",features = ["vendored"] }
 uniffi = { version = "0.27.3", features = ["tokio", "bindgen", "default"] }
 thiserror = "1.0.61"
 uuid = { version = "1.8.0", features = ["v4"] }
