@@ -46,7 +46,7 @@ jobs:
        uses: actions/upload-artifact@v4
        with:
          name: wheels-linux-${{ matrix.platform.target }}
-         path: bindings/ceylon/dist
+         path: dist
 
 
   release:
@@ -56,8 +56,6 @@ jobs:
     needs: [linux]
     steps:
       - uses: actions/download-artifact@v4
-      - name: Change Directory
-        run: cd bindings/ceylon
       - name: Publish to PyPI
         uses: PyO3/maturin-action@v1
         env:
