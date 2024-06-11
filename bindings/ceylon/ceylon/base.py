@@ -2,7 +2,7 @@ import asyncio
 import random
 import time
 
-from ceylon import AgentCore, MessageHandler, Processor
+from ceylon.ceylon import AgentCore, MessageHandler, Processor
 
 
 class LLMAgent(AgentCore, MessageHandler, Processor):

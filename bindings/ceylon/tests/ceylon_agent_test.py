@@ -2,8 +2,8 @@ import asyncio
 import random
 import time
 
-from ceylon import AgentCore, MessageHandler, Processor, uniffi_set_event_loop, Workspace, WorkspaceConfig
-
+from ceylon.ceylon import AgentCore, MessageHandler, Processor
+from ceylon.runner import AgentRunner
 
 
 class Agent(AgentCore, MessageHandler, Processor):
@@ -22,21 +22,13 @@ class Agent(AgentCore, MessageHandler, Processor):
 
 #
 async def main():
-    uniffi_set_event_loop(asyncio.get_event_loop())
-    agent1 = Agent(name="ceylon-ai-1", is_leader=True, )
-    agent2 = Agent(name="ceylon-ai-2", is_leader=False, )
-    agent3 = Agent(name="ceylon-ai-3", is_leader=False, )
-    agent4 = Agent(name="ceylon-ai-4", is_leader=False, )
+    runner = AgentRunner(workspace_name="ceylon-ai")
+    runner.register_agent(Agent(name="ceylon-ai-1", is_leader=True, ))
+    runner.register_agent(Agent(name="ceylon-ai-2", is_leader=False, ))
+    runner.register_agent(Agent(name="ceylon-ai-3", is_leader=False, ))
+    runner.register_agent(Agent(name="ceylon-ai-4", is_leader=False, ))
 
-    LLMAgent(name="ceylon-ai-1", is_leader=True, on_message=agent1, processor=agent1)
-
-    workspace = Workspace(agents=[agent1, agent2, agent3, agent4],
-                          config=WorkspaceConfig(
-                              name="ceylon-ai",
-                              host="/ip4/0.0.0.0/tcp",
-                              port=8888
-                          ))
-    await workspace.run({
+    await runner.run({
         "title": "How to use AI for Machine Learning",
     })
 
