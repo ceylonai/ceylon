@@ -506,8 +506,6 @@ name = "ceylon"
 version = "0.11.0"
 dependencies = [
  "async-trait",
- "openssl",
- "openssl-sys",
  "sangedama",
  "serde",
  "serde_json",
@@ -2967,7 +2965,6 @@ dependencies = [
  "libp2p-gossipsub",
  "log",
  "openssl",
- "openssl-sys",
  "reqwest",
  "serde",
  "serde_json",
