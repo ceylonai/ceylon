@@ -41,7 +41,7 @@ jobs:
      - name: Change Directory
        run: cd bindings/ceylon
      - name: Build
-       run: maturin --release --out dist --find-interpreter -m bindings/ceylon/Cargo.toml
+       run: maturin build --release --out dist --find-interpreter -m bindings/ceylon/Cargo.toml
      - name: Build wheels
        uses: PyO3/maturin-action@v1
        with:
