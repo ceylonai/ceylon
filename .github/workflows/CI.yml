@@ -121,22 +121,22 @@ jobs:
   #          name: wheels-macos-${{ matrix.platform.target }}
   #          path: bindings/ceylon/dist
   #
-  #  sdist:
-  #    runs-on: ubuntu-latest
-  #    steps:
-  #      - uses: actions/checkout@v4
-  #      - name: Change Directory
-  #        run: cd bindings/ceylon
-  #      - name: Build sdist
-  #        uses: PyO3/maturin-action@v1
-  #        with:
-  #          command: sdist
-  #          args: --out dist -m bindings/ceylon/Cargo.toml
-  #      - name: Upload sdist
-  #        uses: actions/upload-artifact@v4
-  #        with:
-  #          name: wheels-sdist
-  #          path: bindings/ceylon/dist
+  sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Change Directory
+        run: cd bindings/ceylon
+      - name: Build sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist -m bindings/ceylon/Cargo.toml
+      - name: Upload sdist
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-sdist
+          path: bindings/ceylon/dist
 
   release:
     name: Release
