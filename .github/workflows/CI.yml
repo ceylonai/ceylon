@@ -44,7 +44,8 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y pkg-config libssl-dev  
+          sudo apt-get install -y pkg-config libssl-dev
+          export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig
 
       - name: Install Libs
         run: pip install uniffi-bindgen
@@ -125,7 +126,7 @@ jobs:
   #          path: bindings/ceylon/dist
   #
   sdist:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Change Directory
