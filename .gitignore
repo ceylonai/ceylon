@@ -3,3 +3,4 @@ target
 
 .env
 !.env.sample
+/bindings/ceylon/ceylon/ceylon/
