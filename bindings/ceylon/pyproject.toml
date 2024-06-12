@@ -9,6 +9,17 @@ classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
+    "Framework :: Ceylon",
+    "License :: Apache LICENCE",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Build Tools",
+
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
 ]
 
 dependencies = ["ollama==0.2.1"]
