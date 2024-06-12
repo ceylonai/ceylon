@@ -4,15 +4,15 @@ use std::time::{Duration, SystemTime};
 use libp2p::{
     futures::StreamExt,
     gossipsub, mdns,
-    Multiaddr,
-    swarm::{NetworkBehaviour, Swarm, SwarmEvent}, SwarmBuilder,
+    swarm::{NetworkBehaviour, Swarm, SwarmEvent},
+    Multiaddr, SwarmBuilder,
 };
 use libp2p_gossipsub::{MessageId, PublishError};
 use log::{debug, error};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tokio::{io, select};
 use tokio::sync::mpsc;
+use tokio::{io, select};
 
 pub enum EventType {
     OnMessage,
@@ -43,11 +43,11 @@ impl EventType {
 #[derive(Deserialize, Serialize, Debug)]
 pub enum MessageType {
     Message,
-    Event(String),
+    Event,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-struct Message {
+pub struct Message {
     pub data: Vec<u8>,
     pub message: String,
     pub time: u64,
@@ -56,21 +56,29 @@ struct Message {
 }
 
 impl Message {
-    fn new(from: String, message: String, data: Vec<u8>) -> Self {
+    fn new(from: String, message: String, data: Vec<u8>, message_type: MessageType) -> Self {
         Self {
             data,
-            time: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64,
+            time: SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
             from,
-            r#type: MessageType::Message,
+            r#type: message_type,
             message,
         }
     }
     fn event(from: String, event: EventType) -> Self {
-        Self::new(from, event.as_str().to_string(), vec![])
+        Self::new(
+            from,
+            event.as_str().to_string(),
+            vec![],
+            MessageType::Event,
+        )
     }
 
     fn data(from: String, data: Vec<u8>) -> Self {
-        Self::new(from, "".to_string(), data)
+        Self::new(from, "".to_string(), data, MessageType::Message)
     }
 
     fn to_json(&self) -> String {
@@ -110,7 +118,7 @@ pub struct Node {
     subscribed_topics: Vec<String>,
 
     in_rx: mpsc::Receiver<Vec<u8>>,
-    out_tx: mpsc::Sender<Vec<u8>>,
+    out_tx: mpsc::Sender<Message>,
 }
 
 impl Node {
@@ -130,11 +138,7 @@ impl Node {
                 .unwrap();
         } else {
             self.swarm
-                .dial(
-                    url.to_string()
-                        .parse::<Multiaddr>()
-                        .unwrap(),
-                )
+                .dial(url.to_string().parse::<Multiaddr>().unwrap())
                 .unwrap();
         }
     }
@@ -163,6 +167,10 @@ impl Node {
         Ok(message_ids)
     }
 
+    async fn pass_message_to_node(&mut self, message: Message) {
+        self.out_tx.clone().send(message).await.unwrap();
+    }
+
     pub async fn run(mut self) {
         loop {
             select! {
@@ -172,7 +180,7 @@ impl Node {
                         match self.broadcast(message){
                             Ok(message_ids) => {
                                 debug!("{:?} Broadcasted message: {:?}", self.name, message_ids);
-                                
+
                             }
                             Err(e) => {
                                 error!("{:?} Failed to broadcast message: {:?}", self.name, e);
@@ -187,22 +195,16 @@ impl Node {
                 event = self.swarm.select_next_some() => match event {
                          SwarmEvent::NewListenAddr { address, .. } => {
                             debug!("{:?} Listening on {:?}", self.name, address);
-                            self.out_tx.clone().send(
-                                    Message::event(  self.swarm.local_peer_id().to_string(),EventType::OnListen,).to_json().as_bytes().to_vec()
-                                ).await.unwrap();
-                        
+                            self.pass_message_to_node(Message::event(  self.swarm.local_peer_id().to_string(),EventType::OnListen,)).await
+
                    },
                         SwarmEvent::ConnectionEstablished { peer_id, .. } => {
                             debug!("{:?} Connected to {:?}", self.name, peer_id);
-                            self.out_tx.clone().send(
-                                    Message::event(  self.swarm.local_peer_id().to_string(),EventType::OnConnectionEstablished,).to_json().as_bytes().to_vec()
-                                ).await.unwrap();
+                            self.pass_message_to_node(Message::event(  self.swarm.local_peer_id().to_string(),EventType::OnConnectionEstablished,)).await
                         },
                         SwarmEvent::ConnectionClosed { peer_id, .. } => {
                             debug!("{:?} Disconnected from {:?}", self.name, peer_id);
-                            self.out_tx.clone().send(
-                                    Message::event(  self.swarm.local_peer_id().to_string(),EventType::OnConnectionClosed ,).to_json().as_bytes().to_vec()
-                                ).await.unwrap();
+                            self.pass_message_to_node(Message::event(  self.swarm.local_peer_id().to_string(),EventType::OnConnectionClosed ,)).await
                         },
 
                         SwarmEvent::Behaviour(Event::Gossipsub(event)) => {
@@ -211,16 +213,22 @@ impl Node {
                             match event {
                                 gossipsub::Event::Message { propagation_source, message_id, message } => {
                                     debug!("{:?} Received message '{:?}' from {:?} on {:?}", self.name, String::from_utf8_lossy(&message.data), propagation_source, message_id);
-                                    self.out_tx.clone().send(message.data.to_vec()).await.unwrap();
+
+                                 let msg = Message::data(self.name.clone(), message.data.clone());
+                                 self.pass_message_to_node(msg).await
+                                    // self.pass_message_to_node(Message::event(  self.swarm.local_peer_id().to_string(),EventType::OnConnectionClosed ,)).await
+                                    // self.out_tx.clone().send(message.data.to_vec()).await.unwrap();
                                 },
 
                                 gossipsub::Event::Subscribed { peer_id, topic } => {
                                     debug!("{:?} Subscribed to topic {:?}", self.name, topic.clone().into_string());
                                     self.subscribed_topics.push(topic.into_string());
-                                    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-                                  self.out_tx.clone().send(
-                                    Message::event(  peer_id.to_string(),EventType::OnSubscribe,).to_json().as_bytes().to_vec()
-                                ).await.unwrap();
+                                    // tokio::time::sleep(Duration::from_millis(10)).await;
+                                //   self.out_tx.clone().send(
+                                //     Message::event(  peer_id.to_string(),EventType::OnSubscribe,).to_json().as_bytes().to_vec()
+                                // ).await.unwrap();
+
+                            self.pass_message_to_node(Message::event(  peer_id.to_string(),EventType::OnSubscribe,)).await
                                 },
 
                                 _ => {
@@ -237,28 +245,14 @@ impl Node {
                                     for (peer_id, _) in list {
                                         self.swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
                                     }
-                                    match self.out_tx.clone().send(
-                                        Message::event(  self.swarm.local_peer_id().to_string(),EventType::OnDiscovered,).to_json().as_bytes().to_vec()
-                                    ).await{
-                                        Ok(_) => {},
-                                        Err(e) => {
-                                            debug!("{:?} Failed to send message", e);
-                                        }
-                                }
+                                self.pass_message_to_node(Message::event(  self.swarm.local_peer_id().to_string(),EventType::OnDiscovered,)).await
                                 },
 
                                 mdns::Event::Expired(list) => {
                                     for (peer_id, _) in list {
                                         self.swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
                                     }
-                                match self.out_tx.clone().send(
-                                        Message::event(  self.swarm.local_peer_id().to_string(),EventType::OnExpired,).to_json().as_bytes().to_vec()
-                                    ).await{
-                                        Ok(_) => {},
-                                        Err(e) => {
-                                            debug!("{:?} Failed to send message", e);
-                                    },
-                                };
+                                self.pass_message_to_node(Message::event(  self.swarm.local_peer_id().to_string(),EventType::OnExpired,)).await
                                 },
                             }
                         },
@@ -275,7 +269,7 @@ pub fn create_node(
     name: String,
     is_leader: bool,
     in_rx: mpsc::Receiver<Vec<u8>>,
-) -> (Node, mpsc::Receiver<Vec<u8>>) {
+) -> (Node, mpsc::Receiver<Message>) {
     let swarm = SwarmBuilder::with_new_identity()
         .with_tokio()
         .with_tcp(
@@ -302,7 +296,8 @@ pub fn create_node(
                 .validation_mode(gossipsub::ValidationMode::Strict) // This sets the kind of message validation. The default is Strict (enforce message signing)
                 .message_id_fn(message_id_fn) // content-address messages. No two messages of the same content will be propagated.
                 .build()
-                .map_err(|msg| io::Error::new(io::ErrorKind::Other, msg))?; // Temporary hack because `build` does not return a proper `std::error::Error`.
+                .map_err(|msg| io::Error::new(io::ErrorKind::Other, msg))
+                .unwrap(); // Temporary hack because `build` does not return a proper `std::error::Error`.
 
             // build a gossipsub network behaviour
             let gossipsub = gossipsub::Behaviour::new(
@@ -335,13 +330,10 @@ pub fn create_node(
 // Create test
 #[cfg(test)]
 mod tests {
-    use std::hash::Hash;
-
-    use env_logger::init;
     use log::{debug, info, trace, warn};
     use serde_json::json;
 
-    use crate::node::node::{create_node, Message};
+    use crate::node::node::{create_node};
 
     #[test]
     fn test_ping() {
@@ -362,11 +354,8 @@ mod tests {
             .build()
             .unwrap();
 
-
         runtime.spawn(async move {
-            while let Some(message) = rx_o_0.recv().await {
-                let message_str = String::from_utf8_lossy(&message);
-                let message_data = serde_json::from_str::<Message>(&message_str).unwrap();
+            while let Some(message_data) = rx_o_0.recv().await {
                 debug!("Node_0 Received: {:?}", message_data);
                 tx_0.send(
                     json!({
@@ -383,9 +372,7 @@ mod tests {
         });
 
         runtime.spawn(async move {
-            while let Some(message) = rx_o_1.recv().await {
-                let message_str = String::from_utf8_lossy(&message);
-                let message_data = serde_json::from_str::<Message>(&message_str).unwrap();
+            while let Some(message_data) = rx_o_1.recv().await {
                 debug!("Node_0 Received: {:?}", message_data);
                 tx_1.send(
                     json!({

@@ -16,4 +16,9 @@ pub use agent::{
     },
 };
 
+pub use sangedama::node::node::{
+    Message,
+    MessageType,
+};
+
 uniffi::include_scaffolding!("ceylon");
