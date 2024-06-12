@@ -69,12 +69,7 @@ impl Message {
         }
     }
     fn event(from: String, event: EventType) -> Self {
-        Self::new(
-            from,
-            event.as_str().to_string(),
-            vec![],
-            MessageType::Event,
-        )
+        Self::new(from, event.as_str().to_string(), vec![], MessageType::Event)
     }
 
     fn data(from: String, data: Vec<u8>) -> Self {
@@ -148,13 +143,11 @@ impl Node {
         for topic in self.subscribed_topics.clone() {
             let topic = gossipsub::IdentTopic::new(topic);
 
-            let prep_message = Message::data(self.name.clone(), message.clone());
-
             match self
                 .swarm
                 .behaviour_mut()
                 .gossipsub
-                .publish(topic, prep_message.to_json().as_bytes())
+                .publish(topic, message.clone())
             {
                 Ok(id) => {
                     message_ids.push(id);
@@ -212,23 +205,16 @@ impl Node {
 
                             match event {
                                 gossipsub::Event::Message { propagation_source, message_id, message } => {
-                                    debug!("{:?} Received message '{:?}' from {:?} on {:?}", self.name, String::from_utf8_lossy(&message.data), propagation_source, message_id);
+                                        debug!("{:?} Received message '{:?}' from {:?} on {:?}", self.name, String::from_utf8_lossy(&message.data), propagation_source, message_id);
 
-                                 let msg = Message::data(self.name.clone(), message.data.clone());
-                                 self.pass_message_to_node(msg).await
-                                    // self.pass_message_to_node(Message::event(  self.swarm.local_peer_id().to_string(),EventType::OnConnectionClosed ,)).await
-                                    // self.out_tx.clone().send(message.data.to_vec()).await.unwrap();
+                                        let msg = Message::data(self.name.clone(), message.data.clone());
+                                        self.pass_message_to_node(msg).await
                                 },
 
                                 gossipsub::Event::Subscribed { peer_id, topic } => {
                                     debug!("{:?} Subscribed to topic {:?}", self.name, topic.clone().into_string());
                                     self.subscribed_topics.push(topic.into_string());
-                                    // tokio::time::sleep(Duration::from_millis(10)).await;
-                                //   self.out_tx.clone().send(
-                                //     Message::event(  peer_id.to_string(),EventType::OnSubscribe,).to_json().as_bytes().to_vec()
-                                // ).await.unwrap();
-
-                            self.pass_message_to_node(Message::event(  peer_id.to_string(),EventType::OnSubscribe,)).await
+                                    self.pass_message_to_node(Message::event(  peer_id.to_string(),EventType::OnSubscribe,)).await
                                 },
 
                                 _ => {
@@ -333,7 +319,7 @@ mod tests {
     use log::{debug, info, trace, warn};
     use serde_json::json;
 
-    use crate::node::node::{create_node};
+    use crate::node::node::create_node;
 
     #[test]
     fn test_ping() {
