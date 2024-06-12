@@ -26,13 +26,13 @@ pub struct AgentCore {
     _workspace_id: Option<String>,
     _processor: Arc<Mutex<Arc<dyn Processor>>>,
     _on_message: Arc<Mutex<Arc<dyn MessageHandler>>>,
-    rx_0: Arc<Mutex<tokio::sync::mpsc::Receiver<Vec<u8>>>>,
-    tx_0: tokio::sync::mpsc::Sender<Vec<u8>>,
+    rx_0: Arc<Mutex<tokio::sync::mpsc::Receiver<Message>>>,
+    tx_0: tokio::sync::mpsc::Sender<Message>,
 }
 
 impl AgentCore {
     pub fn new(name: String, is_leader: bool, on_message: Arc<dyn MessageHandler>, processor: Arc<dyn Processor>) -> Self {
-        let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
+        let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Message>(100);
         let id = uuid::Uuid::new_v4().to_string();
         Self {
             _name: name,
@@ -67,14 +67,14 @@ impl AgentCore {
     }
 
     pub async fn broadcast(&self, message: Vec<u8>) {
-        self.tx_0.send(message).await.unwrap();
+        self.tx_0.send(Message::data(self._name.clone(), self._id.clone(), message)).await.unwrap();
     }
 }
 
 impl AgentCore {
     pub(crate) async fn start(&self, topic: String, url: String, inputs: HashMap<String, String>) {
         let agent_name = self._name.clone();
-        let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
+        let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Message>(100);
         let (mut node_0, mut rx_o_0) = create_node(agent_name.clone(), true, rx_0);
         let on_message = self._on_message.clone();
 

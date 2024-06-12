@@ -23,7 +23,8 @@ dictionary Message{
     bytes data;
     string message;
     u64 time;
-    string from;
+    string originator;
+    string originator_id;
     MessageType type;
 };
 

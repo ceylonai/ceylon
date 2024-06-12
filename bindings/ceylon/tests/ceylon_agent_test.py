@@ -14,7 +14,7 @@ class Agent(AgentCore, MessageHandler, Processor):
     async def on_message(self, agent_id, message):
         if message.type == MessageType.MESSAGE:
             dt = bytes(message.data)
-            print(dt.decode("utf-8"))
+            print(self.id(), self.name(), dt.decode("utf-8"), message.originator_id, message.originator)
         # message = json.loads(str(message, "utf-8"))
         # if message and message.get("type") == "Message":
         #     print(self.name(), message["from"])
