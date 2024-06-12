@@ -1,8 +1,9 @@
 import asyncio
+import json
 import random
 import time
 
-from ceylon.ceylon import AgentCore, MessageHandler, Processor
+from ceylon.ceylon import AgentCore, MessageHandler, Processor, MessageType
 from ceylon.runner import AgentRunner
 
 
@@ -11,13 +12,21 @@ class Agent(AgentCore, MessageHandler, Processor):
         super().__init__(name=name, is_leader=is_leader, on_message=self, processor=self)
 
     async def on_message(self, agent_id, message):
-        print(f"{self.name()} Received message from = '{agent_id}' message= {message}", agent_id, message)
+        if message.type == MessageType.MESSAGE:
+            dt = bytes(message.data)
+            print(dt.decode("utf-8"))
+        # message = json.loads(str(message, "utf-8"))
+        # if message and message.get("type") == "Message":
+        #     print(self.name(), message["from"])
+        #     if self.name() == message["from"]:
+        #         print("Invalid message")
+        #     # print(f" {self.name()} test {data}")
 
     async def run(self, inputs):
         print(f"{self.name()} run", inputs)
         while True:
-            await self.broadcast("Hi from " + self.name() + " at " + str(time.time()))
-            print(f"{self.name()} Broadcast message")
+            await self.broadcast(bytes("Hi from " + self.name() + " at " + str(time.time()), "utf-8"))
+            # print(f"{self.name()} Broadcast message")
             await asyncio.sleep(random.randint(1, 5))
 
 

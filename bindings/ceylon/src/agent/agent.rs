@@ -3,13 +3,13 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 
-use sangedama::node::node::create_node;
+use sangedama::node::node::{create_node, Message};
 
 // The call-answer, callback interface.
 
 #[async_trait::async_trait]
 pub trait MessageHandler: Send + Sync {
-    async fn on_message(&self, agent_id: String, message: String);
+    async fn on_message(&self, agent_id: String, message: Message);
 }
 
 // The call-answer, callback interface.
@@ -66,8 +66,8 @@ impl AgentCore {
         self._workspace_id = Option::from(workspace_id);
     }
 
-    pub async fn broadcast(&self, message: String) {
-        self.tx_0.send(message.to_string().as_bytes().to_vec()).await.unwrap();
+    pub async fn broadcast(&self, message: Vec<u8>) {
+        self.tx_0.send(message).await.unwrap();
     }
 }
 
@@ -91,7 +91,7 @@ impl AgentCore {
                 }
 
                 if let Some(message) = rx_o_0.recv().await {
-                    on_message.lock().await.on_message(agent_name.clone(), String::from_utf8_lossy(&message).to_string()).await;
+                    on_message.lock().await.on_message(agent_name.clone(), message).await;
                 }
             }
         });

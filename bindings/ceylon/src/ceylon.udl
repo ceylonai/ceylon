@@ -11,13 +11,26 @@ interface AgentCore{
     boolean is_leader();
 
     [Async]
-    void broadcast(string message);
+    void broadcast(bytes message);
+};
+
+enum MessageType{
+    "Message",
+    "Event",
+};
+
+dictionary Message{
+    bytes data;
+    string message;
+    u64 time;
+    string from;
+    MessageType type;
 };
 
 [Trait,WithForeign]
 interface MessageHandler {
     [Async]
-    void on_message(string agent_id,string message);
+    void on_message(string agent_id,Message message);
 };
 
 [Trait,WithForeign]
