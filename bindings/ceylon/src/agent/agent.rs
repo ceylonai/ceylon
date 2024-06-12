@@ -1,7 +1,7 @@
 use std::collections::HashMap;
-use tokio::sync::{Mutex};
-use std::sync::{Arc};
-use tokio::runtime::Runtime;
+use std::sync::Arc;
+
+use tokio::sync::Mutex;
 
 use sangedama::node::node::create_node;
 
