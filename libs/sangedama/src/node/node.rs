@@ -4,15 +4,15 @@ use std::time::{Duration, SystemTime};
 use libp2p::{
     futures::StreamExt,
     gossipsub, mdns,
-    swarm::{NetworkBehaviour, Swarm, SwarmEvent},
-    Multiaddr, SwarmBuilder,
+    Multiaddr,
+    swarm::{NetworkBehaviour, Swarm, SwarmEvent}, SwarmBuilder,
 };
 use libp2p_gossipsub::{MessageId, PublishError};
-use log::{debug, error, info, log};
+use log::{debug, error};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use tokio::{io, select};
 use tokio::sync::mpsc;
-use tokio::{io, select, spawn};
 
 pub enum EventType {
     OnMessage,
@@ -237,18 +237,28 @@ impl Node {
                                     for (peer_id, _) in list {
                                         self.swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
                                     }
-                                    self.out_tx.clone().send(
+                                    match self.out_tx.clone().send(
                                         Message::event(  self.swarm.local_peer_id().to_string(),EventType::OnDiscovered,).to_json().as_bytes().to_vec()
-                                    );
+                                    ).await{
+                                        Ok(_) => {},
+                                        Err(e) => {
+                                            debug!("{:?} Failed to send message", e);
+                                        }
+                                }
                                 },
 
                                 mdns::Event::Expired(list) => {
                                     for (peer_id, _) in list {
                                         self.swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
                                     }
-                                self.out_tx.clone().send(
+                                match self.out_tx.clone().send(
                                         Message::event(  self.swarm.local_peer_id().to_string(),EventType::OnExpired,).to_json().as_bytes().to_vec()
-                                    );
+                                    ).await{
+                                        Ok(_) => {},
+                                        Err(e) => {
+                                            debug!("{:?} Failed to send message", e);
+                                    },
+                                };
                                 },
                             }
                         },
@@ -325,10 +335,10 @@ pub fn create_node(
 // Create test
 #[cfg(test)]
 mod tests {
-    use log::{debug, info, trace, warn};
     use std::hash::Hash;
-    use env_logger::init;
 
+    use env_logger::init;
+    use log::{debug, info, trace, warn};
     use serde_json::json;
 
     use crate::node::node::{create_node, Message};
