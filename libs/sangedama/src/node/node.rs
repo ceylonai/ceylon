@@ -40,7 +40,7 @@ impl EventType {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone,Copy)]
+#[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MessageType {
     Message,
     Event,
