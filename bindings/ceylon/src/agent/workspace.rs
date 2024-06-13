@@ -1,8 +1,7 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
-use tokio::runtime::Runtime;
 use serde::{Deserialize, Serialize};
+use tokio::runtime::Runtime;
 use uniffi::deps::log::debug;
 
 use crate::AgentCore;
@@ -37,13 +36,13 @@ impl Workspace {
         }
     }
 
-    pub async fn run(&self, inputs: HashMap<String, String>) {
+    pub async fn run(&self, input: Vec<u8>) {
         debug!("Workspace {} running", self.id);
         let rt = Runtime::new().unwrap();
         let mut tasks = vec![];
-        let _inputs = inputs.clone();
+        let _input = input.clone();
         for agent in self._agents.iter() {
-            let _inputs = _inputs.clone();
+            let _inputs = _input.clone();
             let url = format!("{}/{}", self.host, self.port);
             let topic = format!("workspace-{}", agent.workspace_id());
 

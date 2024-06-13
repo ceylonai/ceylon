@@ -3,7 +3,7 @@ namespace ceylon {
 };
 
 interface AgentCore{
-    constructor(string name,boolean is_leader, MessageHandler on_message, Processor? processor);
+    constructor(string name,boolean is_leader, MessageHandler on_message, Processor? processor,record<string,string>? meta);
 
     string id();
     string name();
@@ -12,6 +12,8 @@ interface AgentCore{
 
     [Async]
     void broadcast(bytes message);
+
+    record<string,string> meta();
 };
 
 enum MessageType{
@@ -37,7 +39,7 @@ interface MessageHandler {
 [Trait,WithForeign]
 interface Processor {
     [Async]
-    void run(record<string, string> inputs);
+    void run(bytes input);
 };
 
 dictionary WorkspaceConfig{
@@ -50,5 +52,5 @@ interface Workspace{
     constructor(sequence<AgentCore> agents,WorkspaceConfig config);
 
     [Async]
-    void run(record<string, string> inputs);
+    void run(bytes input);
 };

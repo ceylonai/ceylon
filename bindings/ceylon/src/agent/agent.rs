@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use tokio::sync::Mutex;
 
@@ -16,7 +17,7 @@ pub trait MessageHandler: Send + Sync {
 
 #[async_trait::async_trait]
 pub trait Processor: Send + Sync {
-    async fn run(&self, message: HashMap<String, String>) -> ();
+    async fn run(&self, input: Vec<u8>) -> ();
 }
 
 pub struct AgentCore {
@@ -28,13 +29,18 @@ pub struct AgentCore {
     _on_message: Arc<Mutex<Arc<dyn MessageHandler>>>,
     rx_0: Arc<Mutex<tokio::sync::mpsc::Receiver<Message>>>,
     tx_0: tokio::sync::mpsc::Sender<Message>,
+    _meta: HashMap<String, String>,
 }
 
 impl AgentCore {
-    pub fn new(name: String, is_leader: bool, on_message: Arc<dyn MessageHandler>, processor: Option<Arc<dyn Processor>>) -> Self {
+    pub fn new(name: String, is_leader: bool, on_message: Arc<dyn MessageHandler>, processor: Option<Arc<dyn Processor>>, meta: Option<HashMap<String, String>>) -> Self {
         let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Message>(100);
         let id = uuid::Uuid::new_v4().to_string();
-        // TODO: Validate 
+        let mut _meta = meta.unwrap_or_default();
+        _meta.insert("id".to_string(), id.clone());
+        _meta.insert("name".to_string(), name.clone());
+        _meta.insert("is_leader".to_string(), is_leader.to_string());
+        _meta.insert("created_at".to_string(), SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis().to_string());
         Self {
             _name: name,
             _is_leader: is_leader,
@@ -44,6 +50,7 @@ impl AgentCore {
             _processor: processor.map(|processor| Arc::new(Mutex::new(processor))), // processor,
             rx_0: Arc::new(Mutex::new(rx_0)),
             tx_0,
+            _meta,
         }
     }
 
@@ -70,10 +77,14 @@ impl AgentCore {
     pub async fn broadcast(&self, message: Vec<u8>) {
         self.tx_0.send(Message::data(self._name.clone(), self._id.clone(), message)).await.unwrap();
     }
+
+    pub fn meta(&self) -> HashMap<String, String> {
+        self._meta.clone()
+    }
 }
 
 impl AgentCore {
-    pub(crate) async fn start(&self, topic: String, url: String, inputs: HashMap<String, String>) {
+    pub(crate) async fn start(&self, topic: String, url: String, inputs: Vec<u8>) {
         let agent_name = self._name.clone();
         let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Message>(100);
         let (mut node_0, mut rx_o_0) = create_node(agent_name.clone(), true, rx_0);
@@ -85,7 +96,7 @@ impl AgentCore {
         });
 
         let rx = Arc::clone(&self.rx_0);
-        tokio::spawn(async move {
+        let t1 = tokio::spawn(async move {
             loop {
                 if let Some(message) = rx.lock().await.recv().await {
                     tx_0.clone().send(message).await.unwrap();
@@ -98,6 +109,9 @@ impl AgentCore {
         });
         if let Some(processor) = self._processor.clone() {
             processor.lock().await.run(inputs).await;
+            t1.await.unwrap();
+        } else {
+            t1.await.unwrap();
         };
     }
 }

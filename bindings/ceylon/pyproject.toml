@@ -26,7 +26,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 
-dependencies = ["ollama==0.2.1"]
+dependencies = ["ollama==0.2.1","pydantic==2.7.4"]
 
 [project.urls]
 Homepage = "https://ceylon.ai"
