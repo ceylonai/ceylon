@@ -10,7 +10,7 @@ readme = { file = "README.md", content-type = "text/markdown" }
 license = { file = "LICENSE" }
 keywords = ["Aritifical Intelligence", "Multi Agent Systems", "CEYLON", "Ceylon Aritficial Intelligence."]
 dynamic = []
-version = "0.12.3"
+version = "0.12.5"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
@@ -27,3 +27,10 @@ classifiers = [
 ]
 
 dependencies = ["ollama==0.2.1"]
+
+[project.urls]
+Homepage = "https://ceylon.ai"
+Documentation = "https://ceylon.ai"
+Repository = "https://github.com/ceylonai/ceylon"
+Issues = "https://github.com/ceylonai/ceylon/issues"
+Changelog = "https://github.com/ceylonai/ceylon/blob/master/CHANGELOG.md"
