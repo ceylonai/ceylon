@@ -107,6 +107,7 @@ jobs:
 
   macos:
     runs-on: ${{ matrix.platform.runner }}
+    if: "startsWith(github.ref, 'refs/tags/')"
     strategy:
       matrix:
         platform:
