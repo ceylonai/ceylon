@@ -1,10 +1,12 @@
+use std::any::Any;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTime;
+use tokio::select;
 
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, watch};
 
-use sangedama::node::node::{create_node, Message};
+use sangedama::node::node::{create_node, Message, MessageType};
 
 // The call-answer, callback interface.
 
@@ -25,7 +27,7 @@ pub struct AgentCore {
     _is_leader: bool,
     _id: String,
     _workspace_id: Option<String>,
-    _processor: Option<Arc<Mutex<Arc<dyn Processor>>>>,
+    _processor: Arc<Mutex<Option<Arc<dyn Processor>>>>,
     _on_message: Arc<Mutex<Arc<dyn MessageHandler>>>,
     rx_0: Arc<Mutex<tokio::sync::mpsc::Receiver<Message>>>,
     tx_0: tokio::sync::mpsc::Sender<Message>,
@@ -47,7 +49,7 @@ impl AgentCore {
             _id: id,
             _workspace_id: None,
             _on_message: Arc::new(Mutex::new(on_message)),
-            _processor: processor.map(|processor| Arc::new(Mutex::new(processor))), // processor,
+            _processor: Arc::new(Mutex::new(processor)),
             rx_0: Arc::new(Mutex::new(rx_0)),
             tx_0,
             _meta,
@@ -74,8 +76,8 @@ impl AgentCore {
         self._workspace_id = Option::from(workspace_id);
     }
 
-    pub async fn broadcast(&self, message: Vec<u8>) {
-        self.tx_0.send(Message::data(self._name.clone(), self._id.clone(), message)).await.unwrap();
+    pub async fn broadcast(&self, message: Vec<u8>, to: Option<String>) {
+        self.tx_0.send(Message::data(self._name.clone(), self._id.clone(), message, to)).await.unwrap();
     }
 
     pub fn meta(&self) -> HashMap<String, String> {

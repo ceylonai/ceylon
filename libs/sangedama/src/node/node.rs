@@ -40,13 +40,13 @@ impl EventType {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone,Copy)]
 pub enum MessageType {
     Message,
     Event,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Message {
     pub data: Vec<u8>,
     pub message: String,
@@ -177,7 +177,6 @@ impl Node {
                         match self.broadcast(message){
                             Ok(message_ids) => {
                                 debug!("{:?} Broadcasted message: {:?}", self.name, message_ids);
-
                             }
                             Err(e) => {
                                 error!("{:?} Failed to broadcast message: {:?}", self.name, e);
@@ -196,7 +195,7 @@ impl Node {
 
                    },
                         SwarmEvent::ConnectionEstablished { peer_id, .. } => {
-                            debug!("{:?} Connected to {:?}", self.name, peer_id);
+                            println!("{:?} Connected to {:?}", self.name, peer_id);
                             self.pass_message_to_node(Message::event(self.swarm.local_peer_id().to_string(),EventType::OnConnectionEstablished,)).await
                         },
                         SwarmEvent::ConnectionClosed { peer_id, .. } => {
@@ -215,7 +214,7 @@ impl Node {
                                 },
 
                                 gossipsub::Event::Subscribed { peer_id, topic } => {
-                                    debug!("{:?} Subscribed to topic {:?}", self.name, topic.clone().into_string());
+                                    println!("{:?} Subscribed to topic {:?}", self.name, topic.clone().into_string());
                                     self.subscribed_topics.push(topic.into_string());
                                     self.pass_message_to_node(Message::event(  peer_id.to_string(),EventType::OnSubscribe,)).await
                                 },

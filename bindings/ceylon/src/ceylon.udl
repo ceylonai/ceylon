@@ -11,7 +11,7 @@ interface AgentCore{
     boolean is_leader();
 
     [Async]
-    void broadcast(bytes message);
+    void broadcast(bytes message, string? to);
 
     record<string,string> meta();
 };
@@ -27,6 +27,7 @@ dictionary Message{
     u64 time;
     string originator;
     string originator_id;
+    string? to_id;
     MessageType type;
 };
 
