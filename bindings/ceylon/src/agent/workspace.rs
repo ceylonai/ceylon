@@ -39,7 +39,7 @@ impl Workspace {
 
     pub async fn run(&self, inputs: HashMap<String, String>) {
         debug!("Workspace {} running", self.id);
-        let mut rt = Runtime::new().unwrap();
+        let rt = Runtime::new().unwrap();
         let mut tasks = vec![];
         let _inputs = inputs.clone();
         for agent in self._agents.iter() {

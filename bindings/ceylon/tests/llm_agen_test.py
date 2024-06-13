@@ -12,7 +12,7 @@ async def main():
     await runner.run({
         "title": "How to use AI for Machine Learning",
     })
-    leader = runner.get_leader()
+    leader = runner.leader()
     print(leader.report)
 
 

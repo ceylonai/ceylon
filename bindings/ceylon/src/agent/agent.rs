@@ -24,23 +24,24 @@ pub struct AgentCore {
     _is_leader: bool,
     _id: String,
     _workspace_id: Option<String>,
-    _processor: Arc<Mutex<Arc<dyn Processor>>>,
+    _processor: Option<Arc<Mutex<Arc<dyn Processor>>>>,
     _on_message: Arc<Mutex<Arc<dyn MessageHandler>>>,
     rx_0: Arc<Mutex<tokio::sync::mpsc::Receiver<Message>>>,
     tx_0: tokio::sync::mpsc::Sender<Message>,
 }
 
 impl AgentCore {
-    pub fn new(name: String, is_leader: bool, on_message: Arc<dyn MessageHandler>, processor: Arc<dyn Processor>) -> Self {
+    pub fn new(name: String, is_leader: bool, on_message: Arc<dyn MessageHandler>, processor: Option<Arc<dyn Processor>>) -> Self {
         let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Message>(100);
         let id = uuid::Uuid::new_v4().to_string();
+        // TODO: Validate 
         Self {
             _name: name,
             _is_leader: is_leader,
             _id: id,
             _workspace_id: None,
             _on_message: Arc::new(Mutex::new(on_message)),
-            _processor: Arc::new(Mutex::new(processor)),
+            _processor: processor.map(|processor| Arc::new(Mutex::new(processor))), // processor,
             rx_0: Arc::new(Mutex::new(rx_0)),
             tx_0,
         }
@@ -95,8 +96,12 @@ impl AgentCore {
                 }
             }
         });
-        let processor = self._processor.clone();
-        processor.lock().await.run(inputs).await;
+        match self._processor.clone() {
+            Some(processor) => {
+                processor.lock().await.run(inputs).await;
+            }
+            None => {}
+        };
     }
 }
 

@@ -38,3 +38,8 @@ class AgentRunner:
         uniffi_set_event_loop(asyncio.get_event_loop())
         workspace = Workspace(agents=self.agents, config=self.config)
         await workspace.run(inputs)
+
+    async def leader(self):
+        if self.leader_agent is None:
+            raise AgentRunnerNotLeaderError()
+        return self.leader_agent

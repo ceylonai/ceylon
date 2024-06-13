@@ -12,9 +12,9 @@ class LLMManager(AgentCore, MessageHandler, Processor):
         print(inputs)
 
 
-class LLMAgent(AgentCore, MessageHandler, Processor):
+class LLMAgent(AgentCore, MessageHandler):
     def __init__(self, name):
-        super().__init__(name=name, is_leader=False, on_message=self, processor=self)
+        super().__init__(name=name, is_leader=False, on_message=self, processor=None)
 
     async def on_message(self, agent_id, message):
         pass

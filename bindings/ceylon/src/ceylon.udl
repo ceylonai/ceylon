@@ -3,7 +3,7 @@ namespace ceylon {
 };
 
 interface AgentCore{
-    constructor(string name,boolean is_leader, MessageHandler on_message, Processor processor);
+    constructor(string name,boolean is_leader, MessageHandler on_message, Processor? processor);
 
     string id();
     string name();
