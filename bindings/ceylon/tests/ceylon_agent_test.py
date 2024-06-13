@@ -13,24 +13,25 @@ class Agent(AgentCore, MessageHandler, Processor):
         super().__init__(name=name, is_leader=is_leader, on_message=self, processor=self, meta=None)
 
     async def on_message(self, agent_id, message):
-        print(message)
-        print({
-            "self_name": self.name(),
-            "self_id": self.id(),
-            "to": message.to_id,
-            "from_id": message.originator_id,
-            "from_name": message.originator,
-            "message_type": message.type.name
-        })
+        print(self.name(), message.message, message.type)
+        # print({
+        #     "self_name": self.name(),
+        #     "self_id": self.id(),
+        #     "to": message.to_id,
+        #     "from_id": message.originator_id,
+        #     "from_name": message.originator,
+        #     "message_type": message.type.name
+        # })
 
     async def run(self, inputs):
-        await asyncio.sleep(random.randint(1, 10))
+        print(f"{self.name()} run", inputs)
+        await asyncio.sleep(random.randint(1, 100))
         # while True:
-        #     await self.broadcast(pickle.dumps({
-        #         "type": "Message",
-        #         "from": self.name(),
-        #         "data": "Hi from " + self.name() + " at " + str(time.time()),
-        #     }), f"ceylon-ai-{random.randint(1, 4)}")
+        await self.broadcast(pickle.dumps({
+            "type": "Message",
+            "from": self.name(),
+            "data": "Hi from " + self.name() + " at " + str(time.time()),
+        }), f"ceylon-ai-{random.randint(1, 24)}")
         #     # print(f"{self.name()} Broadcast message")
         #     await asyncio.sleep(random.randint(1, 10))
 
@@ -39,7 +40,7 @@ class Agent(AgentCore, MessageHandler, Processor):
 async def main():
     runner = AgentRunner(workspace_name="ceylon-ai")
     runner.register_agent(Agent(name="ceylon-ai-1", is_leader=True, ))
-    # runner.register_agent(Agent(name="ceylon-ai-2", is_leader=False, ))
+    runner.register_agent(Agent(name="ceylon-ai-2", is_leader=False, ))
     # runner.register_agent(Agent(name="ceylon-ai-3", is_leader=False, ))
     # runner.register_agent(Agent(name="ceylon-ai-4", is_leader=False, ))
 

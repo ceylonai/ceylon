@@ -5,6 +5,7 @@ use std::time::SystemTime;
 use tokio::select;
 
 use tokio::sync::{Mutex, watch};
+use uniffi::deps::log::debug;
 
 use sangedama::node::node::{create_node, Message, MessageType};
 
@@ -92,29 +93,46 @@ impl AgentCore {
         let (mut node_0, mut rx_o_0) = create_node(agent_name.clone(), true, rx_0);
         let on_message = self._on_message.clone();
 
-        tokio::spawn(async move {
+        let t0 = tokio::spawn(async move {
             node_0.connect(url.as_str(), topic.as_str());
             node_0.run().await;
         });
 
         let rx = Arc::clone(&self.rx_0);
         let t1 = tokio::spawn(async move {
+            let mut rx = rx.lock().await;
             loop {
-                if let Some(message) = rx.lock().await.recv().await {
+                select! {
+                Some(message) = rx.recv() => {
+                    debug!("{} Received: {:?}", agent_name.clone(), message.clone());
                     tx_0.clone().send(message).await.unwrap();
                 }
-
-                if let Some(message) = rx_o_0.recv().await {
-                    on_message.lock().await.on_message(agent_name.clone(), message).await;
+                Some(message) = rx_o_0.recv() => {
+                    let message_to_id = message.to_id.clone().unwrap_or("".to_string());
+                    let message_type = message.r#type;
+                    
+                        if message_to_id == agent_name.clone() && message_type == MessageType::Event.type_id() {
+                            on_message.lock().await.on_message(agent_name.clone(), message.clone()).await;
+                        }
+                        
+                    on_message.lock().await.on_message(agent_name.clone(), message.clone()).await;
                 }
             }
+            }
         });
-        if let Some(processor) = self._processor.clone() {
-            processor.lock().await.run(inputs).await;
-            t1.await.unwrap();
-        } else {
-            t1.await.unwrap();
-        };
+
+
+        let processor = self._processor.clone();
+        let t2 = tokio::spawn(async move {
+            if let Some(processor) = processor.lock().await.clone() {
+                processor.run(inputs).await;
+            }
+        });
+
+
+        t0.await.unwrap();
+        t1.await.unwrap();
+        t2.await.unwrap();
     }
 }
 
