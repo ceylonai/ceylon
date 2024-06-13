@@ -96,11 +96,8 @@ impl AgentCore {
                 }
             }
         });
-        match self._processor.clone() {
-            Some(processor) => {
-                processor.lock().await.run(inputs).await;
-            }
-            None => {}
+        if let Some(processor) = self._processor.clone() {
+            processor.lock().await.run(inputs).await;
         };
     }
 }
