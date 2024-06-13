@@ -6,8 +6,8 @@ build-backend = "maturin"
 name = "ceylon"
 requires-python = ">=3.7"
 description = "Ceylon is an advanced multi-agent platform specifically developed for Ceylon Aritficial Intelligence."
-readme = "README.md"
-license = { file = "LICENSE.txt" }
+readme = "../../README.md"
+license = { file = "../../LICENSE" }
 keywords = ["Aritifical Intelligence", "Multi Agent Systems", "CEYLON", "Ceylon Aritficial Intelligence."]
 dynamic = []
 version = "0.12.1"
