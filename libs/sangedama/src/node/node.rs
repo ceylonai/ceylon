@@ -53,11 +53,12 @@ pub struct Message {
     pub time: u64,
     pub originator: String,
     pub originator_id: String,
+    pub to_id: Option<String>,
     pub r#type: MessageType,
 }
 
 impl Message {
-    fn new(originator: String, originator_id: String, message: String, data: Vec<u8>, message_type: MessageType) -> Self {
+    fn new(originator: String, originator_id: String, message: String, data: Vec<u8>, message_type: MessageType, to_id: Option<String>) -> Self {
         Self {
             data,
             time: SystemTime::now()
@@ -67,17 +68,17 @@ impl Message {
             originator,
             originator_id,
             r#type: message_type,
+            to_id,
             message,
         }
     }
     fn event(originator: String, event: EventType) -> Self {
-        Self::new(originator, "SELF".to_string(), event.as_str().to_string(), vec![], MessageType::Event)
+        Self::new(originator, "SELF".to_string(), event.as_str().to_string(), vec![], MessageType::Event, None)
     }
 
-    pub fn data(from: String, originator_id: String, data: Vec<u8>) -> Self {
-        Self::new(from, originator_id, "DATA-MESSAGE".to_string(), data, MessageType::Message)
+    pub fn data(from: String, originator_id: String, data: Vec<u8>, to_id: Option<String>) -> Self {
+        Self::new(from, originator_id, "DATA-MESSAGE".to_string(), data, MessageType::Message, to_id)
     }
-
     fn to_json(&self) -> String {
         json!(self).to_string()
     }
@@ -337,9 +338,11 @@ mod tests {
 
         let (mut node_0, mut rx_o_0) = create_node("node_0".to_string(), true, rx_0);
         let (mut node_1, mut rx_o_1) = create_node("node_1".to_string(), false, rx_1);
-        
+
         let node_0_id = node_0.id.clone();
         let node_1_id = node_1.id.clone();
+        let node_1_id_2 = node_1.id.clone();
+        let node_0_id_2 = node_0.id.clone();
 
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -349,19 +352,18 @@ mod tests {
         runtime.spawn(async move {
             while let Some(message_data) = rx_o_0.recv().await {
                 debug!("Node_0 Received: {:?}", message_data);
-                let msg = Message::data("node_0".to_string(),node_0_id.clone(), json!({
+                let msg = Message::data("node_0".to_string(), node_0_id.clone(), json!({
                         "data": format!("Hi from Node_0: {}", message_data.message).as_str(),
                     })
                     .to_string()
                     .as_bytes()
-                    .to_vec());
+                    .to_vec(), Some(node_1_id_2.clone()));
                 tx_0.send(msg)
                     .await
                     .unwrap();
                 tokio::time::sleep(std::time::Duration::from_millis(3000)).await;
             }
         });
-
         runtime.spawn(async move {
             while let Some(message_data) = rx_o_1.recv().await {
                 debug!("Node_1 Received: {:?}", message_data);
@@ -370,7 +372,7 @@ mod tests {
                     })
                     .to_string()
                     .as_bytes()
-                    .to_vec());
+                    .to_vec(), Some(node_0_id_2.clone()));
                 tx_1.send(msg)
                     .await
                     .unwrap();
