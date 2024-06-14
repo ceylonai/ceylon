@@ -1,10 +1,9 @@
-use std::any::Any;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::time::SystemTime;
-use tokio::select;
 
-use tokio::sync::{watch, Mutex};
+use tokio::select;
+use tokio::sync::Mutex;
 use uniffi::deps::log::debug;
 
 use sangedama::node::node::{create_node, Message, MessageType};
@@ -26,7 +25,7 @@ pub trait Processor: Send + Sync {
 pub struct AgentCore {
     _name: String,
     _is_leader: bool,
-    _id: String,
+    _id: RwLock<Option<String>>,
     _workspace_id: Option<String>,
     _processor: Arc<Mutex<Option<Arc<dyn Processor>>>>,
     _on_message: Arc<Mutex<Arc<dyn MessageHandler>>>,
@@ -60,7 +59,7 @@ impl AgentCore {
         Self {
             _name: name,
             _is_leader: is_leader,
-            _id: id,
+            _id: RwLock::new(None),
             _workspace_id: None,
             _on_message: Arc::new(Mutex::new(on_message)),
             _processor: Arc::new(Mutex::new(processor)),
@@ -79,7 +78,7 @@ impl AgentCore {
     }
 
     pub fn id(&self) -> String {
-        self._id.clone()
+        self._id.read().unwrap().clone().unwrap_or("".to_string())
     }
 
     pub fn workspace_id(&self) -> String {
@@ -94,7 +93,7 @@ impl AgentCore {
         self.tx_0
             .send(Message::data(
                 self._name.clone(),
-                self._id.clone(),
+                self.id(),
                 message,
                 to,
             ))
@@ -110,10 +109,12 @@ impl AgentCore {
 impl AgentCore {
     pub(crate) async fn start(&self, topic: String, url: String, inputs: Vec<u8>) {
         let agent_name = self._name.clone();
-        let agent_id = self._id.clone();
+        let agent_id = self.id();
         let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Message>(100);
         let (mut node_0, mut rx_o_0) = create_node(agent_name.clone(), true, rx_0);
         let on_message = self._on_message.clone();
+
+        self._id.write().unwrap().replace(agent_id.clone());
 
         let t0 = tokio::spawn(async move {
             node_0.connect(url.as_str(), topic.as_str());
