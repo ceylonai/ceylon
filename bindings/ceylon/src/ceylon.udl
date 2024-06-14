@@ -3,10 +3,15 @@ namespace ceylon {
 };
 
 interface AgentCore{
-    constructor(string name,boolean is_leader, MessageHandler on_message, Processor? processor,record<string,string>? meta);
+    constructor(string name,string position,boolean is_leader,sequence<string> responsibilities, sequence<string> instructions,  MessageHandler on_message, Processor? processor,record<string,string>? meta);
 
     string id();
     string name();
+    string position();
+    sequence<string> responsibilities();
+    sequence<string> instructions();
+
+
     string workspace_id();
     boolean is_leader();
 

@@ -32,12 +32,19 @@ pub struct AgentCore {
     rx_0: Arc<Mutex<tokio::sync::mpsc::Receiver<Message>>>,
     tx_0: tokio::sync::mpsc::Sender<Message>,
     _meta: HashMap<String, String>,
+
+    _position: String,
+    _responsibilities: Vec<String>,
+    _instructions: Vec<String>,
 }
 
 impl AgentCore {
     pub fn new(
         name: String,
+        position: String,
         is_leader: bool,
+        instructions: Vec<String>,
+        responsibilities: Vec<String>,
         on_message: Arc<dyn MessageHandler>,
         processor: Option<Arc<dyn Processor>>,
         meta: Option<HashMap<String, String>>,
@@ -48,6 +55,9 @@ impl AgentCore {
         _meta.insert("id".to_string(), id.clone());
         _meta.insert("name".to_string(), name.clone());
         _meta.insert("is_leader".to_string(), is_leader.to_string());
+        _meta.insert("position".to_string(), position.clone());
+        _meta.insert("responsibilities".to_string(), responsibilities.join(","));
+        _meta.insert("instructions".to_string(), instructions.join(","));
         _meta.insert(
             "created_at".to_string(),
             SystemTime::now()
@@ -57,20 +67,22 @@ impl AgentCore {
                 .to_string(),
         );
 
-
-        let (node_tx_0, node_rx_0) = tokio::sync::mpsc::channel::<Message>(100);
-        let (node_0, mut node_out_rx_o_0) = create_node(name.clone(), true, node_rx_0);
-
         Self {
             _name: name,
             _is_leader: is_leader,
             _id: RwLock::new(None),
             _workspace_id: RwLock::new(None),
+
+            _position: position,
+            _instructions: instructions,
+            _responsibilities: responsibilities,
+
             _on_message: Arc::new(Mutex::new(on_message)),
             _processor: Arc::new(Mutex::new(processor)),
             rx_0: Arc::new(Mutex::new(rx_0)),
             tx_0,
             _meta,
+
         }
     }
 
@@ -108,6 +120,18 @@ impl AgentCore {
 
     pub fn meta(&self) -> HashMap<String, String> {
         self._meta.clone()
+    }
+
+    pub fn instructions(&self) -> Vec<String> {
+        self._instructions.clone()
+    }
+
+    pub fn responsibilities(&self) -> Vec<String> {
+        self._responsibilities.clone()
+    }
+
+    pub fn position(&self) -> String {
+        self._position.clone()
     }
 }
 

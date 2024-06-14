@@ -39,9 +39,6 @@ impl Workspace {
             if names.contains(&agent.name()) {
                 panic!("Agent name {} is not unique", agent.name());
             }
-            if ids.contains(&agent.id()) {
-                panic!("Agent id {} is not unique", agent.id());
-            }
             names.push(agent.name().clone());
             ids.push(agent.id());
         }
