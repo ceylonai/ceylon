@@ -59,16 +59,19 @@ pub struct Message {
     pub data: Vec<u8>,
     pub message: String,
     pub time: u64,
-    pub originator: String,
-    pub originator_id: String,
-    pub to_id: Option<String>,
+    pub from: String,
+    pub r#to: Option<String>,
     pub r#type: MessageType,
     pub event_type: EventType,
 }
 
 impl Message {
-    fn new(originator: String, originator_id: String, message: String, data: Vec<u8>, message_type: MessageType, to_id: Option<String>, event_type: EventType) -> Self {
-        let id = format!("{}-{}-{}", originator, SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis(), Uuid::new_v4());
+    fn new(from: String, to: Option<String>, message: String,
+           data: Vec<u8>, message_type: MessageType,
+           event_type: EventType) -> Self {
+        let id = format!("{}-{}-{}",
+                         from,
+                         SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis(), Uuid::new_v4());
         Self {
             id,
             data,
@@ -76,10 +79,9 @@ impl Message {
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
                 .as_millis() as u64,
-            originator,
-            originator_id,
+            from,
             r#type: message_type,
-            to_id,
+            to,
             message,
             event_type,
         }
@@ -88,21 +90,21 @@ impl Message {
         Self::event_with_data(originator, event, vec![])
     }
 
-    fn event_with_data(originator: String, event: EventType, data: Vec<u8>) -> Self {
-        Self::new(originator, "SELF".to_string(), event.as_str().to_string(), data, MessageType::Event, None, event)
+    fn event_with_data(from: String, event: EventType, data: Vec<u8>) -> Self {
+        Self::new(from, None, "SELF".to_string(), data, MessageType::Event, event)
     }
 
-    pub fn data(from: String, originator_id: String, data: Vec<u8>, to_id: Option<String>, message_type: MessageType) -> Self {
+    pub fn data(from: String, to: Option<String>, data: Vec<u8>, message_type: MessageType) -> Self {
         Self::new(
             from,
-            originator_id,
+            to,
             "DATA-MESSAGE".to_string(),
             data,
             message_type,
-            to_id,
             EventType::OnMessage,
         )
     }
+
     fn to_json(&self) -> String {
         json!(self).to_string()
     }
@@ -347,7 +349,7 @@ pub fn create_node(
 // Create test
 #[cfg(test)]
 mod tests {
-    use log::{debug, info, trace, warn};
+    use log::{debug};
     use serde_json::json;
 
     use crate::node::node::{create_node, Message, MessageType};
@@ -360,8 +362,8 @@ mod tests {
 
         let url = format!("/ip4/0.0.0.0/tcp/{}", port_id);
 
-        let (tx_0, mut rx_0) = tokio::sync::mpsc::channel::<Message>(100);
-        let (tx_1, mut rx_1) = tokio::sync::mpsc::channel::<Message>(100);
+        let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Message>(100);
+        let (tx_1, rx_1) = tokio::sync::mpsc::channel::<Message>(100);
 
         let (mut node_0, mut rx_o_0) = create_node("node_0".to_string(), true, rx_0);
         let (mut node_1, mut rx_o_1) = create_node("node_1".to_string(), false, rx_1);
@@ -379,12 +381,12 @@ mod tests {
         runtime.spawn(async move {
             while let Some(message_data) = rx_o_0.recv().await {
                 debug!("Node_0 Received: {:?}", message_data);
-                let msg = Message::data("node_0".to_string(), node_0_id.clone(), json!({
+                let msg = Message::data(node_0_id.clone(), Some(node_1_id.clone()), json!({
                         "data": format!("Hi from Node_0: {}", message_data.message).as_str(),
                     })
                     .to_string()
                     .as_bytes()
-                    .to_vec(), Some(node_1_id_2.clone()), MessageType::InformationalMessage);
+                    .to_vec(), MessageType::InformationalMessage);
                 tx_0.send(msg)
                     .await
                     .unwrap();
@@ -394,12 +396,12 @@ mod tests {
         runtime.spawn(async move {
             while let Some(message_data) = rx_o_1.recv().await {
                 debug!("Node_1 Received: {:?}", message_data);
-                let msg = Message::data("node_1".to_string(), node_1_id.clone(), json!({
+                let msg = Message::data(node_1_id_2.clone(), Some(node_0_id_2.clone()), json!({
                         "data": format!("Hi from Node_1: {}", message_data.message).as_str(),
                     })
                     .to_string()
                     .as_bytes()
-                    .to_vec(), Some(node_0_id_2.clone()), MessageType::InformationalMessage);
+                    .to_vec(), MessageType::InformationalMessage);
                 tx_1.send(msg)
                     .await
                     .unwrap();

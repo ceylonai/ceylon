@@ -28,10 +28,6 @@ interface AgentCore{
 
     [Async]
     void broadcast(bytes message, string? to, MessageType message_type);
-    [Async]
-    sequence<Message> get_self_context();
-    [Async]
-    record<AgentDefinition,sequence<Message>> get_connected_agents_context();
 
 };
 
@@ -61,9 +57,8 @@ dictionary Message{
     bytes data;
     string message;
     u64 time;
-    string originator;
-    string originator_id;
-    string? to_id;
+    string from;
+    string? to;
     MessageType type;
     EventType event_type;
 };
