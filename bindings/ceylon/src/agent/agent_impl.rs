@@ -120,6 +120,19 @@ impl AgentCore {
     pub fn meta(&self) -> HashMap<String, String> {
         self._meta.clone()
     }
+
+    pub async fn get_self_context(&self) -> Vec<Message> {
+        self._context_mgt
+            .lock()
+            .await
+            .get_self_context()
+    }
+    pub async fn get_connected_agents_context(&self) -> HashMap<String, Vec<Message>> {
+        self._context_mgt
+            .lock()
+            .await
+            .get_connected_agents_context()
+    }
 }
 
 

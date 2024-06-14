@@ -4,6 +4,7 @@ namespace ceylon {
 
 
 dictionary AgentDefinition{
+    string? id;
     string name;
     string position;
     sequence<string> responsibilities;
@@ -22,9 +23,15 @@ interface AgentCore{
     string workspace_id();
     AgentDefinition definition();
 
+
+    record<string,string> meta();
+
     [Async]
     void broadcast(bytes message, string? to, MessageType message_type);
-    record<string,string> meta();
+    [Async]
+    sequence<Message> get_self_context();
+    [Async]
+    record<AgentDefinition,sequence<Message>> get_connected_agents_context();
 
 };
 

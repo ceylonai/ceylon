@@ -17,6 +17,7 @@ pub trait Processor: Send + Sync {
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct AgentDefinition {
+    pub id: Option<String>,
     pub name: String,
     pub position: String,
     pub is_leader: bool,
