@@ -6,6 +6,7 @@ fn version() -> String {
 
 pub use agent::{
     agent::{
+        AgentCoreConfig,
         AgentCore,
         MessageHandler,
         Processor,

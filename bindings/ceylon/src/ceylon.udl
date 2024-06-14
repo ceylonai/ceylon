@@ -2,8 +2,17 @@ namespace ceylon {
   string version();
 };
 
+
+dictionary AgentCoreConfig{
+    string name;
+    string position;
+    sequence<string> responsibilities;
+    sequence<string> instructions;
+    boolean is_leader;
+};
+
 interface AgentCore{
-    constructor(string name,string position,boolean is_leader,sequence<string> responsibilities, sequence<string> instructions,  MessageHandler on_message, Processor? processor,record<string,string>? meta);
+    constructor(AgentCoreConfig config, MessageHandler on_message, Processor? processor,record<string,string>? meta);
 
     string id();
     string name();

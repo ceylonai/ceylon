@@ -4,14 +4,16 @@ import pickle
 import random
 import time
 
-from ceylon.ceylon import AgentCore, MessageHandler, Processor, MessageType
+from ceylon.ceylon import AgentCore, MessageHandler, Processor, MessageType, AgentCoreConfig
 from ceylon.runner import AgentRunner
 
 
 class Agent(AgentCore, MessageHandler, Processor):
     def __init__(self, name, position, is_leader, responsibilities, instructions):
-        super().__init__(name=name, position=position, is_leader=is_leader, on_message=self, processor=self, meta=None,
-                         responsibilities=responsibilities, instructions=instructions)
+        super().__init__(config=AgentCoreConfig(
+            name=name, position=position, is_leader=is_leader
+            , responsibilities=responsibilities, instructions=instructions
+        ), on_message=self, processor=self, meta=None)
 
     async def on_message(self, agent_id, message):
         if message.type == MessageType.MESSAGE:

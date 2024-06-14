@@ -22,6 +22,14 @@ pub trait Processor: Send + Sync {
     async fn run(&self, input: Vec<u8>) -> ();
 }
 
+pub struct AgentCoreConfig {
+    pub name: String,
+    pub position: String,
+    pub is_leader: bool,
+    pub instructions: Vec<String>,
+    pub responsibilities: Vec<String>,
+}
+
 pub struct AgentCore {
     _name: String,
     _is_leader: bool,
@@ -40,19 +48,20 @@ pub struct AgentCore {
 
 impl AgentCore {
     pub fn new(
-        name: String,
-        position: String,
-        is_leader: bool,
-        instructions: Vec<String>,
-        responsibilities: Vec<String>,
+        config: AgentCoreConfig,
         on_message: Arc<dyn MessageHandler>,
         processor: Option<Arc<dyn Processor>>,
         meta: Option<HashMap<String, String>>,
     ) -> Self {
         let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Message>(100);
-        let id = uuid::Uuid::new_v4().to_string();
         let mut _meta = meta.unwrap_or_default();
-        _meta.insert("id".to_string(), id.clone());
+
+        let name = config.name.clone();
+        let is_leader = config.is_leader;
+        let position = config.position.clone();
+        let responsibilities = config.responsibilities.clone();
+        let instructions = config.instructions.clone();
+        
         _meta.insert("name".to_string(), name.clone());
         _meta.insert("is_leader".to_string(), is_leader.to_string());
         _meta.insert("position".to_string(), position.clone());
