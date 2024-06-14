@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::SystemTime;
 
-use serde::{Deserialize, Serialize};
+
 use tokio::select;
 use tokio::sync::Mutex;
 use uniffi::deps::log::debug;
@@ -10,7 +10,7 @@ use uniffi::deps::log::debug;
 use sangedama::node::node::{create_node, EventType, Message, MessageType};
 
 use crate::agent::agent_base::{AgentConfig, AgentDefinition, MessageHandler, Processor};
-use crate::agent::agent_context::{AgentContext, AgentContextManager};
+use crate::agent::agent_context::{AgentContextManager};
 
 pub struct AgentCore {
     _definition: AgentDefinition,
@@ -72,7 +72,7 @@ impl AgentCore {
             _definition: definition.clone(),
             _event_handlers: event_handlers.unwrap_or_default(),
 
-            _context_mgt: Arc::new(Mutex::new(AgentContextManager::new())),
+            _context_mgt: Arc::new(Mutex::new(AgentContextManager::new(config.memory_context_size, None))),
             _context_mgt_rx: Arc::new(Mutex::new(_context_mgt_rx)),
             _context_mgt_tx,
         }
@@ -106,9 +106,13 @@ impl AgentCore {
             to,
             message_type,
         );
-        self._context_mgt_tx.send(msg.clone()).await.unwrap();
-        self.tx_0
-            .send(msg.clone())
+        Self::broadcast_raw(self._context_mgt_tx.clone(), self.tx_0.clone(), msg).await;
+    }
+
+    async fn broadcast_raw(context_mgt_tx: tokio::sync::mpsc::Sender<Message>, tx_0: tokio::sync::mpsc::Sender<Message>, message: Message) {
+        context_mgt_tx.send(message.clone()).await.unwrap();
+        tx_0
+            .send(message)
             .await
             .unwrap();
     }
@@ -130,6 +134,7 @@ impl AgentCore {
         let event_handlers = self._event_handlers.clone();
 
         self._id.write().unwrap().replace(agent_id.clone());
+        self._context_mgt.clone().lock().await.update_self_definition(self._definition.clone(), agent_id.clone());
 
         let t0 = tokio::spawn(async move {
             node_0.connect(url.as_str(), topic.as_str());
@@ -150,7 +155,7 @@ impl AgentCore {
                         Some(message) = rx_o_0.recv() => {
 
                         // self._context_mgt.write().unwrap().add_message(message.clone());
-                        
+
                         if message.r#type != MessageType::Event{
                             ctx_tx.send(message.clone()).await.unwrap();
                         }
@@ -186,13 +191,17 @@ impl AgentCore {
 
         let _context_mgt_rx = Arc::clone(&self._context_mgt_rx);
         let _context_mgt = Arc::clone(&self._context_mgt);
+        let _tx_0 = self.tx_0.clone();
+        let _context_mgt_tx = self._context_mgt_tx.clone();
         let t3 = tokio::spawn(async move {
             let mut rx = _context_mgt_rx.lock().await;
             let mut ctx = _context_mgt.lock().await;
             loop {
                 select! {
                     Some(message) = rx.recv() => {
-                        ctx.add_message(message.clone());
+                       if let Some(msg) = ctx.add_message(message.clone()) {                               
+                           Self::broadcast_raw(_context_mgt_tx.clone(), _tx_0.clone(), msg.clone()).await;
+                       }
                     }
                 }
             }

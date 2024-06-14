@@ -50,6 +50,7 @@ enum MessageType{
 };
 
 dictionary Message{
+    string id;
     bytes data;
     string message;
     u64 time;

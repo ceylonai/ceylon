@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::sync::mpsc;
 use tokio::{io, select};
+use uuid::Uuid;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum EventType {
@@ -54,6 +55,7 @@ pub enum MessageType {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Message {
+    pub id: String,
     pub data: Vec<u8>,
     pub message: String,
     pub time: u64,
@@ -66,7 +68,9 @@ pub struct Message {
 
 impl Message {
     fn new(originator: String, originator_id: String, message: String, data: Vec<u8>, message_type: MessageType, to_id: Option<String>, event_type: EventType) -> Self {
+        let id = format!("{}-{}-{}", originator, SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis(), Uuid::new_v4());
         Self {
+            id,
             data,
             time: SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
