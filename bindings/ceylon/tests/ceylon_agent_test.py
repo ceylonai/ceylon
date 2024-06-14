@@ -1,14 +1,17 @@
 import asyncio
 import pickle
 import random
-import time
 
 from ceylon.ceylon import AgentCore, MessageHandler, Processor, MessageType, AgentDefinition, Message, EventType
 from ceylon.runner import AgentRunner
 
 
 class Agent(AgentCore, MessageHandler, Processor):
-    class AnyEventHandler(MessageHandler):
+    class OnSubscribeEvent(MessageHandler):
+
+        def __init__(self, sender: AgentCore):
+            super().__init__()
+            self.sender = sender
 
         async def on_message(self, agent_id: str, message: Message):
             print("ANY EVENT HANDLER", agent_id, message)
@@ -18,7 +21,7 @@ class Agent(AgentCore, MessageHandler, Processor):
             name=name, position=position, is_leader=is_leader
             , responsibilities=responsibilities, instructions=instructions
         ), on_message=self, processor=self, meta=None, event_handlers={
-            EventType.ON_ANY: self.AnyEventHandler()
+            EventType.ON_ANY: self.OnSubscribeEvent(self)
         })
 
     async def on_message(self, agent_id, message):
@@ -47,13 +50,12 @@ class Agent(AgentCore, MessageHandler, Processor):
 
     async def run(self, inputs):
         inputs = pickle.loads(inputs)
-        print(f"{self.definition().name} run", inputs)
         await asyncio.sleep(random.randint(1, 100))
-        while True:
-            await self.broadcast(pickle.dumps({
-                "data": "Hi from " + self.definition().name + " at " + str(time.time()),
-            }), f"ceylon-ai-{random.randint(1, 4)}")
-            await asyncio.sleep(random.randint(1, 10))
+        # while True:
+        #     await self.broadcast(pickle.dumps({
+        #         "data": "Hi from " + self.definition().name + " at " + str(time.time()),
+        #     }), f"ceylon-ai-{random.randint(1, 4)}")
+        #     await asyncio.sleep(random.randint(1, 10))
         #     # print(f"{self.name()} Broadcast message")
         #     await asyncio.sleep(random.randint(1, 10))
 

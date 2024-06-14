@@ -78,7 +78,11 @@ impl Message {
         }
     }
     fn event(originator: String, event: EventType) -> Self {
-        Self::new(originator, "SELF".to_string(), event.as_str().to_string(), vec![], MessageType::Event, None, event)
+        Self::event_with_data(originator, event, vec![])
+    }
+
+    fn event_with_data(originator: String, event: EventType, data: Vec<u8>) -> Self {
+        Self::new(originator, "SELF".to_string(), event.as_str().to_string(), data, MessageType::Event, None, event)
     }
 
     pub fn data(from: String, originator_id: String, data: Vec<u8>, to_id: Option<String>) -> Self {
@@ -219,9 +223,13 @@ impl Node {
                                 },
 
                                 gossipsub::Event::Subscribed { peer_id, topic } => {
-                                    debug!("{:?} Subscribed to topic {:?}", self.name, topic.clone().into_string());
+                                let topic_val = gossipsub::IdentTopic::new(topic.clone().into_string());
+                                    debug!("{:?} Subscribed to topic {:?}", self.name, topic.to_string());
                                     self.subscribed_topics.push(topic.into_string());
-                                    self.pass_message_to_node(Message::event(  peer_id.to_string(),EventType::OnSubscribe,)).await
+                                    self.pass_message_to_node(Message::event_with_data(  peer_id.to_string(),EventType::OnSubscribe,json!({
+                                        "topic": topic_val.clone().to_string(),
+                                        "peer_id": peer_id.to_string(),
+                                    }).to_string().as_bytes().to_vec())).await
                                 },
 
                                 _ => {
