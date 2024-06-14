@@ -13,7 +13,7 @@ use crate::agent::agent_base::{AgentConfig, AgentDefinition, MessageHandler, Pro
 use crate::agent::agent_context::{AgentContextManager};
 
 pub struct AgentCore {
-    _definition: AgentDefinition,
+    _definition: RwLock<AgentDefinition>,
     _id: RwLock<Option<String>>,
     _workspace_id: RwLock<Option<String>>,
     _processor: Arc<Mutex<Option<Arc<dyn Processor>>>>,
@@ -69,7 +69,7 @@ impl AgentCore {
             rx_0: Arc::new(Mutex::new(rx_0)),
             tx_0,
             _meta,
-            _definition: definition.clone(),
+            _definition: RwLock::new(definition),
             _event_handlers: event_handlers.unwrap_or_default(),
 
             _context_mgt: Arc::new(Mutex::new(AgentContextManager::new(config.memory_context_size, None))),
@@ -79,7 +79,7 @@ impl AgentCore {
     }
 
     pub fn definition(&self) -> AgentDefinition {
-        self._definition.clone()
+        self._definition.read().unwrap().clone()
     }
 
     pub fn id(&self) -> String {
@@ -100,10 +100,9 @@ impl AgentCore {
 
     pub async fn broadcast(&self, message: Vec<u8>, to: Option<String>, message_type: MessageType) {
         let msg = Message::data(
-            self.definition().name.clone(),
-            self.id(),
-            message,
+            self.definition().id.clone().unwrap().clone(),
             to,
+            message,
             message_type,
         );
         Self::broadcast_raw(self._context_mgt_tx.clone(), self.tx_0.clone(), msg).await;
@@ -120,19 +119,6 @@ impl AgentCore {
     pub fn meta(&self) -> HashMap<String, String> {
         self._meta.clone()
     }
-
-    pub async fn get_self_context(&self) -> Vec<Message> {
-        self._context_mgt
-            .lock()
-            .await
-            .get_self_context()
-    }
-    pub async fn get_connected_agents_context(&self) -> HashMap<String, Vec<Message>> {
-        self._context_mgt
-            .lock()
-            .await
-            .get_connected_agents_context()
-    }
 }
 
 
@@ -147,7 +133,8 @@ impl AgentCore {
         let event_handlers = self._event_handlers.clone();
 
         self._id.write().unwrap().replace(agent_id.clone());
-        self._context_mgt.clone().lock().await.update_self_definition(self._definition.clone(), agent_id.clone());
+        self._definition.write().unwrap().id = Some(agent_id.clone());
+        self._context_mgt.clone().lock().await.update_self_definition(self.definition(), agent_id.clone());
 
         let t0 = tokio::spawn(async move {
             node_0.connect(url.as_str(), topic.as_str());
@@ -212,7 +199,7 @@ impl AgentCore {
             loop {
                 select! {
                     Some(message) = rx.recv() => {
-                       if let Some(msg) = ctx.add_message(message.clone()) {                               
+                       if let Some(msg) = ctx.add_message(message.clone()) {
                            Self::broadcast_raw(_context_mgt_tx.clone(), _tx_0.clone(), msg.clone()).await;
                        }
                     }

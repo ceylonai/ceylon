@@ -59,18 +59,18 @@ pub struct Message {
     pub data: Vec<u8>,
     pub message: String,
     pub time: u64,
-    pub from: String,
-    pub r#to: Option<String>,
+    pub sender: String,
+    pub receiver: Option<String>,
     pub r#type: MessageType,
     pub event_type: EventType,
 }
 
 impl Message {
-    fn new(from: String, to: Option<String>, message: String,
+    fn new(sender: String, receiver: Option<String>, message: String,
            data: Vec<u8>, message_type: MessageType,
            event_type: EventType) -> Self {
         let id = format!("{}-{}-{}",
-                         from,
+                         sender,
                          SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis(), Uuid::new_v4());
         Self {
             id,
@@ -79,9 +79,9 @@ impl Message {
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
                 .as_millis() as u64,
-            from,
+            sender,
             r#type: message_type,
-            to,
+            receiver,
             message,
             event_type,
         }

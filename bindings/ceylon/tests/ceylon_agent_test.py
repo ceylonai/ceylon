@@ -20,8 +20,12 @@ class Agent(AgentCore, MessageHandler, Processor):
 
     def __init__(self, name, position, is_leader, responsibilities, instructions):
         super().__init__(definition=AgentDefinition(
-            name=name, position=position, is_leader=is_leader
-            , responsibilities=responsibilities, instructions=instructions
+            id=None,
+            name=name,
+            position=position,
+            is_leader=is_leader,
+            responsibilities=responsibilities,
+            instructions=instructions
         ),
             config=AgentConfig(
                 memory_context_size=10
@@ -31,24 +35,26 @@ class Agent(AgentCore, MessageHandler, Processor):
             })
 
     async def on_message(self, agent_id, message):
+        id = self.definition().id
         name = self.definition().name
         if (message.type == MessageType.REQUEST_MESSAGE or message.type == MessageType.RESPONSE_MESSAGE
                 or message.type == MessageType.INFORMATIONAL_MESSAGE):
             print(
-                "SENDER NAME=", message.originator,
-                "RECEIVER ID=", message.to_id, name == message.to_id,
+                "SENDER NAME=", message.sender,
+                "RECEIVER ID=", message.receiver,
+                id == message.receiver,
                 "MY ID=", name,
                 "DATA=", pickle.loads(message.data),
                 "MESSAGE=", message.message,
                 "MESSAGE TYPE=", message.type.name)
         else:
             print(
-                "SENDER NAME=", message.originator,
-                "RECEIVER ID=", message.to_id,
-                "IS FOR ME=", name == message.to_id,
+                "SENDER NAME=", message.sender,
+                "RECEIVER ID=", message.receiver,
+                id == message.receiver,
                 "MY ID=", name,
-                "MESSAGE TYPE=", message.type.name,
-                "MESSAGE=", message.message)
+                "MESSAGE=", message.message,
+                "MESSAGE TYPE=", message.type.name)
 
     async def run(self, inputs):
         print("run", self.definition().name)

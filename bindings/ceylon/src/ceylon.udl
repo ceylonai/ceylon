@@ -57,8 +57,8 @@ dictionary Message{
     bytes data;
     string message;
     u64 time;
-    string from;
-    string? to;
+    string sender;
+    string? receiver;
     MessageType type;
     EventType event_type;
 };
