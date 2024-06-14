@@ -45,7 +45,9 @@ impl EventType {
 
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MessageType {
-    Message,
+    RequestMessage,
+    ResponseMessage,
+    InformationalMessage,
     Event,
 }
 
@@ -85,8 +87,16 @@ impl Message {
         Self::new(originator, "SELF".to_string(), event.as_str().to_string(), data, MessageType::Event, None, event)
     }
 
-    pub fn data(from: String, originator_id: String, data: Vec<u8>, to_id: Option<String>) -> Self {
-        Self::new(from, originator_id, "DATA-MESSAGE".to_string(), data, MessageType::Message, to_id, EventType::OnMessage)
+    pub fn data(from: String, originator_id: String, data: Vec<u8>, to_id: Option<String>, message_type: MessageType) -> Self {
+        Self::new(
+            from,
+            originator_id,
+            "DATA-MESSAGE".to_string(),
+            data,
+            message_type,
+            to_id,
+            EventType::OnMessage,
+        )
     }
     fn to_json(&self) -> String {
         json!(self).to_string()
@@ -335,7 +345,7 @@ mod tests {
     use log::{debug, info, trace, warn};
     use serde_json::json;
 
-    use crate::node::node::{create_node, Message};
+    use crate::node::node::{create_node, Message, MessageType};
 
     #[test]
     fn test_ping() {
@@ -345,7 +355,7 @@ mod tests {
 
         let url = format!("/ip4/0.0.0.0/tcp/{}", port_id);
 
-        let (tx_0, mut rx_0) = tokio::sync::mpsc::channel::<Message>(100);
+        let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Message>(100);
         let (tx_1, mut rx_1) = tokio::sync::mpsc::channel::<Message>(100);
 
         let (mut node_0, mut rx_o_0) = create_node("node_0".to_string(), true, rx_0);
@@ -369,7 +379,7 @@ mod tests {
                     })
                     .to_string()
                     .as_bytes()
-                    .to_vec(), Some(node_1_id_2.clone()));
+                    .to_vec(), Some(node_1_id_2.clone()), MessageType::InformationalMessage);
                 tx_0.send(msg)
                     .await
                     .unwrap();
@@ -384,7 +394,7 @@ mod tests {
                     })
                     .to_string()
                     .as_bytes()
-                    .to_vec(), Some(node_0_id_2.clone()));
+                    .to_vec(), Some(node_0_id_2.clone()), MessageType::InformationalMessage);
                 tx_1.send(msg)
                     .await
                     .unwrap();

@@ -1,6 +1,7 @@
 import asyncio
 import pickle
 import random
+import time
 
 from ceylon.ceylon import AgentCore, MessageHandler, Processor, MessageType, AgentDefinition, Message, EventType
 from ceylon.runner import AgentRunner
@@ -21,43 +22,37 @@ class Agent(AgentCore, MessageHandler, Processor):
             name=name, position=position, is_leader=is_leader
             , responsibilities=responsibilities, instructions=instructions
         ), on_message=self, processor=self, meta=None, event_handlers={
-            EventType.ON_ANY: self.OnSubscribeEvent(self)
+            EventType.ON_SUBSCRIBE: [self.OnSubscribeEvent(self)]
         })
 
     async def on_message(self, agent_id, message):
         name = self.definition().name
-        if message.type == MessageType.MESSAGE:
-            print(
-                "SENDER NAME=", message.originator,
-                "RECEIVER ID=", message.to_id, name == message.to_id, "MY ID=", name,
-                "DATA=", pickle.loads(message.data),
-                "MESSAGE=", message.message)
-        else:
+        if (message.type == MessageType.REQUEST_MESSAGE or message.type == MessageType.RESPONSE_MESSAGE
+                or message.type == MessageType.INFORMATIONAL_MESSAGE):
             print(
                 "SENDER NAME=", message.originator,
                 "RECEIVER ID=", message.to_id, name == message.to_id,
                 "MY ID=", name,
+                "DATA=", pickle.loads(message.data),
+                "MESSAGE=", message.message,
+                "MESSAGE TYPE=", message.type.name)
+        else:
+            print(
+                "SENDER NAME=", message.originator,
+                "RECEIVER ID=", message.to_id,
+                "IS FOR ME=", name == message.to_id,
+                "MY ID=", name,
                 "MESSAGE TYPE=", message.type.name,
                 "MESSAGE=", message.message)
-        # print({
-        #     "self_name": self.name(),
-        #     "self_id": self.id(),
-        #     "to": message.to_id,
-        #     "from_id": message.originator_id,
-        #     "from_name": message.originator,
-        #     "message_type": message.type.name
-        # })
 
     async def run(self, inputs):
+        print("run", self.definition().name)
         inputs = pickle.loads(inputs)
-        await asyncio.sleep(random.randint(1, 100))
-        # while True:
-        #     await self.broadcast(pickle.dumps({
-        #         "data": "Hi from " + self.definition().name + " at " + str(time.time()),
-        #     }), f"ceylon-ai-{random.randint(1, 4)}")
-        #     await asyncio.sleep(random.randint(1, 10))
-        #     # print(f"{self.name()} Broadcast message")
-        #     await asyncio.sleep(random.randint(1, 10))
+        while True:
+            await asyncio.sleep(random.randint(1, 5))
+            await self.broadcast(pickle.dumps({
+                "title": f"Hi Im  {self.definition().name} at {time.time()}",
+            }), to=None, message_type=MessageType.INFORMATIONAL_MESSAGE)
 
 
 #

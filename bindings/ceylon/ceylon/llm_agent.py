@@ -1,6 +1,6 @@
 import pickle
 
-from ceylon.ceylon import AgentCore, MessageHandler, Processor, AgentDefinition, MessageType
+from ceylon.ceylon import AgentCore, MessageHandler, Processor, AgentDefinition, MessageType, EventType
 from ceylon.runner import RunnerInput
 
 
@@ -11,9 +11,10 @@ class LLMManager(AgentCore, MessageHandler, Processor):
 
     def __init__(self, name="manager"):
         super().__init__(definition=AgentDefinition(name=name, is_leader=True, position="LEADER", responsibilities=[],
-                                                    instructions=[]), on_message=self, processor=self, meta={
-            "on_subscribed": self.OnAnyEvent()
-        })
+                                                    instructions=[]), on_message=self, processor=self, meta={},
+                         event_handlers={
+                             EventType.ON_ANY: [self.OnAnyEvent()]
+                         })
 
     async def on_message(self, agent_id, message):
         pass

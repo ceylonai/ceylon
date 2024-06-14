@@ -1,4 +1,3 @@
-use std::any::Any;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::SystemTime;
@@ -42,8 +41,9 @@ pub struct AgentCore {
     rx_0: Arc<Mutex<tokio::sync::mpsc::Receiver<Message>>>,
     tx_0: tokio::sync::mpsc::Sender<Message>,
     _meta: HashMap<String, String>,
-    _event_handlers: HashMap<EventType, Arc<dyn MessageHandler>>,
+    _event_handlers: HashMap<EventType, Vec<Arc<dyn MessageHandler>>>,
 
+    _connected_agents: RwLock<HashMap<String, Arc<AgentDefinition>>>,
 }
 
 impl AgentCore {
@@ -52,7 +52,7 @@ impl AgentCore {
         on_message: Arc<dyn MessageHandler>,
         processor: Option<Arc<dyn Processor>>,
         meta: Option<HashMap<String, String>>,
-        event_handlers: Option<HashMap<EventType, Arc<dyn MessageHandler>>>,
+        event_handlers: Option<HashMap<EventType, Vec<Arc<dyn MessageHandler>>>>,
     ) -> Self {
         let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Message>(100);
         let mut _meta = meta.unwrap_or_default();
@@ -88,6 +88,7 @@ impl AgentCore {
             _definition: definition,
             _event_handlers: event_handlers.unwrap_or_default(),
 
+            _connected_agents: RwLock::new(HashMap::new()),
         }
     }
 
@@ -100,20 +101,25 @@ impl AgentCore {
     }
 
     pub fn workspace_id(&self) -> String {
-        self._workspace_id.read().unwrap().clone().unwrap_or("".to_string())
+        self._workspace_id
+            .read()
+            .unwrap()
+            .clone()
+            .unwrap_or("".to_string())
     }
 
     pub fn set_workspace_id(&self, workspace_id: String) {
         self._workspace_id.write().unwrap().replace(workspace_id);
     }
 
-    pub async fn broadcast(&self, message: Vec<u8>, to: Option<String>) {
+    pub async fn broadcast(&self, message: Vec<u8>, to: Option<String>, message_type: MessageType) {
         self.tx_0
             .send(Message::data(
                 self.definition().name.clone(),
                 self.id(),
                 message,
                 to,
+                message_type,
             ))
             .await
             .unwrap();
@@ -123,6 +129,7 @@ impl AgentCore {
         self._meta.clone()
     }
 }
+
 
 impl AgentCore {
     pub(crate) async fn start(&self, topic: String, url: String, inputs: Vec<u8>) {
@@ -151,28 +158,23 @@ impl AgentCore {
                             tx_0.clone().send(message).await.unwrap();
                         }
                         Some(message) = rx_o_0.recv() => {
-
-                        if message.r#type == MessageType::Message {
+                        if message.r#type == MessageType::RequestMessage || message.r#type == MessageType::ResponseMessage || message.r#type == MessageType::InformationalMessage {
                              on_message.lock().await.on_message(agent_name.clone(), message.clone()).await;
                         }else if message.r#type == MessageType::Event {
                             for handler_event in event_handlers.keys() {
                                 if handler_event == &message.event_type || handler_event == &EventType::OnAny {
-                                    let handler = event_handlers.get(handler_event).unwrap();
-                                    handler.on_message(agent_name.clone(), message.clone()).await;
-                                }                                
+                                    let handlers = event_handlers.get(handler_event).unwrap();
+                                     for handler in handlers {
+                                        let _messaage = message.clone();
+                                        let _handler = handler.clone();
+                                        let _name =  agent_name.clone();
+                                        tokio::spawn(async move{
+                                            _handler.on_message(_name, _messaage).await;
+                                        });
+                                     }
+                                };
                             }
                         }
-
-
-
-                        //     let message_to_id = message.to_id.clone().unwrap_or("ALL".to_string());
-                        //     let message_type = message.r#type;
-                        //     if message_to_id == agent_name.clone() ||
-                        //         message_to_id == agent_id.clone() ||
-                        //         message_to_id == "ALL" ||
-                        //         message_type == MessageType::Event                                {
-                        //         on_message.lock().await.on_message(agent_name.clone(), message.clone()).await;
-                        // }
                     }
                 }
             }
