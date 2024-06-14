@@ -3,7 +3,8 @@ import pickle
 import random
 import time
 
-from ceylon.ceylon import AgentCore, MessageHandler, Processor, MessageType, AgentDefinition, Message, EventType
+from ceylon.ceylon import AgentCore, MessageHandler, Processor, MessageType, AgentDefinition, Message, EventType, \
+    AgentConfig
 from ceylon.runner import AgentRunner
 
 
@@ -21,9 +22,13 @@ class Agent(AgentCore, MessageHandler, Processor):
         super().__init__(definition=AgentDefinition(
             name=name, position=position, is_leader=is_leader
             , responsibilities=responsibilities, instructions=instructions
-        ), on_message=self, processor=self, meta=None, event_handlers={
-            EventType.ON_SUBSCRIBE: [self.OnSubscribeEvent(self)]
-        })
+        ),
+            config=AgentConfig(
+                memory_context_size=10
+            ),
+            on_message=self, processor=self, meta=None, event_handlers={
+                EventType.ON_SUBSCRIBE: [self.OnSubscribeEvent(self)]
+            })
 
     async def on_message(self, agent_id, message):
         name = self.definition().name

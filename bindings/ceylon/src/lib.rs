@@ -5,11 +5,14 @@ fn version() -> String {
 }
 
 pub use agent::{
-    agent::{
+    agent_base::{
         AgentDefinition,
-        AgentCore,
+        AgentConfig,
         MessageHandler,
         Processor,
+    },
+    agent_impl::{
+        AgentCore
     },
     workspace::{
         Workspace,

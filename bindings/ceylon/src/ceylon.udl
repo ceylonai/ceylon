@@ -11,8 +11,12 @@ dictionary AgentDefinition{
     boolean is_leader;
 };
 
+dictionary AgentConfig{
+    u16 memory_context_size = 10;
+};
+
 interface AgentCore{
-    constructor(AgentDefinition definition, MessageHandler on_message, Processor? processor,record<string,string>? meta, record<EventType,sequence<MessageHandler>>? event_handlers);
+    constructor(AgentDefinition definition,AgentConfig config, MessageHandler on_message, Processor? processor,record<string,string>? meta, record<EventType,sequence<MessageHandler>>? event_handlers);
 
     string id();
     string workspace_id();
@@ -41,6 +45,7 @@ enum MessageType{
     "RequestMessage",
     "ResponseMessage",
     "InformationalMessage",
+    "IntroduceMessage",
     "Event",
 };
 

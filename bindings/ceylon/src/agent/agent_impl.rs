@@ -9,28 +9,8 @@ use uniffi::deps::log::debug;
 
 use sangedama::node::node::{create_node, EventType, Message, MessageType};
 
-// The call-answer, callback interface.
-
-#[async_trait::async_trait]
-pub trait MessageHandler: Send + Sync {
-    async fn on_message(&self, agent_id: String, message: Message);
-}
-
-// The call-answer, callback interface.
-
-#[async_trait::async_trait]
-pub trait Processor: Send + Sync {
-    async fn run(&self, input: Vec<u8>) -> ();
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct AgentDefinition {
-    pub name: String,
-    pub position: String,
-    pub is_leader: bool,
-    pub instructions: Vec<String>,
-    pub responsibilities: Vec<String>,
-}
+use crate::agent::agent_base::{AgentConfig, AgentDefinition, MessageHandler, Processor};
+use crate::agent::agent_context::{AgentContext, AgentContextManager};
 
 pub struct AgentCore {
     _definition: AgentDefinition,
@@ -43,18 +23,22 @@ pub struct AgentCore {
     _meta: HashMap<String, String>,
     _event_handlers: HashMap<EventType, Vec<Arc<dyn MessageHandler>>>,
 
-    _connected_agents: RwLock<HashMap<String, Arc<AgentDefinition>>>,
+    _context_mgt: Arc<Mutex<AgentContextManager>>,
+    _context_mgt_rx: Arc<Mutex<tokio::sync::mpsc::Receiver<Message>>>,
+    _context_mgt_tx: tokio::sync::mpsc::Sender<Message>,
 }
 
 impl AgentCore {
     pub fn new(
         definition: AgentDefinition,
+        config: AgentConfig,
         on_message: Arc<dyn MessageHandler>,
         processor: Option<Arc<dyn Processor>>,
         meta: Option<HashMap<String, String>>,
         event_handlers: Option<HashMap<EventType, Vec<Arc<dyn MessageHandler>>>>,
     ) -> Self {
         let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Message>(100);
+        let (_context_mgt_tx, _context_mgt_rx) = tokio::sync::mpsc::channel::<Message>(100);
         let mut _meta = meta.unwrap_or_default();
 
         let name = definition.name.clone();
@@ -85,10 +69,12 @@ impl AgentCore {
             rx_0: Arc::new(Mutex::new(rx_0)),
             tx_0,
             _meta,
-            _definition: definition,
+            _definition: definition.clone(),
             _event_handlers: event_handlers.unwrap_or_default(),
 
-            _connected_agents: RwLock::new(HashMap::new()),
+            _context_mgt: Arc::new(Mutex::new(AgentContextManager::new())),
+            _context_mgt_rx: Arc::new(Mutex::new(_context_mgt_rx)),
+            _context_mgt_tx,
         }
     }
 
@@ -113,14 +99,16 @@ impl AgentCore {
     }
 
     pub async fn broadcast(&self, message: Vec<u8>, to: Option<String>, message_type: MessageType) {
+        let msg = Message::data(
+            self.definition().name.clone(),
+            self.id(),
+            message,
+            to,
+            message_type,
+        );
+        self._context_mgt_tx.send(msg.clone()).await.unwrap();
         self.tx_0
-            .send(Message::data(
-                self.definition().name.clone(),
-                self.id(),
-                message,
-                to,
-                message_type,
-            ))
+            .send(msg.clone())
             .await
             .unwrap();
     }
@@ -148,7 +136,9 @@ impl AgentCore {
             node_0.run().await;
         });
 
+
         let rx = Arc::clone(&self.rx_0);
+        let ctx_tx = self._context_mgt_tx.clone();
         let t1 = tokio::spawn(async move {
             let mut rx = rx.lock().await;
             loop {
@@ -158,6 +148,13 @@ impl AgentCore {
                             tx_0.clone().send(message).await.unwrap();
                         }
                         Some(message) = rx_o_0.recv() => {
+
+                        // self._context_mgt.write().unwrap().add_message(message.clone());
+                        
+                        if message.r#type != MessageType::Event{
+                            ctx_tx.send(message.clone()).await.unwrap();
+                        }
+
                         if message.r#type == MessageType::RequestMessage || message.r#type == MessageType::ResponseMessage || message.r#type == MessageType::InformationalMessage {
                              on_message.lock().await.on_message(agent_name.clone(), message.clone()).await;
                         }else if message.r#type == MessageType::Event {
@@ -187,8 +184,23 @@ impl AgentCore {
             }
         });
 
+        let _context_mgt_rx = Arc::clone(&self._context_mgt_rx);
+        let _context_mgt = Arc::clone(&self._context_mgt);
+        let t3 = tokio::spawn(async move {
+            let mut rx = _context_mgt_rx.lock().await;
+            let mut ctx = _context_mgt.lock().await;
+            loop {
+                select! {
+                    Some(message) = rx.recv() => {
+                        ctx.add_message(message.clone());
+                    }
+                }
+            }
+        });
+
         t0.await.unwrap();
         t1.await.unwrap();
         t2.await.unwrap();
+        t3.await.unwrap();
     }
 }

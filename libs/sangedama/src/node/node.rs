@@ -48,6 +48,7 @@ pub enum MessageType {
     RequestMessage,
     ResponseMessage,
     InformationalMessage,
+    IntroduceMessage,
     Event,
 }
 
@@ -355,7 +356,7 @@ mod tests {
 
         let url = format!("/ip4/0.0.0.0/tcp/{}", port_id);
 
-        let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Message>(100);
+        let (tx_0, mut rx_0) = tokio::sync::mpsc::channel::<Message>(100);
         let (tx_1, mut rx_1) = tokio::sync::mpsc::channel::<Message>(100);
 
         let (mut node_0, mut rx_o_0) = create_node("node_0".to_string(), true, rx_0);
