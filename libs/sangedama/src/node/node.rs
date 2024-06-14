@@ -91,13 +91,13 @@ impl Message {
         Self::new(from, None, "SELF".to_string(), data, MessageType::Event, event)
     }
 
-    pub fn data(from: String, to: Option<String>, data: Vec<u8>, message_type: MessageType) -> Self {
+    pub fn data(from: String, to: Option<String>, data: Vec<u8>) -> Self {
         Self::new(
             from,
             to,
             "DATA-MESSAGE".to_string(),
             data,
-            message_type,
+            MessageType::Message,
             EventType::OnMessage,
         )
     }
@@ -383,7 +383,7 @@ mod tests {
                     })
                     .to_string()
                     .as_bytes()
-                    .to_vec(), MessageType::InformationalMessage);
+                    .to_vec());
                 tx_0.send(msg)
                     .await
                     .unwrap();
@@ -398,7 +398,7 @@ mod tests {
                     })
                     .to_string()
                     .as_bytes()
-                    .to_vec(), MessageType::InformationalMessage);
+                    .to_vec());
                 tx_1.send(msg)
                     .await
                     .unwrap();

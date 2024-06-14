@@ -37,8 +37,7 @@ class Agent(AgentCore, MessageHandler, Processor):
     async def on_message(self, agent_id, message):
         id = self.definition().id
         name = self.definition().name
-        if (message.type == MessageType.REQUEST_MESSAGE or message.type == MessageType.RESPONSE_MESSAGE
-                or message.type == MessageType.INFORMATIONAL_MESSAGE):
+        if message.type == MessageType.MESSAGE:
             print(
                 "SENDER NAME=", message.sender,
                 "RECEIVER ID=", message.receiver,
@@ -63,7 +62,7 @@ class Agent(AgentCore, MessageHandler, Processor):
             await asyncio.sleep(random.randint(1, 5))
             await self.broadcast(pickle.dumps({
                 "title": f"Hi Im  {self.definition().name} at {time.time()}",
-            }), to=None, message_type=MessageType.INFORMATIONAL_MESSAGE)
+            }), to=None)
 
 
 #

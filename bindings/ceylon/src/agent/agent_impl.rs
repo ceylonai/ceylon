@@ -72,7 +72,7 @@ impl AgentCore {
             _definition: RwLock::new(definition),
             _event_handlers: event_handlers.unwrap_or_default(),
 
-            _context_mgt: Arc::new(Mutex::new(AgentContextManager::new(config.memory_context_size, None))),
+            _context_mgt: Arc::new(Mutex::new(AgentContextManager::new(config.memory_context_size))),
             _context_mgt_rx: Arc::new(Mutex::new(_context_mgt_rx)),
             _context_mgt_tx,
         }
@@ -98,12 +98,11 @@ impl AgentCore {
         self._workspace_id.write().unwrap().replace(workspace_id);
     }
 
-    pub async fn broadcast(&self, message: Vec<u8>, to: Option<String>, message_type: MessageType) {
+    pub async fn broadcast(&self, message: Vec<u8>, to: Option<String>) {
         let msg = Message::data(
             self.definition().id.clone().unwrap().clone(),
             to,
-            message,
-            message_type,
+            message
         );
         Self::broadcast_raw(self._context_mgt_tx.clone(), self.tx_0.clone(), msg).await;
     }
@@ -134,7 +133,7 @@ impl AgentCore {
 
         self._id.write().unwrap().replace(agent_id.clone());
         self._definition.write().unwrap().id = Some(agent_id.clone());
-        self._context_mgt.clone().lock().await.update_self_definition(self.definition(), agent_id.clone());
+        self._context_mgt.clone().lock().await.update_self_definition(self.definition());
 
         let t0 = tokio::spawn(async move {
             node_0.connect(url.as_str(), topic.as_str());

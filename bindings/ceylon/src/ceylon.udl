@@ -27,7 +27,7 @@ interface AgentCore{
     record<string,string> meta();
 
     [Async]
-    void broadcast(bytes message, string? to, MessageType message_type);
+    void broadcast(bytes message, string? to);
 
 };
 
