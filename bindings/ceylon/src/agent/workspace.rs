@@ -27,6 +27,26 @@ impl Workspace {
         let _name = config.name;
         let id = format!("workspace-{}", uuid::Uuid::new_v4());
 
+        // Set agent workspace_id
+        for agent in agents.iter() {
+            agent.set_workspace_id(id.clone());
+        }
+
+        // Validate: agent name,id must be unique
+        let mut names = vec![];
+        let mut ids = vec![];
+        for agent in agents.iter() {
+            if names.contains(&agent.name()) {
+                panic!("Agent name {} is not unique", agent.name());
+            }
+            if ids.contains(&agent.id()) {
+                panic!("Agent id {} is not unique", agent.id());
+            }
+            names.push(agent.name().clone());
+            ids.push(agent.id());
+        }
+
+
         Self {
             id,
             port: config.port,
