@@ -36,10 +36,11 @@ impl Workspace {
         let mut names = vec![];
         let mut ids = vec![];
         for agent in agents.iter() {
-            if names.contains(&agent.name()) {
-                panic!("Agent name {} is not unique", agent.name());
+            let name = agent.definition().name.clone();
+            if names.contains(&name) {
+                panic!("Agent name {} is not unique", name);
             }
-            names.push(agent.name().clone());
+            names.push(name.clone());
             ids.push(agent.id());
         }
 

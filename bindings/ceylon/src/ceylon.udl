@@ -3,7 +3,7 @@ namespace ceylon {
 };
 
 
-dictionary AgentCoreConfig{
+dictionary AgentDefinition{
     string name;
     string position;
     sequence<string> responsibilities;
@@ -12,22 +12,16 @@ dictionary AgentCoreConfig{
 };
 
 interface AgentCore{
-    constructor(AgentCoreConfig config, MessageHandler on_message, Processor? processor,record<string,string>? meta);
+    constructor(AgentDefinition definition, MessageHandler on_message, Processor? processor,record<string,string>? meta);
 
     string id();
-    string name();
-    string position();
-    sequence<string> responsibilities();
-    sequence<string> instructions();
-
-
     string workspace_id();
-    boolean is_leader();
+    AgentDefinition definition();
 
     [Async]
     void broadcast(bytes message, string? to);
-
     record<string,string> meta();
+
 };
 
 enum MessageType{

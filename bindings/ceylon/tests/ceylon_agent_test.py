@@ -1,32 +1,32 @@
 import asyncio
-import json
 import pickle
 import random
 import time
 
-from ceylon.ceylon import AgentCore, MessageHandler, Processor, MessageType, AgentCoreConfig
+from ceylon.ceylon import AgentCore, MessageHandler, Processor, MessageType, AgentDefinition
 from ceylon.runner import AgentRunner
 
 
 class Agent(AgentCore, MessageHandler, Processor):
     def __init__(self, name, position, is_leader, responsibilities, instructions):
-        super().__init__(config=AgentCoreConfig(
+        super().__init__(definition=AgentDefinition(
             name=name, position=position, is_leader=is_leader
             , responsibilities=responsibilities, instructions=instructions
         ), on_message=self, processor=self, meta=None)
 
     async def on_message(self, agent_id, message):
+        name = self.definition().name
         if message.type == MessageType.MESSAGE:
             print(
                 "SENDER NAME=", message.originator,
-                "RECEIVER ID=", message.to_id, self.name() == message.to_id, "MY ID=", self.name(),
+                "RECEIVER ID=", message.to_id,name == message.to_id, "MY ID=", name,
                 "DATA=", pickle.loads(message.data),
                 "MESSAGE=", message.message)
         else:
             print(
                 "SENDER NAME=", message.originator,
-                "RECEIVER ID=", message.to_id, self.name() == message.to_id,
-                "MY ID=", self.name(),
+                "RECEIVER ID=", message.to_id, name == message.to_id,
+                "MY ID=", name,
                 "MESSAGE TYPE=", message.type.name,
                 "MESSAGE=", message.message)
         # print({
@@ -40,11 +40,11 @@ class Agent(AgentCore, MessageHandler, Processor):
 
     async def run(self, inputs):
         inputs = pickle.loads(inputs)
-        print(f"{self.name()} run", inputs)
+        print(f"{self.definition().name} run", inputs)
         await asyncio.sleep(random.randint(1, 100))
         while True:
             await self.broadcast(pickle.dumps({
-                "data": "Hi from " + self.name() + " at " + str(time.time()),
+                "data": "Hi from " + self.definition().name + " at " + str(time.time()),
             }), f"ceylon-ai-{random.randint(1, 4)}")
             await asyncio.sleep(random.randint(1, 10))
         #     # print(f"{self.name()} Broadcast message")

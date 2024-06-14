@@ -2,11 +2,12 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::SystemTime;
 
+use serde::{Deserialize, Serialize};
 use tokio::select;
 use tokio::sync::Mutex;
 use uniffi::deps::log::debug;
 
-use sangedama::node::node::{create_node, Message, MessageType, Node};
+use sangedama::node::node::{create_node, Message, MessageType};
 
 // The call-answer, callback interface.
 
@@ -22,7 +23,8 @@ pub trait Processor: Send + Sync {
     async fn run(&self, input: Vec<u8>) -> ();
 }
 
-pub struct AgentCoreConfig {
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct AgentDefinition {
     pub name: String,
     pub position: String,
     pub is_leader: bool,
@@ -31,8 +33,7 @@ pub struct AgentCoreConfig {
 }
 
 pub struct AgentCore {
-    _name: String,
-    _is_leader: bool,
+    _definition: AgentDefinition,
     _id: RwLock<Option<String>>,
     _workspace_id: RwLock<Option<String>>,
     _processor: Arc<Mutex<Option<Arc<dyn Processor>>>>,
@@ -41,14 +42,11 @@ pub struct AgentCore {
     tx_0: tokio::sync::mpsc::Sender<Message>,
     _meta: HashMap<String, String>,
 
-    _position: String,
-    _responsibilities: Vec<String>,
-    _instructions: Vec<String>,
 }
 
 impl AgentCore {
     pub fn new(
-        config: AgentCoreConfig,
+        definition: AgentDefinition,
         on_message: Arc<dyn MessageHandler>,
         processor: Option<Arc<dyn Processor>>,
         meta: Option<HashMap<String, String>>,
@@ -56,12 +54,12 @@ impl AgentCore {
         let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Message>(100);
         let mut _meta = meta.unwrap_or_default();
 
-        let name = config.name.clone();
-        let is_leader = config.is_leader;
-        let position = config.position.clone();
-        let responsibilities = config.responsibilities.clone();
-        let instructions = config.instructions.clone();
-        
+        let name = definition.name.clone();
+        let is_leader = definition.is_leader;
+        let position = definition.position.clone();
+        let responsibilities = definition.responsibilities.clone();
+        let instructions = definition.instructions.clone();
+
         _meta.insert("name".to_string(), name.clone());
         _meta.insert("is_leader".to_string(), is_leader.to_string());
         _meta.insert("position".to_string(), position.clone());
@@ -77,30 +75,20 @@ impl AgentCore {
         );
 
         Self {
-            _name: name,
-            _is_leader: is_leader,
             _id: RwLock::new(None),
             _workspace_id: RwLock::new(None),
-
-            _position: position,
-            _instructions: instructions,
-            _responsibilities: responsibilities,
-
             _on_message: Arc::new(Mutex::new(on_message)),
             _processor: Arc::new(Mutex::new(processor)),
             rx_0: Arc::new(Mutex::new(rx_0)),
             tx_0,
             _meta,
+            _definition: definition,
 
         }
     }
 
-    pub fn name(&self) -> String {
-        self._name.clone()
-    }
-
-    pub fn is_leader(&self) -> bool {
-        self._is_leader
+    pub fn definition(&self) -> AgentDefinition {
+        self._definition.clone()
     }
 
     pub fn id(&self) -> String {
@@ -118,7 +106,7 @@ impl AgentCore {
     pub async fn broadcast(&self, message: Vec<u8>, to: Option<String>) {
         self.tx_0
             .send(Message::data(
-                self._name.clone(),
+                self.definition().name.clone(),
                 self.id(),
                 message,
                 to,
@@ -130,23 +118,12 @@ impl AgentCore {
     pub fn meta(&self) -> HashMap<String, String> {
         self._meta.clone()
     }
-
-    pub fn instructions(&self) -> Vec<String> {
-        self._instructions.clone()
-    }
-
-    pub fn responsibilities(&self) -> Vec<String> {
-        self._responsibilities.clone()
-    }
-
-    pub fn position(&self) -> String {
-        self._position.clone()
-    }
 }
 
 impl AgentCore {
     pub(crate) async fn start(&self, topic: String, url: String, inputs: Vec<u8>) {
-        let agent_name = self._name.clone();
+        let definition = self.definition();
+        let agent_name = definition.name.clone();
         let agent_id = self.id();
         let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Message>(100);
         let (mut node_0, mut rx_o_0) = create_node(agent_name.clone(), true, rx_0);

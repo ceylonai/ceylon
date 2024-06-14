@@ -36,9 +36,9 @@ class AgentRunner:
 
     def register_agent(self, agent: AgentCore):
         # Not accepting multiple leaders
-        if self.leader_agent is None and agent.is_leader():
+        if self.leader_agent is None and agent.definition().is_leader:
             self.leader_agent = agent
-        elif agent.is_leader() and self.leader_agent is not None:
+        elif agent.definition().is_leader and self.leader_agent is not None:
             raise AgentRunnerCannotHaveMultipleLeadersError()
         self.agents.append(agent)
 
