@@ -14,6 +14,7 @@ use serde_json::json;
 use tokio::sync::mpsc;
 use tokio::{io, select};
 
+#[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum EventType {
     OnMessage,
     OnSubscribe,
@@ -23,6 +24,7 @@ pub enum EventType {
     OnDiscovered,
     OnConnectionClosed,
     OnConnectionEstablished,
+    OnAny,
 }
 
 impl EventType {
@@ -36,6 +38,7 @@ impl EventType {
             EventType::OnDiscovered => "OnDiscovered",
             EventType::OnConnectionClosed => "OnConnectionClosed",
             EventType::OnConnectionEstablished => "OnConnectionEstablished",
+            EventType::OnAny => "OnAny",
         }
     }
 }
@@ -55,10 +58,11 @@ pub struct Message {
     pub originator_id: String,
     pub to_id: Option<String>,
     pub r#type: MessageType,
+    pub event_type: EventType,
 }
 
 impl Message {
-    fn new(originator: String, originator_id: String, message: String, data: Vec<u8>, message_type: MessageType, to_id: Option<String>) -> Self {
+    fn new(originator: String, originator_id: String, message: String, data: Vec<u8>, message_type: MessageType, to_id: Option<String>, event_type: EventType) -> Self {
         Self {
             data,
             time: SystemTime::now()
@@ -70,14 +74,15 @@ impl Message {
             r#type: message_type,
             to_id,
             message,
+            event_type,
         }
     }
     fn event(originator: String, event: EventType) -> Self {
-        Self::new(originator, "SELF".to_string(), event.as_str().to_string(), vec![], MessageType::Event, None)
+        Self::new(originator, "SELF".to_string(), event.as_str().to_string(), vec![], MessageType::Event, None, event)
     }
 
     pub fn data(from: String, originator_id: String, data: Vec<u8>, to_id: Option<String>) -> Self {
-        Self::new(from, originator_id, "DATA-MESSAGE".to_string(), data, MessageType::Message, to_id)
+        Self::new(from, originator_id, "DATA-MESSAGE".to_string(), data, MessageType::Message, to_id, EventType::OnMessage)
     }
     fn to_json(&self) -> String {
         json!(self).to_string()
@@ -150,7 +155,7 @@ impl Node {
             match self
                 .swarm
                 .behaviour_mut()
-                .gossipsub                
+                .gossipsub
                 .publish(topic, message.to_json().as_bytes())
             {
                 Ok(id) => {
@@ -168,7 +173,7 @@ impl Node {
         self.out_tx.clone().send(message).await.unwrap();
     }
 
-    pub async fn run(mut self) {        
+    pub async fn run(mut self) {
         loop {
             select! {
                 message =  self.in_rx.recv() => match message {

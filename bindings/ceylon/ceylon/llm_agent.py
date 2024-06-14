@@ -1,12 +1,19 @@
 import pickle
 
-from ceylon.ceylon import AgentCore, MessageHandler, Processor
+from ceylon.ceylon import AgentCore, MessageHandler, Processor, AgentDefinition, MessageType
 from ceylon.runner import RunnerInput
 
 
 class LLMManager(AgentCore, MessageHandler, Processor):
+    class OnAnyEvent(MessageHandler):
+        async def on_message(self, agent_id, message):
+            print(f"on_any_event {agent_id} {message}")
+
     def __init__(self, name="manager"):
-        super().__init__(name=name, is_leader=True, on_message=self, processor=self, meta=None)
+        super().__init__(definition=AgentDefinition(name=name, is_leader=True, position="LEADER", responsibilities=[],
+                                                    instructions=[]), on_message=self, processor=self, meta={
+            "on_subscribed": self.OnAnyEvent()
+        })
 
     async def on_message(self, agent_id, message):
         pass
@@ -18,9 +25,15 @@ class LLMManager(AgentCore, MessageHandler, Processor):
 
 
 class LLMAgent(AgentCore, MessageHandler):
-    def __init__(self, name, responsibility="", instructions=""):
-        meta = {"responsibility": responsibility, "instructions": instructions, "name": name}
-        super().__init__(name=name, is_leader=False, on_message=self, processor=None, meta=meta)
+    def __init__(self, name, position, responsibilities=[], instructions=[]):
+        super().__init__(definition=AgentDefinition(
+            name=name,
+            responsibilities=responsibilities,
+            position=position,
+            is_leader=False,
+            instructions=instructions
+        ), on_message=self, processor=None)
 
     async def on_message(self, agent_id, message):
-        pass
+        if message.type == MessageType.EVENT:
+            pass

@@ -3,23 +3,30 @@ import pickle
 import random
 import time
 
-from ceylon.ceylon import AgentCore, MessageHandler, Processor, MessageType, AgentDefinition
+from ceylon.ceylon import AgentCore, MessageHandler, Processor, MessageType, AgentDefinition, Message, EventType
 from ceylon.runner import AgentRunner
 
 
 class Agent(AgentCore, MessageHandler, Processor):
+    class AnyEventHandler(MessageHandler):
+
+        async def on_message(self, agent_id: str, message: Message):
+            print("ANY EVENT HANDLER", agent_id, message)
+
     def __init__(self, name, position, is_leader, responsibilities, instructions):
         super().__init__(definition=AgentDefinition(
             name=name, position=position, is_leader=is_leader
             , responsibilities=responsibilities, instructions=instructions
-        ), on_message=self, processor=self, meta=None)
+        ), on_message=self, processor=self, meta=None, event_handlers={
+            EventType.ON_ANY: self.AnyEventHandler()
+        })
 
     async def on_message(self, agent_id, message):
         name = self.definition().name
         if message.type == MessageType.MESSAGE:
             print(
                 "SENDER NAME=", message.originator,
-                "RECEIVER ID=", message.to_id,name == message.to_id, "MY ID=", name,
+                "RECEIVER ID=", message.to_id, name == message.to_id, "MY ID=", name,
                 "DATA=", pickle.loads(message.data),
                 "MESSAGE=", message.message)
         else:

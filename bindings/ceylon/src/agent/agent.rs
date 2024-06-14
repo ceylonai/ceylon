@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::SystemTime;
@@ -7,7 +8,7 @@ use tokio::select;
 use tokio::sync::Mutex;
 use uniffi::deps::log::debug;
 
-use sangedama::node::node::{create_node, Message, MessageType};
+use sangedama::node::node::{create_node, EventType, Message, MessageType};
 
 // The call-answer, callback interface.
 
@@ -41,6 +42,7 @@ pub struct AgentCore {
     rx_0: Arc<Mutex<tokio::sync::mpsc::Receiver<Message>>>,
     tx_0: tokio::sync::mpsc::Sender<Message>,
     _meta: HashMap<String, String>,
+    _event_handlers: HashMap<EventType, Arc<dyn MessageHandler>>,
 
 }
 
@@ -50,6 +52,7 @@ impl AgentCore {
         on_message: Arc<dyn MessageHandler>,
         processor: Option<Arc<dyn Processor>>,
         meta: Option<HashMap<String, String>>,
+        event_handlers: Option<HashMap<EventType, Arc<dyn MessageHandler>>>,
     ) -> Self {
         let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Message>(100);
         let mut _meta = meta.unwrap_or_default();
@@ -83,6 +86,7 @@ impl AgentCore {
             tx_0,
             _meta,
             _definition: definition,
+            _event_handlers: event_handlers.unwrap_or_default(),
 
         }
     }
@@ -128,6 +132,7 @@ impl AgentCore {
         let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Message>(100);
         let (mut node_0, mut rx_o_0) = create_node(agent_name.clone(), true, rx_0);
         let on_message = self._on_message.clone();
+        let event_handlers = self._event_handlers.clone();
 
         self._id.write().unwrap().replace(agent_id.clone());
 
@@ -146,14 +151,28 @@ impl AgentCore {
                             tx_0.clone().send(message).await.unwrap();
                         }
                         Some(message) = rx_o_0.recv() => {
-                            let message_to_id = message.to_id.clone().unwrap_or("ALL".to_string());
-                            let message_type = message.r#type;
-                            if message_to_id == agent_name.clone() ||
-                                message_to_id == agent_id.clone() ||
-                                message_to_id == "ALL" ||
-                                message_type == MessageType::Event                                {
-                                on_message.lock().await.on_message(agent_name.clone(), message.clone()).await;
+
+                        if message.r#type == MessageType::Message {
+                             on_message.lock().await.on_message(agent_name.clone(), message.clone()).await;
+                        }else if message.r#type == MessageType::Event {
+                            for handler_event in event_handlers.keys() {
+                                if handler_event == &message.event_type || handler_event == &EventType::OnAny {
+                                    let handler = event_handlers.get(handler_event).unwrap();
+                                    handler.on_message(agent_name.clone(), message.clone()).await;
+                                }                                
+                            }
                         }
+
+
+
+                        //     let message_to_id = message.to_id.clone().unwrap_or("ALL".to_string());
+                        //     let message_type = message.r#type;
+                        //     if message_to_id == agent_name.clone() ||
+                        //         message_to_id == agent_id.clone() ||
+                        //         message_to_id == "ALL" ||
+                        //         message_type == MessageType::Event                                {
+                        //         on_message.lock().await.on_message(agent_name.clone(), message.clone()).await;
+                        // }
                     }
                 }
             }
