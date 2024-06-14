@@ -4,6 +4,7 @@ use sangedama::node::node::Message;
 
 use crate::agent::agent_base::AgentDefinition;
 
+
 pub struct AgentContextManager {
     context_limit: u16,
     owner_id: RwLock<Option<String>>,
@@ -13,7 +14,7 @@ impl AgentContextManager {
     pub fn new(limit: u16, owner_id: Option<String>) -> Self {
         Self {
             owner_id: RwLock::new(owner_id),
-            context_limit: limit
+            context_limit: limit,
         }
     }
 
@@ -23,8 +24,7 @@ impl AgentContextManager {
 
     pub fn add_message(&mut self, message: Message) -> Option<Message> {
         let message_type = message.r#type.clone();
-      
+
         None
     }
-
 }

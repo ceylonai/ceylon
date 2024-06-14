@@ -160,7 +160,7 @@ impl AgentCore {
                             ctx_tx.send(message.clone()).await.unwrap();
                         }
 
-                        if message.r#type == MessageType::RequestMessage || message.r#type == MessageType::ResponseMessage || message.r#type == MessageType::InformationalMessage {
+                        if message.r#type == MessageType::Message {
                              on_message.lock().await.on_message(agent_name.clone(), message.clone()).await;
                         }else if message.r#type == MessageType::Event {
                             for handler_event in event_handlers.keys() {

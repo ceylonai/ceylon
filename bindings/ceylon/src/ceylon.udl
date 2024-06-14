@@ -45,10 +45,7 @@ interface AgentCore{
 
 
 enum MessageType{
-    "RequestMessage",
-    "ResponseMessage",
-    "InformationalMessage",
-    "IntroduceMessage",
+    "Message",
     "Event",
 };
 
