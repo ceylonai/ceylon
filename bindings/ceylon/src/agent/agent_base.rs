@@ -29,3 +29,68 @@ pub struct AgentDefinition {
 pub struct AgentConfig {
     pub memory_context_size: u16,
 }
+
+
+// Builders
+pub struct AgentDefinitionBuilder {
+    id: Option<String>,
+    name: String,
+    position: String,
+    is_leader: bool,
+    instructions: Vec<String>,
+    responsibilities: Vec<String>,
+}
+
+impl AgentDefinitionBuilder {
+    pub fn new() -> Self {
+        AgentDefinitionBuilder {
+            id: None,
+            name: String::new(),
+            position: String::new(),
+            is_leader: false,
+            instructions: Vec::new(),
+            responsibilities: Vec::new(),
+        }
+    }
+
+    pub fn id(mut self, id: String) -> Self {
+        self.id = Some(id);
+        self
+    }
+
+    pub fn name(mut self, name: String) -> Self {
+        self.name = name;
+        self
+    }
+
+    pub fn position(mut self, position: String) -> Self {
+        self.position = position;
+        self
+    }
+
+    pub fn is_leader(mut self, is_leader: bool) -> Self {
+        self.is_leader = is_leader;
+        self
+    }
+
+    pub fn instructions(mut self, instructions: Vec<String>) -> Self {
+        self.instructions = instructions;
+        self
+    }
+
+    pub fn responsibilities(mut self, responsibilities: Vec<String>) -> Self {
+        self.responsibilities = responsibilities;
+        self
+    }
+
+    pub fn build(self) -> AgentDefinition {
+        AgentDefinition {
+            id: self.id,
+            name: self.name,
+            position: self.position,
+            is_leader: self.is_leader,
+            instructions: self.instructions,
+            responsibilities: self.responsibilities,
+        }
+    }
+}

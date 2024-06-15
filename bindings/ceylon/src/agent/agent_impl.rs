@@ -133,7 +133,7 @@ impl AgentCore {
 
         self._id.write().unwrap().replace(agent_id.clone());
         self._definition.write().unwrap().id = Some(agent_id.clone());
-        self._context_mgt.clone().lock().await.update_self_definition(self.definition());
+        self._context_mgt.clone().lock().await.set_self_definition(self.definition());
 
         let t0 = tokio::spawn(async move {
             node_0.connect(url.as_str(), topic.as_str());
@@ -198,9 +198,10 @@ impl AgentCore {
             loop {
                 select! {
                     Some(message) = rx.recv() => {
-                       if let Some(msg) = ctx.add_message(message.clone()) {
-                           Self::broadcast_raw(_context_mgt_tx.clone(), _tx_0.clone(), msg.clone()).await;
-                       }
+                        ctx.add_message(message.clone())
+                       // if let Some(msg) = ctx.add_message(message.clone()) {
+                       //     Self::broadcast_raw(_context_mgt_tx.clone(), _tx_0.clone(), msg.clone()).await;
+                       // }
                     }
                 }
             }
