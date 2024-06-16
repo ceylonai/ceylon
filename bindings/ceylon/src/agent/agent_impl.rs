@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use std::time::SystemTime;
 
 
 use tokio::select;
@@ -9,8 +8,10 @@ use uniffi::deps::log::debug;
 
 use sangedama::node::node::{create_node, EventType, Message, MessageType};
 
-use crate::agent::agent_base::{AgentConfig, AgentDefinition, MessageHandler, Processor};
+use crate::agent::agent_base::{AgentConfig, AgentDefinition, AgentHandler, MessageHandler, Processor};
 use crate::agent::agent_context::{AgentContextManager};
+use crate::agent::message_types::{AgentMessage, AgentMessageConversions, AgentMessageTrait, AgentMessageType, DataMessage, HandshakeMessage, IntroduceMessage};
+use crate::EventHandler;
 
 pub struct AgentCore {
     _definition: RwLock<AgentDefinition>,
@@ -18,10 +19,11 @@ pub struct AgentCore {
     _workspace_id: RwLock<Option<String>>,
     _processor: Arc<Mutex<Option<Arc<dyn Processor>>>>,
     _on_message: Arc<Mutex<Arc<dyn MessageHandler>>>,
+    _agent_handler: Arc<Mutex<Arc<dyn AgentHandler>>>,
     rx_0: Arc<Mutex<tokio::sync::mpsc::Receiver<Message>>>,
     tx_0: tokio::sync::mpsc::Sender<Message>,
     _meta: HashMap<String, String>,
-    _event_handlers: HashMap<EventType, Vec<Arc<dyn MessageHandler>>>,
+    _event_handlers: HashMap<EventType, Vec<Arc<dyn EventHandler>>>,
 
     _context_mgt: Arc<Mutex<AgentContextManager>>,
     _context_mgt_rx: Arc<Mutex<tokio::sync::mpsc::Receiver<Message>>>,
@@ -30,12 +32,13 @@ pub struct AgentCore {
 
 impl AgentCore {
     pub fn new(
-        definition: AgentDefinition,
+        mut definition: AgentDefinition,
         config: AgentConfig,
         on_message: Arc<dyn MessageHandler>,
         processor: Option<Arc<dyn Processor>>,
         meta: Option<HashMap<String, String>>,
-        event_handlers: Option<HashMap<EventType, Vec<Arc<dyn MessageHandler>>>>,
+        agent_handler: Arc<dyn AgentHandler>,
+        event_handlers: Option<HashMap<EventType, Vec<Arc<dyn EventHandler>>>>,
     ) -> Self {
         let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Message>(100);
         let (_context_mgt_tx, _context_mgt_rx) = tokio::sync::mpsc::channel::<Message>(100);
@@ -50,10 +53,10 @@ impl AgentCore {
             _meta,
             _definition: RwLock::new(definition),
             _event_handlers: event_handlers.unwrap_or_default(),
-
             _context_mgt: Arc::new(Mutex::new(AgentContextManager::new(config.memory_context_size))),
             _context_mgt_rx: Arc::new(Mutex::new(_context_mgt_rx)),
             _context_mgt_tx,
+            _agent_handler: Arc::new(Mutex::new(agent_handler)),
         }
     }
 
@@ -78,10 +81,11 @@ impl AgentCore {
     }
 
     pub async fn broadcast(&self, message: Vec<u8>, to: Option<String>) {
+        let message = AgentMessage::from_data(AgentMessageType::Data, DataMessage { data: message }).into_bytes();
         let msg = Message::data(
             self.definition().id.clone().unwrap().clone(),
             to,
-            message
+            message,
         );
         Self::broadcast_raw(self._context_mgt_tx.clone(), self.tx_0.clone(), msg).await;
     }
@@ -104,13 +108,14 @@ impl AgentCore {
     pub(crate) async fn start(&self, topic: String, url: String, inputs: Vec<u8>) {
         let definition = self.definition();
         let agent_name = definition.name.clone();
-        let agent_id = self.id();
         let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Message>(100);
         let (mut node_0, mut rx_o_0) = create_node(agent_name.clone(), true, rx_0);
         let on_message = self._on_message.clone();
         let event_handlers = self._event_handlers.clone();
+        let agent_id = node_0.id.clone();
 
         self._id.write().unwrap().replace(agent_id.clone());
+        println!("{} Started", self.id().clone());
         self._definition.write().unwrap().id = Some(agent_id.clone());
         self._context_mgt.clone().lock().await.set_self_definition(self.definition());
 
@@ -134,12 +139,9 @@ impl AgentCore {
 
                         // self._context_mgt.write().unwrap().add_message(message.clone());
 
-                        if message.r#type != MessageType::Event{
-                            ctx_tx.send(message.clone()).await.unwrap();
-                        }
 
                         if message.r#type == MessageType::Message {
-                             on_message.lock().await.on_message(agent_name.clone(), message.clone()).await;
+                            ctx_tx.send(message.clone()).await.unwrap();
                         }else if message.r#type == MessageType::Event {
                             for handler_event in event_handlers.keys() {
                                 if handler_event == &message.event_type || handler_event == &EventType::OnAny {
@@ -149,7 +151,7 @@ impl AgentCore {
                                         let _handler = handler.clone();
                                         let _name =  agent_name.clone();
                                         tokio::spawn(async move{
-                                            _handler.on_message(_name, _messaage).await;
+                                            _handler.on_event(_messaage).await;
                                         });
                                      }
                                 };
@@ -177,10 +179,48 @@ impl AgentCore {
             loop {
                 select! {
                     Some(message) = rx.recv() => {
-                        ctx.add_message(message.clone())
-                       // if let Some(msg) = ctx.add_message(message.clone()) {
-                       //     Self::broadcast_raw(_context_mgt_tx.clone(), _tx_0.clone(), msg.clone()).await;
-                       // }
+                        let message_creator = ctx.get_owner().id.unwrap_or("".to_string());
+                        if message.sender == message_creator.clone()  {
+                            ctx.add_message( message.clone());
+                            continue;
+                        }        
+                        let msg = AgentMessage::from_bytes(message.data.clone());
+                        let sender_id = message.sender.clone();
+                        if ctx.has_thread( sender_id) {
+                            debug!("Received: {:?}",msg.clone());
+                            if msg.r#type==AgentMessageType::Data {
+                                let data_msg:Option<DataMessage> = msg.into_data();
+                                if let Some(data_msg) = data_msg {
+                                    on_message.lock().await.on_message(message.sender, data_msg.data).await;
+                                }
+                            }
+                        }else{
+                            debug!("No context for {}", message.sender);
+                            let handshake_message = HandshakeMessage{
+                                message: format!( "Im a new agent {}", definition.name),
+                            };
+                            AgentCore::broadcast_raw(_context_mgt_tx.clone(),_tx_0.clone(),
+                                Message::data(message_creator.clone(),None,
+                                AgentMessage::from_data(AgentMessageType::Handshake,
+                                        handshake_message).into_bytes()) ).await;
+                            if msg.r#type==AgentMessageType::Handshake {
+                                let handshake_msg:Option<HandshakeMessage> = msg.into_data();
+                                debug!("{} Handshake received: {:?}",definition.name,handshake_msg);
+                                let handshake_message = IntroduceMessage{
+                                    agent_definition: ctx.get_owner().clone(),
+                                };
+                                AgentCore::broadcast_raw(_context_mgt_tx.clone(),_tx_0.clone(),
+                                    Message::data(message_creator.clone(),None,
+                                    AgentMessage::from_data(AgentMessageType::Introduce,
+                                            handshake_message).into_bytes()) ).await;
+                            }else if msg.r#type==AgentMessageType::Introduce {
+                                let data_msg:Option<IntroduceMessage> = msg.into_data();
+                                if let Some(data_msg) = data_msg {
+                                    ctx.create_context(data_msg.agent_definition);
+                                }
+                                debug!( "{} has joined", ctx.has_thread( message.sender.clone()));
+                            }
+                        }
                     }
                 }
             }

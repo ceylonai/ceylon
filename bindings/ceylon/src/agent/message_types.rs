@@ -7,6 +7,7 @@ pub enum AgentMessageType {
     Handshake,
     Introduce,
     Text,
+    Data,
     Other,
 }
 
@@ -27,15 +28,6 @@ pub trait AgentMessageConversions {
 pub struct AgentMessage {
     pub r#type: AgentMessageType,
     pub data: Vec<u8>,
-}
-
-impl AgentMessage {
-    pub fn new<T: Serialize>(r#type: AgentMessageType, data: T) -> Self {
-        Self {
-            r#type,
-            data: serde_json::to_vec(&data).unwrap(),
-        }
-    }
 }
 
 impl AgentMessageTrait for AgentMessage {
@@ -82,4 +74,9 @@ pub struct IntroduceMessage {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct TextMessage {
     pub text: String,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct DataMessage {
+    pub data: Vec<u8>,
 }

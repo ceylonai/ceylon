@@ -9,7 +9,9 @@ pub use agent::{
         AgentDefinition,
         AgentConfig,
         MessageHandler,
+        EventHandler,
         Processor,
+        AgentHandler
     },
     agent_impl::{
         AgentCore

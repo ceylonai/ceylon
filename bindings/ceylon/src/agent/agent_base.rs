@@ -5,7 +5,18 @@ use sangedama::node::node::Message;
 
 #[async_trait::async_trait]
 pub trait MessageHandler: Send + Sync {
-    async fn on_message(&self, agent_id: String, message: Message);
+    async fn on_message(&self, agent_id: String, message: Vec<u8>);
+}
+
+#[async_trait::async_trait]
+pub trait EventHandler: Send + Sync {
+    async fn on_event(&self, message: Message);
+}
+
+
+#[async_trait::async_trait]
+pub trait AgentHandler: Send + Sync {
+    async fn on_agent(&self, agent: AgentDefinition);
 }
 
 // The call-answer, callback interface.
