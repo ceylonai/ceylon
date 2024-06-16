@@ -1,4 +1,5 @@
 use std::collections::{HashMap, VecDeque};
+use std::fmt::format;
 use std::sync::RwLock;
 
 use sangedama::node::node::Message;
@@ -38,6 +39,30 @@ impl MessageThread {
             messages: RwLock::new(VecDeque::with_capacity(message_limit)),
             participants: RwLock::new(HashMap::new()),
             _limit_participants: limit_participants,
+            _message_limit: message_limit,
+        }
+    }
+
+    pub fn new_with_participants(id: String, purpose: String, owner_id: String, participants: HashMap<String, AgentDefinition>, limit_participants: usize, message_limit: usize) -> Self {
+        Self {
+            id,
+            owner_id,
+            purpose,
+            messages: RwLock::new(VecDeque::with_capacity(message_limit)),
+            participants: RwLock::new(participants),
+            _limit_participants: limit_participants,
+            _message_limit: message_limit,
+        }
+    }
+
+    pub fn new_for_only_one_agent(id: String, purpose: String, owner_id: String, participant: AgentDefinition, message_limit: usize) -> Self {
+        Self {
+            id,
+            owner_id,
+            purpose,
+            messages: RwLock::new(VecDeque::with_capacity(message_limit)),
+            participants: RwLock::new(HashMap::from([(participant.id.clone().unwrap(), participant)])),
+            _limit_participants: 1,
             _message_limit: message_limit,
         }
     }
@@ -102,8 +127,17 @@ impl AgentContextManager {
         let message_receiver = message.receiver.clone();
         let owner_id = self.owner.read().unwrap().as_ref().unwrap().id.clone().unwrap();
         let thread_id = format!("{}-{}", owner_id.clone(), if owner_id == message_sender { message_receiver.clone().unwrap_or("all".to_string()) } else { message_sender.clone() });
-        self.add_or_update_thread(thread_id, message.clone());
+        self.add_to_existing_thread(thread_id, message.clone());
     }
+
+    fn add_to_existing_thread(&self, thread_id: String, message: Message) {
+        let mut threads = self.threads.write().unwrap(); // Lock for writing
+        threads.entry(thread_id.clone())
+            .and_modify(|thread| {
+                thread.add_message(message.clone());
+            });
+    }
+
 
     fn add_or_update_thread(&self, thread_id: String, message: Message) {
         let mut threads = self.threads.write().unwrap(); // Lock for writing
@@ -117,6 +151,18 @@ impl AgentContextManager {
                 thread.add_message(message);
                 thread
             });
+    }
+
+    fn create_context(&self, agent_definition: AgentDefinition) {
+        let topic = format!("{}-{}", self.owner.read().unwrap().as_ref().unwrap().id.clone().unwrap(), agent_definition.id.clone().unwrap());
+        let agent_context = MessageThread::new_for_only_one_agent(
+            topic.clone(),
+            format!("Discussion with {}", agent_definition.position),
+            agent_definition.id.clone().unwrap(),
+            agent_definition,
+            self.context_limit as usize,
+        );
+        self.threads.write().unwrap().insert(topic, agent_context);
     }
 
     fn print_threads(&self) {
@@ -221,7 +267,7 @@ mod tests {
             context.print_threads();
             println!("\n");
         }
-        
+
         println!("\n\n");
         context.print_threads_messages();
     }

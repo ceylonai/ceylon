@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use serde::{Deserialize, Serialize};
 use tokio::runtime::Runtime;
@@ -18,7 +18,7 @@ pub struct Workspace {
     port: u16,
     host: String,
     _name: String,
-    _agents: Vec<Arc<AgentCore>>,
+    _agents: RwLock<Vec<Arc<AgentCore>>>,
 }
 
 
@@ -50,7 +50,7 @@ impl Workspace {
             port: config.port,
             host: config.host,
             _name,
-            _agents: agents,
+            _agents: RwLock::new(agents),
         }
     }
 
@@ -59,7 +59,7 @@ impl Workspace {
         let rt = Runtime::new().unwrap();
         let mut tasks = vec![];
         let _input = input.clone();
-        for agent in self._agents.iter() {
+        for agent in self._agents.read().unwrap().iter() {
             let _inputs = _input.clone();
             let url = format!("{}/{}", self.host, self.port);
             let topic = format!("workspace-{}", agent.workspace_id());
