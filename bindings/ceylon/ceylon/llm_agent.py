@@ -1,13 +1,14 @@
 import pickle
 
-from ceylon.ceylon import AgentCore, MessageHandler, Processor, AgentDefinition, MessageType, EventType, AgentConfig
+from ceylon.ceylon import AgentCore, MessageHandler, Processor, AgentDefinition, MessageType, EventType, AgentConfig, \
+    AgentHandler, EventHandler
 from ceylon.runner import RunnerInput
 
 
-class LLMManager(AgentCore, MessageHandler, Processor):
-    class OnAnyEvent(MessageHandler):
-        async def on_message(self, agent_id, message):
-            print(f"on_any_event {agent_id} {message}")
+class LLMManager(AgentCore, MessageHandler, Processor, AgentHandler):
+    class OnAnyEvent(EventHandler):
+        async def on_event(self, message):
+            print(f"on_any_event {message}")
 
     def __init__(self, name="manager"):
         super().__init__(
@@ -19,9 +20,13 @@ class LLMManager(AgentCore, MessageHandler, Processor):
             config=AgentConfig(memory_context_size=10),
             on_message=self,
             processor=self, meta={},
+            agent_handler=self,
             event_handlers={
                 EventType.ON_ANY: [self.OnAnyEvent()]
             })
+
+    async def on_agent(self, agent: "AgentDefinition"):
+        pass
 
     async def on_message(self, agent_id, message):
         pass
@@ -32,7 +37,7 @@ class LLMManager(AgentCore, MessageHandler, Processor):
         print(agents)
 
 
-class LLMAgent(AgentCore, MessageHandler):
+class LLMAgent(AgentCore, MessageHandler, AgentHandler):
     def __init__(self, name, position, responsibilities=[], instructions=[]):
         super().__init__(definition=AgentDefinition(
             id=None,
@@ -43,7 +48,11 @@ class LLMAgent(AgentCore, MessageHandler):
             instructions=instructions
         ),
             config=AgentConfig(memory_context_size=10),
+            agent_handler=self,
             on_message=self, processor=None, meta=None, event_handlers={})
+
+    async def on_agent(self, agent: "AgentDefinition"):
+        pass
 
     async def on_message(self, agent_id, message):
         if message.type == MessageType.EVENT:
