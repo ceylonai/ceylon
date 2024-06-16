@@ -112,6 +112,7 @@ impl AgentCore {
         let (mut node_0, mut rx_o_0) = create_node(agent_name.clone(), true, rx_0);
         let on_message = self._on_message.clone();
         let event_handlers = self._event_handlers.clone();
+        let agent_handler = self._agent_handler.clone();
         let agent_id = node_0.id.clone();
 
         self._id.write().unwrap().replace(agent_id.clone());
@@ -216,9 +217,11 @@ impl AgentCore {
                             }else if msg.r#type==AgentMessageType::Introduce {
                                 let data_msg:Option<IntroduceMessage> = msg.into_data();
                                 if let Some(data_msg) = data_msg {
-                                    ctx.create_context(data_msg.agent_definition);
+                                    ctx.create_context(data_msg.agent_definition.clone());
+                                    debug!( "{} has joined", ctx.has_thread( message.sender.clone()));
+                                    agent_handler.lock().await.on_agent(data_msg.agent_definition ).await;
                                 }
-                                debug!( "{} has joined", ctx.has_thread( message.sender.clone()));
+                                
                             }
                         }
                     }

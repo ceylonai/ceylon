@@ -38,8 +38,8 @@ class Agent(AgentCore, MessageHandler, Processor, AgentHandler):
                 EventType.ON_SUBSCRIBE: [self.OnSubscribeEvent(self)]
             })
 
-    def on_agent(self, agent: AgentDefinition):
-        print(f"on_agent {agent.name}")
+    async def on_agent(self, agent: AgentDefinition):
+        print(f"{self.definition().name} on_agent {agent.name}")
 
     async def on_message(self, agent_id, message):
         print("SELF=", self.definition().name, "AGENT ID=", agent_id, "MESSAGE=", pickle.loads(message))
@@ -51,7 +51,7 @@ class Agent(AgentCore, MessageHandler, Processor, AgentHandler):
             await self.broadcast(pickle.dumps({
                 "title": f"Hi Im  {self.definition().name} at {time.time()}",
             }), to=None)
-            # await asyncio.sleep(random.randint(1, 2))
+            await asyncio.sleep(random.randint(1, 2))
 
 
 #
