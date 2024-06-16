@@ -40,27 +40,6 @@ impl AgentCore {
         let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Message>(100);
         let (_context_mgt_tx, _context_mgt_rx) = tokio::sync::mpsc::channel::<Message>(100);
         let mut _meta = meta.unwrap_or_default();
-
-        let name = definition.name.clone();
-        let is_leader = definition.is_leader;
-        let position = definition.position.clone();
-        let responsibilities = definition.responsibilities.clone();
-        let instructions = definition.instructions.clone();
-
-        _meta.insert("name".to_string(), name.clone());
-        _meta.insert("is_leader".to_string(), is_leader.to_string());
-        _meta.insert("position".to_string(), position.clone());
-        _meta.insert("responsibilities".to_string(), responsibilities.join(","));
-        _meta.insert("instructions".to_string(), instructions.join(","));
-        _meta.insert(
-            "created_at".to_string(),
-            SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_millis()
-                .to_string(),
-        );
-
         Self {
             _id: RwLock::new(None),
             _workspace_id: RwLock::new(None),
