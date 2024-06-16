@@ -23,6 +23,7 @@ pub struct AgentDefinition {
     pub is_leader: bool,
     pub instructions: Vec<String>,
     pub responsibilities: Vec<String>,
+    pub is_completed: bool,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -39,6 +40,7 @@ pub struct AgentDefinitionBuilder {
     is_leader: bool,
     instructions: Vec<String>,
     responsibilities: Vec<String>,
+    is_completed: bool,
 }
 
 impl AgentDefinitionBuilder {
@@ -50,6 +52,7 @@ impl AgentDefinitionBuilder {
             is_leader: false,
             instructions: Vec::new(),
             responsibilities: Vec::new(),
+            is_completed: false,
         }
     }
 
@@ -82,6 +85,10 @@ impl AgentDefinitionBuilder {
         self.responsibilities = responsibilities;
         self
     }
+    pub fn complete(mut self, is_completed: bool) -> Self {
+        self.is_completed = is_completed;
+        self
+    }
 
     pub fn build(self) -> AgentDefinition {
         AgentDefinition {
@@ -91,6 +98,7 @@ impl AgentDefinitionBuilder {
             is_leader: self.is_leader,
             instructions: self.instructions,
             responsibilities: self.responsibilities,
+            is_completed: self.is_completed,
         }
     }
 }

@@ -6,6 +6,7 @@ use crate::AgentDefinition;
 pub enum AgentMessageType {
     Handshake,
     Introduce,
+    Text,
     Other,
 }
 
@@ -76,4 +77,9 @@ pub struct HandshakeMessage {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct IntroduceMessage {
     pub agent_definition: AgentDefinition,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct TextMessage {
+    pub text: String,
 }
