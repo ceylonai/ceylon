@@ -1,11 +1,12 @@
 import asyncio
 
-from ceylon import AgentRunner, LLMAgent
-from ceylon.llm_agent import LLMManager
+from ceylon.llm.agent import LLMAgent
+from ceylon.llm.manger import LLMManager
+from ceylon.llm.runner import AgentLLMRunner
 
 
 async def main():
-    runner = AgentRunner(workspace_name="ceylon-ai")
+    runner = AgentLLMRunner(workspace_name="ceylon-ai")
     runner.register_agent(LLMManager())
     runner.register_agent(LLMAgent(
         name="writer",
