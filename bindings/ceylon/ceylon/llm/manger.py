@@ -22,7 +22,7 @@ class LLMManager(AgentCore, MessageHandler, Processor, AgentHandler):
             processor=self, meta={},
             agent_handler=self,
             event_handlers={
-                EventType.ON_ANY: [self.OnAnyEvent()]
+                # EventType.ON_ANY: [self.OnAnyEvent()]
             })
 
     async def on_agent(self, agent: "AgentDefinition"):
