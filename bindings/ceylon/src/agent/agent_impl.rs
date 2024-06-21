@@ -4,7 +4,7 @@ use std::time::{Duration, UNIX_EPOCH};
 
 use tokio::select;
 use tokio::sync::Mutex;
-use uniffi::deps::log::{debug, Level, log};
+use uniffi::deps::log::{debug, info, Level, log};
 
 use sangedama::node::node::{create_node, EventType, Message, MessageType};
 
@@ -126,7 +126,7 @@ impl AgentCore {
         let agent_id = node_0.id.clone();
 
         self._id.write().unwrap().replace(agent_id.clone());
-        println!("{} Started", self.id().clone());
+        info!("{} - Agent {} Started", self.id().clone(), agent_name.clone());
         self._definition.write().unwrap().id = Some(agent_id.clone());
         self._context_mgt
             .clone()
