@@ -84,6 +84,10 @@ interface AgentHandler {
 interface Processor {
     [Async]
     void run(bytes input);
+
+    [Async]
+    void on_start(bytes input);
+
 };
 
 dictionary WorkspaceConfig{

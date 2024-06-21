@@ -139,6 +139,13 @@ impl AgentCore {
             node_0.run().await;
         });
 
+        let processor = self._processor.clone();
+        if let Some(processor) = processor.lock().await.clone() {
+            // Non blocking events on start
+            processor.on_start(inputs.clone()).await;
+        }
+
+
         let rx = Arc::clone(&self.rx_0);
         let ctx_tx = self._context_mgt_tx.clone();
         let t1 = tokio::spawn(async move {

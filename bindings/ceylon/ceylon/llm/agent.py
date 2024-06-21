@@ -1,6 +1,7 @@
 import pickle
+from collections import deque
 from typing import Dict
-
+import networkx as nx
 from langchain_core.tools import StructuredTool
 
 from ceylon.ceylon import AgentCore, MessageHandler, AgentHandler, AgentDefinition, AgentConfig, Processor
@@ -39,49 +40,46 @@ class LLMAgent(AgentCore, MessageHandler, AgentHandler, Processor):
         self.log(f"on_message {agent_id} {message}")
 
     async def run(self, inputs):
+        pass
+
+    async def on_start(self, inputs):
         runner_input: RunnerInput = pickle.loads(inputs)
         # print(runner_input)
 
-        # while True:
-        #     await self.broadcast(pickle.dumps({
-        #         "title": f"Hi Im  {self.definition().name} at {time.time()}",
-        #     }), to=None)
-        #     await asyncio.sleep(random.randint(1, 2))
-        # await asyncio.sleep(random.randint(1, 2)
+        network = runner_input.network
 
-        # network = runner_input.network
-        #
-        # # Create a directed graph to represent the workflow
-        # G = nx.DiGraph()
-        #
-        # # Add nodes and edges based on the agents and their dependencies
-        # for agent, dependencies in network.items():
-        #     G.add_node(agent)
-        #     for dependency in dependencies:
-        #         G.add_edge(dependency, agent)
-        #
-        # # Function to execute the workflow in the correct order
-        # def execute_workflow(graph):
-        #     # Find all nodes with no dependencies (indegree 0)
-        #     queue = deque([node for node in graph if graph.in_degree(node) == 0])
-        #     executed = []
-        #
-        #     while queue:
-        #         current_agent = queue.popleft()
-        #         executed.append(current_agent)
-        #         print(f"Executing {current_agent}")
-        #
-        #         # Remove the current agent and update the graph
-        #         for successor in list(graph.successors(current_agent)):
-        #             graph.remove_edge(current_agent, successor)
-        #             if graph.in_degree(successor) == 0:
-        #                 queue.append(successor)
-        #         graph.remove_node(current_agent)
-        #
-        #     if graph.nodes:
-        #         print("Cycle detected in the workflow!")
-        #     else:
-        #         print("Workflow executed successfully.")
-        #
-        # # Execute the workflow
-        # execute_workflow(G)
+        # Create a directed graph to represent the workflow
+        G = nx.DiGraph()
+
+        # Add nodes and edges based on the agents and their dependencies
+        for agent, dependencies in network.items():
+            G.add_node(agent)
+        for dependency in dependencies:
+            G.add_edge(dependency, agent)
+
+            # Function to execute the workflow in the correct order
+
+        def execute_workflow(graph):
+            # Find all nodes with no dependencies (indegree 0)
+            queue = deque([node for node in graph if graph.in_degree(node) == 0])
+            executed = []
+
+            while queue:
+                current_agent = queue.popleft()
+                executed.append(current_agent)
+                print(f"Executing {current_agent}")
+
+                # Remove the current agent and update the graph
+                for successor in list(graph.successors(current_agent)):
+                    graph.remove_edge(current_agent, successor)
+                    if graph.in_degree(successor) == 0:
+                        queue.append(successor)
+                graph.remove_node(current_agent)
+
+            if graph.nodes:
+                print("Cycle detected in the workflow!")
+            else:
+                print("Workflow executed successfully.")
+
+        # Execute the workflow
+        execute_workflow(G)

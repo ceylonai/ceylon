@@ -53,6 +53,9 @@ class Agent(AgentCore, MessageHandler, Processor, AgentHandler):
             }), to=None)
             await asyncio.sleep(random.randint(1, 2))
 
+    async def on_start(self, input: "bytes"):
+        self.log(f"on_start {input}")
+
 
 #
 async def main():

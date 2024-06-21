@@ -24,6 +24,7 @@ pub trait AgentHandler: Send + Sync {
 #[async_trait::async_trait]
 pub trait Processor: Send + Sync {
     async fn run(&self, input: Vec<u8>) -> ();
+    async fn on_start(&self, input: Vec<u8>) -> ();
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
