@@ -252,28 +252,6 @@ impl AgentCore {
                                          Message::data(message_creator.clone(), None,
                                                        AgentMessage::from_data(AgentMessageType::Handshake,
                                                                                handshake_message).into_bytes())).await;
-
-                // AgentCore::broadcast_raw(
-                //     _context_mgt_tx.clone(),
-                //     _tx_0.clone(),
-                //     Message::data(
-                //         message_creator.clone(),
-                //         None,
-                //         AgentMessage::from_data(
-                //             AgentMessageType::Beacon,
-                //             BeaconMessage {
-                //                 time: SystemTime::now()
-                //                     .duration_since(UNIX_EPOCH)
-                //                     .expect("Time went backwards")
-                //                     .as_secs(),
-                //             },
-                //         )
-                //             .into_bytes(),
-                //     ),
-                // )
-                //     .await;
-
-
                 tokio::time::sleep(Duration::from_secs(1)).await;
             }
         });
