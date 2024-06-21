@@ -99,10 +99,10 @@ async def main():
             "style": "creative"
         },
         network={
-            "Researcher": [],
-            "Writer": ["Researcher"],
-            "Editor": ["Writer"],
-            "Publisher": ["Editor"]
+            "researcher": [],
+            "writer": ["researcher"],
+            "editor": ["writer"],
+            "publisher": ["editor"]
         }
     )
     leader = runner.leader()

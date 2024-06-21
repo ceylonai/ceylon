@@ -91,7 +91,7 @@ impl AgentCore {
         let message =
             AgentMessage::from_data(AgentMessageType::Data, DataMessage { data: message })
                 .into_bytes();
-        debug!("broadcasting message: {:?} to: {:?}", message, to);
+        info!("broadcasting message: {:?} to: {:?}", message, to);
         let msg = Message::data(self.definition().id.clone().unwrap().clone(), to, message);
         Self::broadcast_raw(self._context_mgt_tx.clone(), self.tx_0.clone(), msg).await;
     }
@@ -134,17 +134,16 @@ impl AgentCore {
             .await
             .set_self_definition(self.definition());
 
-        let t0 = tokio::spawn(async move {
-            node_0.connect(url.as_str(), topic.as_str());
-            node_0.run().await;
-        });
 
         let processor = self._processor.clone();
         if let Some(processor) = processor.lock().await.clone() {
             // Non blocking events on start
             processor.on_start(inputs.clone()).await;
         }
-
+        let t0 = tokio::spawn(async move {
+            node_0.connect(url.as_str(), topic.as_str());
+            node_0.run().await;
+        });
 
         let rx = Arc::clone(&self.rx_0);
         let ctx_tx = self._context_mgt_tx.clone();
@@ -251,6 +250,8 @@ impl AgentCore {
         let _context_mgt_tx = self._context_mgt_tx.clone();
         let _tx_0 = self.tx_0.clone();
         let t4 = tokio::spawn(async move {
+            // Need to stop this after a while
+            let mut sleep_duration = Duration::from_secs(1); // Initial sleep duration
             loop {
                 let handshake_message = HandshakeMessage {
                     message: format!("Im a new agent {}", agent_name),
@@ -259,11 +260,37 @@ impl AgentCore {
                                          Message::data(message_creator.clone(), None,
                                                        AgentMessage::from_data(AgentMessageType::Handshake,
                                                                                handshake_message).into_bytes())).await;
-                tokio::time::sleep(Duration::from_secs(1)).await;
+                tokio::time::sleep(sleep_duration).await;
+                sleep_duration += Duration::from_secs(1);
+                // if sleep_duration > Duration::from_secs(120) {
+                //     sleep_duration = Duration::from_secs(45);
+                // }
             }
         });
 
 
-        tokio::try_join!(t1, t2, t3, t4).unwrap();
+        t0.await.unwrap();
+        t1.await.unwrap();
+        t2.await.unwrap();
+        t3.await.unwrap();
+        t4.await.unwrap();
+
+        // select! {
+        //     _ = t0 => {
+        //         debug!("{} - Agent {} Stopped", self.id().clone(), "Processor");
+        //     },
+        //     _ = t1 => {
+        //         debug!("{} - Agent {} Stopped", self.id().clone(), "Message Dispatcher");
+        //     },
+        //     _ = t2 => {
+        //         debug!("{} - Agent {} Stopped", self.id().clone(), "Message Processor");
+        //     },
+        //     _ = t3 => {
+        //         debug!("{} - Agent {} Stopped", self.id().clone(), "Memory Context handler");
+        //     },
+        //     _ = t4 => {
+        //         debug!("{} - Agent {} Stopped", self.id().clone(), "Beacon");
+        //     },
+        // }
     }
 }

@@ -57,7 +57,9 @@ impl Workspace {
     pub async fn run(&self, input: Vec<u8>) {
         env_logger::init();
         debug!("Workspace {} running", self.id);
-        let rt = Runtime::new().unwrap();
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build().unwrap();
         let mut tasks = vec![];
         let _input = input.clone();
         for agent in self._agents.read().unwrap().iter() {

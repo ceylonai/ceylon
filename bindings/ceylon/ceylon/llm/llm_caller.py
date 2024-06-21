@@ -4,7 +4,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.utils.function_calling import format_tool_to_openai_function
 
 
-async def process_agent_request(llm, inputs, agent_definition, tools=[]):
+def process_agent_request(llm, inputs, agent_definition, tools=[]):
     template = """
         **Role:** {role}
         **Responsibilities:** {responsibilities}

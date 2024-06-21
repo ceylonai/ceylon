@@ -3,22 +3,35 @@ from collections import deque
 from typing import Dict
 import networkx as nx
 from langchain_core.tools import StructuredTool
+from pydantic import dataclasses
 
 from ceylon.ceylon import AgentCore, MessageHandler, AgentHandler, AgentDefinition, AgentConfig, Processor
+from ceylon.llm.llm_caller import process_agent_request
 from ceylon.runner import RunnerInput
+
+
+@dataclasses.dataclass
+class AgentMessage:
+    agent: str
+    response: str
 
 
 class LLMAgent(AgentCore, MessageHandler, AgentHandler, Processor):
     tools: list[StructuredTool]
-    joined_team: Dict[str, AgentCore]
+    neighbour_agents: Dict[str, AgentDefinition]
+    joined_team: Dict[str, AgentDefinition]
     network_graph: nx.DiGraph
     queue: deque
     executed: list
+    input: RunnerInput
 
     async def on_start(self, inputs):
         runner_input: RunnerInput = pickle.loads(inputs)
         network = runner_input.network
+        for agent in runner_input.agents:
+            self.neighbour_agents[agent.name] = agent
         self._initialize_graph(network)
+        self.joined_team[self.definition().name] = self.definition()
 
     def _initialize_graph(self, network):
         # Add nodes and edges based on the agents and their dependencies
@@ -87,22 +100,37 @@ class LLMAgent(AgentCore, MessageHandler, AgentHandler, Processor):
         # Initialize the queue and executed agents
         self.queue = deque()
         self.executed = []
+        self.joined_team = {}
+        self.neighbour_agents = {}
 
     async def on_agent(self, agent: AgentDefinition):
         self.log(f"{self.definition().name} on_agent {agent.name}")
-
-        # Manually check the next agent to execute
-        next_agent = self.get_next_agent()
-        if next_agent:
-            print(f"Next agent to execute: {next_agent}")
-
-            # Manually update the status of the next agent
-        #     self.update_status(next_agent)
-        #
-        # print("Executed agents:", self.get_executed())
+        self.joined_team[agent.name] = agent
+        # If all agents have joined, execute the workflow
+        if len(self.joined_team) == len(self.neighbour_agents):
+            next_agent = self.get_next_agent()
+            if next_agent == self.definition().name:
+                self.log(
+                    f"Next agent to execute: {next_agent} {self.definition().name} {next_agent == self.definition().name}")
+                self.log(f"Running {self.definition().name} My self")
+                response = process_agent_request(self.llm, self.input.request, self.definition(),
+                                                 tools=self.tools)
+                # response = "Test response"
+                agent_task_response = AgentMessage(
+                    agent=self.definition().name,
+                    response=response
+                )
+                await self.broadcast(pickle.dumps(agent_task_response), None)
 
     async def on_message(self, agent_id, message):
-        self.log(f"on_message {agent_id} {message}")
+        print(f"{self.definition().name} Received message from = '{agent_id}' message= {message}")
+        # message: AgentMessage = pickle.loads(message)
+        # print(f"{self.definition().name} Received message from = '{agent_id}' message= {message}")
+        # self.log(f"{self.definition().name} Received message from = '{agent_id}' message= {message}")
+        # # Manually check the next agent to execute
+        # next_agent = self.get_next_agent()
+        # if next_agent:
+        #     print(f"Next agent to execute: {next_agent}")
 
     async def run(self, inputs):
-        pass
+        self.input: RunnerInput = pickle.loads(inputs)
