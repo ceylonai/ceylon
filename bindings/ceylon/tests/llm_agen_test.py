@@ -9,6 +9,7 @@ from langchain_core.tools import StructuredTool
 
 from ceylon import AgentRunner
 from ceylon.llm.agent import LLMAgent
+from ceylon.llm.manger import LLMManager
 
 os.environ.setdefault("SERPER_API_KEY", "866312803646d82919ddd409469c9ad106c0d3c1")
 
@@ -37,6 +38,14 @@ async def main():
     runner = AgentRunner(workspace_name="ceylon-ai")
     ollama_llama3 = ChatOllama(model="llama3")
     # runner.register_agent(LLMManager(ollama_llama3))
+    runner.register_agent(LLMAgent(
+        name="leader",
+        position="Leader",
+        llm=ollama_llama3,
+        responsibilities=[],
+        instructions=[],
+        is_leader=True
+    ))
     runner.register_agent(LLMAgent(
         name="writer",
         position="Assistant Writer",
@@ -99,6 +108,7 @@ async def main():
             "style": "creative"
         },
         network={
+            "leader": [],
             "researcher": [],
             "writer": ["researcher"],
             "editor": ["writer"],

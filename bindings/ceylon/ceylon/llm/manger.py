@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from ceylon.ceylon import AgentCore, MessageHandler, Processor, AgentDefinition, AgentConfig, \
     AgentHandler, EventHandler
-from ceylon.llm.runner import RunnerInput
+from ceylon.runner import RunnerInput
 
 
 class OtherAgent(BaseModel):
@@ -24,7 +24,7 @@ class LLMManager(AgentCore, MessageHandler, Processor, AgentHandler):
         async def on_event(self, message):
             print(f"on_any_event {message}")
 
-    def __init__(self, llm, name="manager"):
+    def __init__(self, llm, name="leader"):
         self.llm = llm
         super().__init__(
             definition=AgentDefinition(id=None, name=name,

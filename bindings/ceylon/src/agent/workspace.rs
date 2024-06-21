@@ -1,4 +1,5 @@
 use std::sync::{Arc, RwLock};
+use std::thread;
 
 use serde::{Deserialize, Serialize};
 use tokio::runtime::Runtime;
@@ -77,6 +78,26 @@ impl Workspace {
         for task in tasks {
             task.await.unwrap();
         }
+        // let mut handles = vec![];
+        //
+        // for agent in self._agents.read().unwrap().iter() {
+        //     let url = format!("{}/{}", self.host, self.port);
+        //     let topic = format!("workspace-{}", agent.workspace_id());
+        //     let agent_clone = agent.clone();
+        //     let input_val = input.clone();
+        //     let handle = thread::spawn(move || {
+        //         let rt = Runtime::new().unwrap();
+        //         rt.block_on(async {
+        //             let _inputs = input_val.clone();
+        //             agent_clone.start(topic, url, _inputs.clone()).await;
+        //         });
+        //     });
+        //     handles.push(handle);
+        // }
+        //
+        // for handle in handles {
+        //     handle.join().unwrap();
+        // }
     }
 }
 

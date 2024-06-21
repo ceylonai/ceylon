@@ -91,7 +91,7 @@ impl AgentCore {
         let message =
             AgentMessage::from_data(AgentMessageType::Data, DataMessage { data: message })
                 .into_bytes();
-        info!("broadcasting message: {:?} to: {:?}", message, to);
+        // info!("broadcasting message: {:?} to: {:?}", message, to);
         let msg = Message::data(self.definition().id.clone().unwrap().clone(), to, message);
         Self::broadcast_raw(self._context_mgt_tx.clone(), self.tx_0.clone(), msg).await;
     }
@@ -119,7 +119,7 @@ impl AgentCore {
         let definition = self.definition();
         let agent_name = definition.name.clone();
         let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Message>(100);
-        let (mut node_0, mut rx_o_0) = create_node(agent_name.clone(), true, rx_0);
+        let (mut node_0, mut rx_o_0) = create_node(agent_name.clone(), self.definition().is_leader, rx_0);
         let on_message = self._on_message.clone();
         let event_handlers = self._event_handlers.clone();
         let agent_handler = self._agent_handler.clone();
@@ -262,9 +262,10 @@ impl AgentCore {
                                                                                handshake_message).into_bytes())).await;
                 tokio::time::sleep(sleep_duration).await;
                 sleep_duration += Duration::from_secs(1);
-                // if sleep_duration > Duration::from_secs(120) {
-                //     sleep_duration = Duration::from_secs(45);
-                // }
+
+                if sleep_duration > Duration::from_secs(30) {
+                    sleep_duration = Duration::from_secs(5);
+                }
             }
         });
 

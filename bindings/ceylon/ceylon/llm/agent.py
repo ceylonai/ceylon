@@ -73,7 +73,7 @@ class LLMAgent(AgentCore, MessageHandler, AgentHandler, Processor):
     def get_executed(self):
         return self.executed
 
-    def __init__(self, name, position, llm, responsibilities=None, instructions=None, tools=None):
+    def __init__(self, name, position, llm, responsibilities=None, instructions=None, tools=None, is_leader=False):
         if responsibilities is None:
             responsibilities = []
         if instructions is None:
@@ -87,7 +87,7 @@ class LLMAgent(AgentCore, MessageHandler, AgentHandler, Processor):
             name=name,
             responsibilities=responsibilities,
             position=position,
-            is_leader=False,
+            is_leader=is_leader,
             instructions=instructions
         ),
             config=AgentConfig(memory_context_size=10),
@@ -123,7 +123,7 @@ class LLMAgent(AgentCore, MessageHandler, AgentHandler, Processor):
                 await self.broadcast(pickle.dumps(agent_task_response), None)
 
     async def on_message(self, agent_id, message):
-        print(f"{self.definition().name} Received message from = '{agent_id}' message= {message}")
+        print(f"{self.definition().id} Received message from = '{agent_id}' message= {message}")
         # message: AgentMessage = pickle.loads(message)
         # print(f"{self.definition().name} Received message from = '{agent_id}' message= {message}")
         # self.log(f"{self.definition().name} Received message from = '{agent_id}' message= {message}")
