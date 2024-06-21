@@ -1,12 +1,10 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use std::time;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, UNIX_EPOCH};
 
 use tokio::select;
 use tokio::sync::Mutex;
-use uniffi::deps::log;
-use uniffi::deps::log::{debug, debug, Level, log};
+use uniffi::deps::log::{debug, Level, log};
 
 use sangedama::node::node::{create_node, EventType, Message, MessageType};
 

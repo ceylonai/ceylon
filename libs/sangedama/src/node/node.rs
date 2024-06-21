@@ -203,7 +203,7 @@ impl Node {
                                 debug!("{:?} Broadcast message: {:?}", self.name, message_ids);
                             }
                             Err(e) => {
-                                warn!("{:?} Failed to broadcast message: {:?} {:?} {:?}", self.name, e, message.clone(), from_utf8_lossy(&message.data));
+                                debug!("{:?} Failed to broadcast message: {:?} {:?} {:?}", self.name, e, message.clone(), from_utf8_lossy(&message.data));
                             }
                         };
                     }
