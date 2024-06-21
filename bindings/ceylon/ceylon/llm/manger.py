@@ -1,10 +1,11 @@
 import pickle
+from collections import deque
 
+import networkx as nx
 from pydantic import BaseModel
 
 from ceylon.ceylon import AgentCore, MessageHandler, Processor, AgentDefinition, AgentConfig, \
     AgentHandler, EventHandler
-from ceylon.llm.llm_caller import process_agent_request
 from ceylon.llm.runner import RunnerInput
 
 
@@ -45,22 +46,46 @@ class LLMManager(AgentCore, MessageHandler, Processor, AgentHandler):
         self.connected_agents = []
 
     async def on_agent(self, agent: "AgentDefinition"):
-        pass
+        print(f"{self.definition().name} on_agent {agent.name}")
 
     async def on_message(self, agent_id, message):
         pass
 
     async def run(self, inputs):
         runner_input: RunnerInput = pickle.loads(inputs)
-        agents = runner_input.agents
+        network = runner_input.network
 
-        agent_details = []
-        for agent in agents:
-            agent_details.append((agent.position, agent.responsibilities, agent.instructions))
+        # Create a directed graph to represent the workflow
+        G = nx.DiGraph()
 
-        inputs = {
-            "agents": agent_details
-        }
+        # Add nodes and edges based on the agents and their dependencies
+        for agent, dependencies in network.items():
+            G.add_node(agent)
+            for dependency in dependencies:
+                G.add_edge(dependency, agent)
 
-        res = await process_agent_request(self.llm, inputs, agent_definition=self.definition(), tools=[])
-        print(res)
+        # Function to execute the workflow in the correct order
+        def execute_workflow(graph):
+            # Find all nodes with no dependencies (indegree 0)
+            queue = deque([node for node in graph if graph.in_degree(node) == 0])
+            executed = []
+
+            while queue:
+                current_agent = queue.popleft()
+                executed.append(current_agent)
+                print(f"Executing {current_agent}")
+
+                # Remove the current agent and update the graph
+                for successor in list(graph.successors(current_agent)):
+                    graph.remove_edge(current_agent, successor)
+                    if graph.in_degree(successor) == 0:
+                        queue.append(successor)
+                graph.remove_node(current_agent)
+
+            if graph.nodes:
+                print("Cycle detected in the workflow!")
+            else:
+                print("Workflow executed successfully.")
+
+        # Execute the workflow
+        execute_workflow(G)

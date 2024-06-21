@@ -4,6 +4,7 @@ use crate::AgentDefinition;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AgentMessageType {
+    Beacon,
     Handshake,
     Introduce,
     Text,
@@ -79,4 +80,9 @@ pub struct TextMessage {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct DataMessage {
     pub data: Vec<u8>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct BeaconMessage {
+    pub time: u64,
 }

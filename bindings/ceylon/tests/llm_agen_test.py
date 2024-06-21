@@ -1,13 +1,14 @@
 import asyncio
+import datetime
 import os
+import uuid
 
 from duckduckgo_search import DDGS
 from langchain_community.chat_models import ChatOllama
 from langchain_core.tools import StructuredTool
 
+from ceylon import AgentRunner
 from ceylon.llm.agent import LLMAgent
-from ceylon.llm.manger import LLMManager
-from ceylon.llm.runner import AgentLLMRunner
 
 os.environ.setdefault("SERPER_API_KEY", "866312803646d82919ddd409469c9ad106c0d3c1")
 
@@ -20,10 +21,22 @@ def search_query(keywords: str, ):
     return results
 
 
+def publish_content(content: str, ):
+    """Publishes the given content
+        Valid parameters: 'content'
+    """
+    # Write to text file
+    # name should be unique
+    name = f"content-{datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.txt"
+    with open(name, "w") as f:
+        f.write(content)
+    return f"Published {content}"
+
+
 async def main():
-    runner = AgentLLMRunner(workspace_name="ceylon-ai")
+    runner = AgentRunner(workspace_name="ceylon-ai")
     ollama_llama3 = ChatOllama(model="llama3")
-    runner.register_agent(LLMManager(ollama_llama3))
+    # runner.register_agent(LLMManager(ollama_llama3))
     runner.register_agent(LLMAgent(
         name="writer",
         position="Assistant Writer",
@@ -47,6 +60,35 @@ async def main():
             StructuredTool.from_function(search_query)
         ]
     ))
+    #
+    runner.register_agent(LLMAgent(
+        name="editor",
+        position="Content Editor",
+        llm=ollama_llama3,
+        responsibilities=[
+            "Review and refine content to ensure it meets quality standards and aligns with the editorial guidelines."],
+        instructions=[
+            "Check for grammatical errors, clarity, and coherence.",
+            "Ensure the content is engaging and maintains the intended tone and style.",
+            "Provide constructive feedback to the writer."
+        ]
+    ))
+    #
+    runner.register_agent(LLMAgent(
+        name="publisher",
+        position="Content Publisher",
+        llm=ollama_llama3,
+        responsibilities=[
+            "Publish the finalized content on the designated platform and ensure proper formatting and SEO optimization."],
+        instructions=[
+            "Format the content according to platform guidelines.",
+            "Optimize for SEO by including relevant keywords, meta descriptions, and tags.",
+            "Ensure all links are functional and images are properly placed."
+        ],
+        tools=[
+            StructuredTool.from_function(publish_content)
+        ]
+    ))
 
     await runner.run(
         {
@@ -55,6 +97,12 @@ async def main():
             "tone": "informal",
             "length": "short",
             "style": "creative"
+        },
+        network={
+            "Researcher": [],
+            "Writer": ["Researcher"],
+            "Editor": ["Writer"],
+            "Publisher": ["Editor"]
         }
     )
     leader = runner.leader()

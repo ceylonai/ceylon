@@ -68,7 +68,7 @@ async def main():
 
     await runner.run({
         "title": "How to use AI for Machine Learning",
-    })
+    }, network={})
 
 
 if __name__ == '__main__':

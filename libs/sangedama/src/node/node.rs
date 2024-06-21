@@ -8,8 +8,9 @@ use libp2p::{
     Multiaddr, SwarmBuilder,
 };
 use libp2p_gossipsub::{MessageId, PublishError};
-use log::{debug, error};
+use log::{debug, error, warn};
 use serde::{Deserialize, Serialize};
+use serde::__private::from_utf8_lossy;
 use serde_json::json;
 use tokio::sync::mpsc;
 use tokio::{io, select};
@@ -75,7 +76,7 @@ impl Message {
             time: SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
-                .as_millis() as u64,
+                .as_nanos() as u64,
             sender,
             r#type: message_type,
             receiver,
@@ -197,12 +198,12 @@ impl Node {
                 message =  self.in_rx.recv() => match message {
                     Some(message) => {
                         debug!("{:?} Received To Broadcast", self.name);
-                        match self.broadcast(message){
+                        match self.broadcast(message.clone()){
                             Ok(message_ids) => {
                                 debug!("{:?} Broadcast message: {:?}", self.name, message_ids);
                             }
                             Err(e) => {
-                                error!("{:?} Failed to broadcast message: {:?}", self.name, e);
+                                warn!("{:?} Failed to broadcast message: {:?} {:?} {:?}", self.name, e, message.clone(), from_utf8_lossy(&message.data));
                             }
                         };
                     }

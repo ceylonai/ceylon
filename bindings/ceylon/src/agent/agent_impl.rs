@@ -1,16 +1,23 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-
+use std::time;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use tokio::select;
 use tokio::sync::Mutex;
-use uniffi::deps::log::debug;
+use uniffi::deps::log;
+use uniffi::deps::log::{debug, debug, Level, log};
 
 use sangedama::node::node::{create_node, EventType, Message, MessageType};
 
-use crate::agent::agent_base::{AgentConfig, AgentDefinition, AgentHandler, MessageHandler, Processor};
-use crate::agent::agent_context::{AgentContextManager};
-use crate::agent::message_types::{AgentMessage, AgentMessageConversions, AgentMessageTrait, AgentMessageType, DataMessage, HandshakeMessage, IntroduceMessage};
+use crate::agent::agent_base::{
+    AgentConfig, AgentDefinition, AgentHandler, MessageHandler, Processor,
+};
+use crate::agent::agent_context::AgentContextManager;
+use crate::agent::message_types::{
+    AgentMessage, AgentMessageConversions, AgentMessageTrait, AgentMessageType, BeaconMessage,
+    DataMessage, HandshakeMessage, IntroduceMessage,
+};
 use crate::EventHandler;
 
 pub struct AgentCore {
@@ -53,7 +60,9 @@ impl AgentCore {
             _meta,
             _definition: RwLock::new(definition),
             _event_handlers: event_handlers.unwrap_or_default(),
-            _context_mgt: Arc::new(Mutex::new(AgentContextManager::new(config.memory_context_size))),
+            _context_mgt: Arc::new(Mutex::new(AgentContextManager::new(
+                config.memory_context_size,
+            ))),
             _context_mgt_rx: Arc::new(Mutex::new(_context_mgt_rx)),
             _context_mgt_tx,
             _agent_handler: Arc::new(Mutex::new(agent_handler)),
@@ -81,28 +90,31 @@ impl AgentCore {
     }
 
     pub async fn broadcast(&self, message: Vec<u8>, to: Option<String>) {
-        let message = AgentMessage::from_data(AgentMessageType::Data, DataMessage { data: message }).into_bytes();
-        let msg = Message::data(
-            self.definition().id.clone().unwrap().clone(),
-            to,
-            message,
-        );
+        let message =
+            AgentMessage::from_data(AgentMessageType::Data, DataMessage { data: message })
+                .into_bytes();
+        debug!("broadcasting message: {:?} to: {:?}", message, to);
+        let msg = Message::data(self.definition().id.clone().unwrap().clone(), to, message);
         Self::broadcast_raw(self._context_mgt_tx.clone(), self.tx_0.clone(), msg).await;
     }
 
-    async fn broadcast_raw(context_mgt_tx: tokio::sync::mpsc::Sender<Message>, tx_0: tokio::sync::mpsc::Sender<Message>, message: Message) {
+    async fn broadcast_raw(
+        context_mgt_tx: tokio::sync::mpsc::Sender<Message>,
+        tx_0: tokio::sync::mpsc::Sender<Message>,
+        message: Message,
+    ) {
         context_mgt_tx.send(message.clone()).await.unwrap();
-        tx_0
-            .send(message)
-            .await
-            .unwrap();
+        tx_0.send(message).await.unwrap();
     }
 
     pub fn meta(&self) -> HashMap<String, String> {
         self._meta.clone()
     }
-}
 
+    pub fn log(&self, message: String) {
+        log!(Level::Info,"{}: {}", self.id(), message);
+    }
+}
 
 impl AgentCore {
     pub(crate) async fn start(&self, topic: String, url: String, inputs: Vec<u8>) {
@@ -118,13 +130,16 @@ impl AgentCore {
         self._id.write().unwrap().replace(agent_id.clone());
         println!("{} Started", self.id().clone());
         self._definition.write().unwrap().id = Some(agent_id.clone());
-        self._context_mgt.clone().lock().await.set_self_definition(self.definition());
+        self._context_mgt
+            .clone()
+            .lock()
+            .await
+            .set_self_definition(self.definition());
 
         let t0 = tokio::spawn(async move {
             node_0.connect(url.as_str(), topic.as_str());
             node_0.run().await;
         });
-
 
         let rx = Arc::clone(&self.rx_0);
         let ctx_tx = self._context_mgt_tx.clone();
@@ -178,15 +193,19 @@ impl AgentCore {
             let mut rx = _context_mgt_rx.lock().await;
             let mut ctx = _context_mgt.lock().await;
             loop {
+                let message_creator = ctx.get_owner().id.unwrap_or("".to_string());
                 select! {
                     Some(message) = rx.recv() => {
-                        let message_creator = ctx.get_owner().id.unwrap_or("".to_string());
                         if message.sender == message_creator.clone()  {
                             ctx.add_message( message.clone());
                             continue;
-                        }        
+                        }
                         let msg = AgentMessage::from_bytes(message.data.clone());
                         let sender_id = message.sender.clone();
+                        
+                        
+                        debug!("{} Received: {:?}", message_creator.clone(), sender_id.clone());
+                                                
                         if ctx.has_thread( sender_id) {
                             debug!("Received: {:?}",msg.clone());
                             if msg.r#type==AgentMessageType::Data {
@@ -197,13 +216,7 @@ impl AgentCore {
                             }
                         }else{
                             debug!("No context for {}", message.sender);
-                            let handshake_message = HandshakeMessage{
-                                message: format!( "Im a new agent {}", definition.name),
-                            };
-                            AgentCore::broadcast_raw(_context_mgt_tx.clone(),_tx_0.clone(),
-                                Message::data(message_creator.clone(),None,
-                                AgentMessage::from_data(AgentMessageType::Handshake,
-                                        handshake_message).into_bytes()) ).await;
+                            
                             if msg.r#type==AgentMessageType::Handshake {
                                 let handshake_msg:Option<HandshakeMessage> = msg.into_data();
                                 debug!("{} Handshake received: {:?}",definition.name,handshake_msg);
@@ -221,17 +234,53 @@ impl AgentCore {
                                     debug!( "{} has joined", ctx.has_thread( message.sender.clone()));
                                     agent_handler.lock().await.on_agent(data_msg.agent_definition ).await;
                                 }
-                                
+
                             }
                         }
                     }
                 }
             }
         });
+        let message_creator = self.id().clone();
+        let agent_name = self.definition().name.clone();
+        let _context_mgt_tx = self._context_mgt_tx.clone();
+        let _tx_0 = self.tx_0.clone();
+        let t4 = tokio::spawn(async move {
+            loop {
+                let handshake_message = HandshakeMessage {
+                    message: format!("Im a new agent {}", agent_name),
+                };
+                AgentCore::broadcast_raw(_context_mgt_tx.clone(), _tx_0.clone(),
+                                         Message::data(message_creator.clone(), None,
+                                                       AgentMessage::from_data(AgentMessageType::Handshake,
+                                                                               handshake_message).into_bytes())).await;
 
-        t0.await.unwrap();
-        t1.await.unwrap();
-        t2.await.unwrap();
-        t3.await.unwrap();
+                // AgentCore::broadcast_raw(
+                //     _context_mgt_tx.clone(),
+                //     _tx_0.clone(),
+                //     Message::data(
+                //         message_creator.clone(),
+                //         None,
+                //         AgentMessage::from_data(
+                //             AgentMessageType::Beacon,
+                //             BeaconMessage {
+                //                 time: SystemTime::now()
+                //                     .duration_since(UNIX_EPOCH)
+                //                     .expect("Time went backwards")
+                //                     .as_secs(),
+                //             },
+                //         )
+                //             .into_bytes(),
+                //     ),
+                // )
+                //     .await;
+
+
+                tokio::time::sleep(Duration::from_secs(1)).await;
+            }
+        });
+
+
+        tokio::try_join!(t1, t2, t3, t4).unwrap();
     }
 }

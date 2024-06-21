@@ -29,6 +29,8 @@ interface AgentCore{
     [Async]
     void broadcast(bytes message, string? to);
 
+    void log(string message);
+
 };
 
  enum EventType {

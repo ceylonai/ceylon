@@ -55,6 +55,7 @@ impl Workspace {
     }
 
     pub async fn run(&self, input: Vec<u8>) {
+        env_logger::init();
         debug!("Workspace {} running", self.id);
         let rt = Runtime::new().unwrap();
         let mut tasks = vec![];
