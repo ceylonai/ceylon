@@ -23,7 +23,7 @@ version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d122413f284cf2d62fb1b7db97e02edb8cda96d769b16e443a4f6195e35662b0"
 dependencies = [
- "crypto-common",
+ "crypto-common 0.1.6",
  "generic-array",
 ]
 
@@ -78,6 +78,21 @@ name = "allocator-api2"
 version = "0.2.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c6cb57a04249c6480766f7f7cef5467412af1490f8d1e243141daddada3264f"
+
+[[package]]
+name = "android-tzdata"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e999941b234f3131b00bc13c22d06e8c5ff726d1b6318ac7eb276997bbb4fef0"
+
+[[package]]
+name = "android_system_properties"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "819e7219dbd41043ac279b19830f2efc897156490d7fd6ea916720117ee66311"
+dependencies = [
+ "libc",
+]
 
 [[package]]
 name = "anstream"
@@ -424,7 +439,7 @@ version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "46502ad458c9a52b69d4d4d32775c788b7a1b85e8bc9d482d92250fc0e3f8efe"
 dependencies = [
- "digest",
+ "digest 0.10.7",
 ]
 
 [[package]]
@@ -434,6 +449,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71"
 dependencies = [
  "generic-array",
+]
+
+[[package]]
+name = "block-buffer"
+version = "0.11.0-pre.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ded684142010808eb980d9974ef794da2bcf97d13396143b1515e9f0fb4a10e"
+dependencies = [
+ "crypto-common 0.2.0-pre.5",
 ]
 
 [[package]]
@@ -518,6 +542,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ceylonchain"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "hex",
+ "serde",
+ "sha2 0.11.0-pre.3",
+]
+
+[[package]]
 name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -548,12 +582,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "chrono"
+version = "0.4.38"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a21f936df1771bf62b77f047b726c4625ff2e8aa607c01ec06e5a05bd8463401"
+dependencies = [
+ "android-tzdata",
+ "iana-time-zone",
+ "js-sys",
+ "num-traits",
+ "wasm-bindgen",
+ "windows-targets 0.52.5",
+]
+
+[[package]]
 name = "cipher"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "773f3b9af64447d2ce9850330c473515014aa235e6a783b02db81ff39e4a3dad"
 dependencies = [
- "crypto-common",
+ "crypto-common 0.1.6",
  "inout",
  "zeroize",
 ]
@@ -578,6 +626,12 @@ name = "const-oid"
 version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2459377285ad874054d797f3ccebf984978aa39129f6eafde5cdc8315b612f8"
+
+[[package]]
+name = "const-oid"
+version = "0.10.0-pre.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f7e3352a27098ba6b09546e5f13b15165e6a88b5c2723afecb3ea9576b27e3ea"
 
 [[package]]
 name = "core-foundation"
@@ -631,6 +685,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "crypto-common"
+version = "0.2.0-pre.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b7aa2ec04f5120b830272a481e8d9d8ba4dda140d2cda59b0f1110d5eb93c38e"
+dependencies = [
+ "getrandom",
+ "hybrid-array",
+ "rand_core",
+]
+
+[[package]]
 name = "ctr"
 version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -648,7 +713,7 @@ dependencies = [
  "cfg-if",
  "cpufeatures",
  "curve25519-dalek-derive",
- "digest",
+ "digest 0.10.7",
  "fiat-crypto",
  "platforms",
  "rustc_version",
@@ -699,7 +764,7 @@ version = "0.7.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f55bf8e7b65898637379c1b74eb1551107c8294ed26d855ceb9fd1a09cfc9bc0"
 dependencies = [
- "const-oid",
+ "const-oid 0.9.6",
  "zeroize",
 ]
 
@@ -746,9 +811,20 @@ version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
 dependencies = [
- "block-buffer",
- "crypto-common",
+ "block-buffer 0.10.4",
+ "crypto-common 0.1.6",
  "subtle",
+]
+
+[[package]]
+name = "digest"
+version = "0.11.0-pre.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "065d93ead7c220b85d5b4be4795d8398eac4ff68b5ee63895de0a3c1fb6edf25"
+dependencies = [
+ "block-buffer 0.11.0-pre.5",
+ "const-oid 0.10.0-pre.2",
+ "crypto-common 0.2.0-pre.5",
 ]
 
 [[package]]
@@ -794,7 +870,7 @@ dependencies = [
  "ed25519",
  "rand_core",
  "serde",
- "sha2",
+ "sha2 0.10.8",
  "subtle",
  "zeroize",
 ]
@@ -1196,6 +1272,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d231dfb89cfffdbc30e7fc41579ed6066ad03abda9e567ccafae602b97ec5024"
 
 [[package]]
+name = "hex"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+
+[[package]]
 name = "hex_fmt"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1262,7 +1344,7 @@ version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c49c37c09c17a53d937dfbb742eb3a961d65a994e6bcdcf37e7399d0cc8ab5e"
 dependencies = [
- "digest",
+ "digest 0.10.7",
 ]
 
 [[package]]
@@ -1351,6 +1433,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
+name = "hybrid-array"
+version = "0.2.0-rc.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53668f5da5a41d9eaf4bf7064be46d1ebe6a4e1ceed817f387587b18f2b51047"
+dependencies = [
+ "typenum",
+]
+
+[[package]]
 name = "hyper"
 version = "0.14.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1428,6 +1519,29 @@ dependencies = [
  "tower",
  "tower-service",
  "tracing",
+]
+
+[[package]]
+name = "iana-time-zone"
+version = "0.1.60"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7ffbb5a1b541ea2561f8c41c087286cc091e21e556a4f09a8f6cbf17b69b141"
+dependencies = [
+ "android_system_properties",
+ "core-foundation-sys",
+ "iana-time-zone-haiku",
+ "js-sys",
+ "wasm-bindgen",
+ "windows-core",
+]
+
+[[package]]
+name = "iana-time-zone-haiku"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f31827a206f56af32e590ba56d5d2d085f558508192593743f16b2306495269f"
+dependencies = [
+ "cc",
 ]
 
 [[package]]
@@ -1703,7 +1817,7 @@ dependencies = [
  "quick-protobuf-codec",
  "rand",
  "regex",
- "sha2",
+ "sha2 0.10.8",
  "smallvec",
  "tracing",
  "void",
@@ -1721,7 +1835,7 @@ dependencies = [
  "multihash",
  "quick-protobuf",
  "rand",
- "sha2",
+ "sha2 0.10.8",
  "thiserror",
  "tracing",
  "zeroize",
@@ -1781,7 +1895,7 @@ dependencies = [
  "once_cell",
  "quick-protobuf",
  "rand",
- "sha2",
+ "sha2 0.10.8",
  "snow",
  "static_assertions",
  "thiserror",
@@ -3093,7 +3207,18 @@ checksum = "793db75ad2bcafc3ffa7c68b215fee268f537982cd901d132f89c6343f3a3dc8"
 dependencies = [
  "cfg-if",
  "cpufeatures",
- "digest",
+ "digest 0.10.7",
+]
+
+[[package]]
+name = "sha2"
+version = "0.11.0-pre.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f33549bf3064b62478926aa89cbfc7c109aab66ae8f0d5d2ef839e482cc30d6"
+dependencies = [
+ "cfg-if",
+ "cpufeatures",
+ "digest 0.11.0-pre.8",
 ]
 
 [[package]]
@@ -3163,7 +3288,7 @@ dependencies = [
  "rand_core",
  "ring 0.17.8",
  "rustc_version",
- "sha2",
+ "sha2 0.10.8",
  "subtle",
 ]
 
@@ -3714,7 +3839,7 @@ version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc1de2c688dc15305988b563c3854064043356019f97a4b46276fe734c4f07ea"
 dependencies = [
- "crypto-common",
+ "crypto-common 0.1.6",
  "subtle",
 ]
 
