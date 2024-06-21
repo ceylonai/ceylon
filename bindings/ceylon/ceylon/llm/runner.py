@@ -1,16 +1,18 @@
 import asyncio
 import pickle
-from typing import List, Tuple
+from typing import List
 
-from pydantic.dataclasses import dataclass
+from pydantic import BaseModel
 
-from ceylon.ceylon import Workspace, WorkspaceConfig, uniffi_set_event_loop, AgentCore
+from ceylon.ceylon import Workspace, WorkspaceConfig, uniffi_set_event_loop, AgentCore, AgentDefinition
 
 
-@dataclass
-class RunnerInput:
+class RunnerInput(BaseModel):
     request: dict
-    agents_meta: List[dict[str, str]]
+    agents: List[AgentDefinition]
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class AgentRunnerError(Exception):
@@ -50,7 +52,7 @@ class AgentLLMRunner:
 
         input = RunnerInput(
             request=request,
-            agents_meta=[agent.meta() for agent in self.agents],
+            agents=[agent.definition() for agent in self.agents],
         )
 
         await workspace.run(pickle.dumps(input))

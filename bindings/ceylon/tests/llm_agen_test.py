@@ -2,6 +2,7 @@ import asyncio
 import os
 
 from duckduckgo_search import DDGS
+from langchain_community.chat_models import ChatOllama
 from langchain_core.tools import StructuredTool
 
 from ceylon.llm.agent import LLMAgent
@@ -21,10 +22,12 @@ def search_query(keywords: str, ):
 
 async def main():
     runner = AgentLLMRunner(workspace_name="ceylon-ai")
-    runner.register_agent(LLMManager())
+    ollama_llama3 = ChatOllama(model="llama3")
+    runner.register_agent(LLMManager(ollama_llama3))
     runner.register_agent(LLMAgent(
         name="writer",
         position="Assistant Writer",
+        llm=ollama_llama3,
         responsibilities=["Create high-quality, original content that matches the audience's tone and style."],
         instructions=[
             "Ensure clarity, accuracy, and proper formatting while respecting ethical guidelines and privacy."]
@@ -33,6 +36,7 @@ async def main():
     runner.register_agent(LLMAgent(
         name="researcher",
         position="Content Researcher",
+        llm=ollama_llama3,
         responsibilities=["Conducting thorough and accurate research to support content creation."],
         instructions=[
             "Find credible sources, verify information, and provide comprehensive and relevant "
@@ -45,7 +49,13 @@ async def main():
     ))
 
     await runner.run(
-        {"title": "How to use AI for Machine Learning", "tone": "informal", "length": "short", "style": "creative"}
+        {
+            "request": "I want to create a blog post",
+            "title": "How to use AI for Machine Learning",
+            "tone": "informal",
+            "length": "short",
+            "style": "creative"
+        }
     )
     leader = runner.leader()
 
