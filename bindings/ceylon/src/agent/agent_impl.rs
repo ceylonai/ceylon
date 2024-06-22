@@ -185,10 +185,6 @@ mod tests {
         let topic = format!("workspace-{}", workspace_id);
         let inputs = vec![1, 2, 3, 4];
 
-        // Call the start method
-        // agent_1.start(topic.clone(), url.clone(), inputs.clone()).await;
-        // agent_2.start(topic.clone(), url.clone(), inputs.clone()).await;
-
         let agents = vec![agent_1, agent_2];
 
         let mut agent_thread_handlers = vec![];
