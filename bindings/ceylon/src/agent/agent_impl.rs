@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use async_trait::async_trait;
+use tokio::select;
 
 use tokio::sync::Mutex;
 use uniffi::deps::log::debug;
@@ -77,11 +78,21 @@ impl AgentCore {
     pub async fn start(&self, topic: String, url: String, inputs: Vec<u8>) {
         let definition = self.definition();
         let agent_name = definition.name.clone();
-        let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Message>(100);
-        let (mut node_0, mut rx_o_0) = create_node(agent_name.clone(), self.definition().is_leader, rx_0);
+        let (mut node_0, mut msg_from_other_nodes, send_to_other_nodes) = create_node(agent_name.clone(), self.definition().is_leader);
 
         node_0.connect(url.as_str(), topic.as_str());
-        node_0.run().await;
+        let node_start_handle = tokio::spawn(async move {
+            debug!("Agent {} started", agent_name);
+            node_0.run().await;
+        });
+
+
+        let agent_name = definition.name.clone();
+        select! {
+            _ = node_start_handle => {
+                debug!("Agent {} node_start_handle finished", agent_name);
+            },
+        }
     }
 }
 
@@ -198,7 +209,7 @@ mod tests {
                 tokio::runtime::Runtime::new().unwrap().block_on(async move {
                     agent_2.start(ag2_topic.clone(), ag2_url.clone(), ag2_input.clone()).await;
                 });
-                println!( "Hello, world!" );
+                println!("Hello, world!");
             }
         );
 

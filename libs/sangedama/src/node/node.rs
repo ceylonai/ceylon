@@ -87,7 +87,7 @@ impl Message {
     }
 
     fn event_with_data(from: String, event: EventType, data: Vec<u8>) -> Self {
-        Self::new(from,  "SELF".to_string(), data, MessageType::Event, event)
+        Self::new(from, "SELF".to_string(), data, MessageType::Event, event)
     }
 
     pub fn data(from: String, data: Vec<u8>) -> Self {
@@ -278,11 +278,18 @@ impl Node {
     }
 }
 
+/**
+ * Create a node
+ * this will return a tuple of (Node, in_rx, out_tx)
+ * in_rx will be used to receive messages from other nodes
+ * out_tx will be used to send messages to other nodes
+ * node need to be started by calling node.run()
+ **/
 pub fn create_node(
     name: String,
     is_leader: bool,
-    in_rx: mpsc::Receiver<Message>,
-) -> (Node, mpsc::Receiver<Message>) {
+) -> (Node, mpsc::Receiver<Message>, mpsc::Sender<Message>) {
+    let (tx_0, in_rx) = tokio::sync::mpsc::channel::<Message>(100);
     let swarm = SwarmBuilder::with_new_identity()
         .with_tokio()
         .with_tcp(
@@ -338,6 +345,7 @@ pub fn create_node(
             out_tx,
         },
         _rx,
+        tx_0
     )
 }
 
@@ -357,11 +365,9 @@ mod tests {
 
         let url = format!("/ip4/0.0.0.0/tcp/{}", port_id);
 
-        let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Message>(100);
-        let (tx_1, rx_1) = tokio::sync::mpsc::channel::<Message>(100);
 
-        let (mut node_0, mut rx_o_0) = create_node("node_0".to_string(), true, rx_0);
-        let (mut node_1, mut rx_o_1) = create_node("node_1".to_string(), false, rx_1);
+        let (mut node_0, mut rx_o_0, tx_0) = create_node("node_0".to_string(), true);
+        let (mut node_1, mut rx_o_1, tx_1) = create_node("node_1".to_string(), false);
 
         let node_0_id = node_0.id.clone();
         let node_1_id = node_1.id.clone();
