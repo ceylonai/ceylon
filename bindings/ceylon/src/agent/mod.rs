@@ -4,3 +4,4 @@ pub mod agent_context;
 pub mod agent_base;
 mod message_types;
 pub mod agent_impl;
+mod memory_blockchain;

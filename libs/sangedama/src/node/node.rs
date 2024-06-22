@@ -213,7 +213,7 @@ impl Node {
                         debug!("{:?} Received To Broadcast", self.name);
                         match self.broadcast(message.clone()){
                             Ok(message_ids) => {
-                                debug!("{:?} Broadcast message: {:?}", self.name, message_ids);
+                                debug!("{:?} Message Broad casted", self.name);
                             }
                             Err(e) => {
                                 debug!("{:?} Failed to broadcast message: {:?} {:?} {:?}", self.name, e, message.clone(), from_utf8_lossy(&message.data));
@@ -305,7 +305,7 @@ pub fn create_node(
     name: String,
     is_leader: bool,
 ) -> (Node, mpsc::Receiver<Message>, mpsc::Sender<Message>) {
-    let (tx_0, in_rx) = tokio::sync::mpsc::channel::<Message>(100);
+    let (tx_0, in_rx) = mpsc::channel::<Message>(1);
     let swarm = SwarmBuilder::with_new_identity()
         .with_tokio()
         .with_tcp(
@@ -349,7 +349,7 @@ pub fn create_node(
         .unwrap()
         .build();
 
-    let (out_tx, _rx) = mpsc::channel(100);
+    let (out_tx, _rx) = mpsc::channel::<Message>(100);
 
     (
         Node {
