@@ -189,31 +189,26 @@ mod tests {
         // agent_1.start(topic.clone(), url.clone(), inputs.clone()).await;
         // agent_2.start(topic.clone(), url.clone(), inputs.clone()).await;
 
-        let ag1_input = inputs.clone();
-        let ag1_topic = topic.clone();
-        let ag1_url = url.clone();
-        let ag1_thread = thread::spawn(
-            move || {
-                tokio::runtime::Runtime::new().unwrap().block_on(async move {
-                    agent_1.start(ag1_topic.clone(), ag1_url.clone(), ag1_input.clone()).await;
-                });
-            }
-        );
+        let agents = vec![agent_1, agent_2];
 
+        let mut agent_thread_handlers = vec![];
 
-        let ag2_input = inputs.clone();
-        let ag2_topic = topic.clone();
-        let ag2_url = url.clone();
-        let ag2_thread = thread::spawn(
-            move || {
-                tokio::runtime::Runtime::new().unwrap().block_on(async move {
-                    agent_2.start(ag2_topic.clone(), ag2_url.clone(), ag2_input.clone()).await;
-                });
-                println!("Hello, world!");
-            }
-        );
+        for agent in agents {
+            let ag1_input = inputs.clone();
+            let ag1_topic = topic.clone();
+            let ag1_url = url.clone();
+            let ag1_thread = thread::spawn(
+                move || {
+                    tokio::runtime::Runtime::new().unwrap().block_on(async move {
+                        agent.start(ag1_topic.clone(), ag1_url.clone(), ag1_input.clone()).await;
+                    });
+                }
+            );
+            agent_thread_handlers.push(ag1_thread);
+        }
 
-        ag1_thread.join().unwrap();
-        ag2_thread.join().unwrap();
+        for thread in agent_thread_handlers {
+            thread.join().unwrap();
+        }
     }
 }
