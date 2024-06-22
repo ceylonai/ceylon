@@ -58,13 +58,12 @@ pub struct Message {
     pub message: String,
     pub time: u64,
     pub sender: String,
-    pub receiver: Option<String>,
     pub r#type: MessageType,
     pub event_type: EventType,
 }
 
 impl Message {
-    fn new(sender: String, receiver: Option<String>, message: String,
+    fn new(sender: String, message: String,
            data: Vec<u8>, message_type: MessageType,
            event_type: EventType) -> Self {
         let id = format!("{}-{}-{}",
@@ -79,7 +78,6 @@ impl Message {
                 .as_nanos() as u64,
             sender,
             r#type: message_type,
-            receiver,
             message,
             event_type,
         }
@@ -89,13 +87,12 @@ impl Message {
     }
 
     fn event_with_data(from: String, event: EventType, data: Vec<u8>) -> Self {
-        Self::new(from, None, "SELF".to_string(), data, MessageType::Event, event)
+        Self::new(from,  "SELF".to_string(), data, MessageType::Event, event)
     }
 
-    pub fn data(from: String, to: Option<String>, data: Vec<u8>) -> Self {
+    pub fn data(from: String, data: Vec<u8>) -> Self {
         Self::new(
             from,
-            to,
             "DATA-MESSAGE".to_string(),
             data,
             MessageType::Message,
@@ -379,7 +376,7 @@ mod tests {
         runtime.spawn(async move {
             while let Some(message_data) = rx_o_0.recv().await {
                 debug!("Node_0 Received: {:?}", message_data);
-                let msg = Message::data(node_0_id.clone(), Some(node_1_id.clone()), json!({
+                let msg = Message::data(node_0_id.clone(), json!({
                         "data": format!("Hi from Node_0: {}", message_data.message).as_str(),
                     })
                     .to_string()
@@ -394,7 +391,7 @@ mod tests {
         runtime.spawn(async move {
             while let Some(message_data) = rx_o_1.recv().await {
                 debug!("Node_1 Received: {:?}", message_data);
-                let msg = Message::data(node_1_id_2.clone(), Some(node_0_id_2.clone()), json!({
+                let msg = Message::data(node_1_id_2.clone(), json!({
                         "data": format!("Hi from Node_1: {}", message_data.message).as_str(),
                     })
                     .to_string()
