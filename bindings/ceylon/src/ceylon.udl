@@ -34,7 +34,7 @@ interface AgentCore{
     record<string,string> meta();
 
     [Async]
-    void broadcast(bytes message, string? to);
+    void broadcast(bytes message);
 
     void log(string message);
 };
@@ -63,7 +63,6 @@ dictionary Message{
     string message;
     u64 time;
     string sender;
-    string? receiver;
     MessageType type;
     EventType event_type;
 };
