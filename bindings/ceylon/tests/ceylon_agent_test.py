@@ -3,7 +3,7 @@ import pickle
 import random
 import time
 
-from ceylon.ceylon import AgentCore, MessageHandler, Processor, MessageType, AgentDefinition, Message, EventType, \
+from ceylon.ceylon import AgentCore, MessageHandler, Processor, AgentDefinition, Message, EventType, \
     AgentConfig, AgentHandler, EventHandler
 from ceylon.runner import AgentRunner
 
