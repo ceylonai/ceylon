@@ -1,106 +1,196 @@
-// src/lib.rs
+use std::collections::HashSet;
 use std::time::{SystemTime, UNIX_EPOCH};
-use serde::{Serialize, Deserialize};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Transaction {
-    data: Vec<u8>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Block {
-    index: u64,
-    timestamp: u128,
-    previous_hash: String,
-    hash: String,
-    transaction: Transaction,
+    pub index: u64,
+    pub timestamp: u64,
+    pub message: Vec<u8>,
+    pub previous_hash: String,
+    pub hash: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Blockchain {
-    blocks: Vec<Block>,
+    pub chain: Vec<Block>,
 }
 
 impl Blockchain {
-    pub fn new() -> Blockchain {
-        let mut blockchain = Blockchain { blocks: vec![] };
-        blockchain.add_block(Transaction { data: String::from("Genesis Block").as_bytes().to_vec() }, "0".to_string());
-        blockchain
+    pub fn new() -> Self {
+        Self {
+            chain: vec![],
+        }
     }
 
-    pub fn add_block(&mut self, transaction: Transaction, previous_hash: String) {
-        let block = Block {
-            index: self.blocks.len() as u64,
-            timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis(),
-            previous_hash,
-            hash: String::new(), // Placeholder
-            transaction,
+    pub fn init_block(&mut self) {
+        let genesis_block = Block {
+            index: 0,
+            timestamp: Self::current_timestamp(),
+            message: vec![],
+            previous_hash: String::new(),
+            hash: String::new(),
         };
-        let block = Block {
-            hash: self.calculate_hash(&block),
-            ..block
-        };
-        self.blocks.push(block);
+        self.chain.push(genesis_block);
     }
 
-    pub fn calculate_hash(&self, block: &Block) -> String {
-        let block_data = format!(
-            "{}{}{}{:?}",
-            block.index, block.timestamp, block.previous_hash, block.transaction.data
-        );
-        format!("{:x}", md5::compute(block_data))
+    pub fn add_block(&mut self, message: Vec<u8>) {
+        let previous_block = self.chain.last().unwrap().clone();
+        let index = previous_block.index + 1;
+        let previous_hash = previous_block.hash.clone();
+        let hash = Self::hash_block(&previous_block);
+        let timestamp = Self::current_timestamp();
+        let new_block = Block { index, timestamp, message, previous_hash, hash };
+        self.chain.push(new_block);
+        self.remove_duplicates();
+        self.reorder_blocks_by_time();
     }
 
-    pub fn latest_block(&self) -> &Block {
-        self.blocks.last().unwrap()
+    fn reorder_blocks_by_time(&mut self) {
+        self.chain.sort_by_key(|block| block.timestamp);
+        self.reindex_chain();
+    }
+
+    fn reindex_chain(&mut self) {
+        for (i, block) in self.chain.iter_mut().enumerate() {
+            block.index = i as u64;
+        }
+    }
+
+    pub fn remove_duplicates(&mut self) {
+        let mut unique_blocks = HashSet::new();
+        self.chain.retain(|block| {
+            let key = (block.index, block.timestamp);
+            unique_blocks.insert(key)
+        });
+        self.reindex_chain();
+    }
+
+    fn current_timestamp() -> u64 {
+        SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()
+    }
+
+    fn hash_block(block: &Block) -> String {
+        // Here you should implement a proper hash function for your block
+        format!("{}_{}", block.index, block.timestamp)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
     use super::*;
-    use tokio::sync::{mpsc, Mutex};
-    use tokio::task;
 
-    pub async fn start_server(mut blockchain: Arc<Mutex<Blockchain>>, mut receiver: mpsc::Receiver<()>, sender: mpsc::Sender<Blockchain>) {
-        while let Some(_) = receiver.recv().await {
-            let blockchain = blockchain.lock().await;
-            sender.send(blockchain.clone()).await.unwrap();
-        }
+    #[test]
+    fn test_blockchain_initialization() {
+        let blockchain = Blockchain::new();
+        assert!(blockchain.chain.is_empty());
     }
 
-    pub async fn sync_blockchain(sender: mpsc::Sender<()>, mut receiver: mpsc::Receiver<Blockchain>) -> Blockchain {
-        sender.send(()).await.unwrap();
-        receiver.recv().await.unwrap()
+    #[test]
+    fn test_init_block() {
+        let mut blockchain = Blockchain::new();
+        blockchain.init_block();
+        assert_eq!(blockchain.chain.len(), 1);
+        let genesis_block = &blockchain.chain[0];
+        assert_eq!(genesis_block.clone().index, 0);
+        assert_eq!(genesis_block.clone().message.len(), 0);
+        assert_eq!(genesis_block.clone().previous_hash, String::new());
     }
 
-    #[tokio::test]
-    async fn test_blockchain_sync() {
-        let (server_tx, server_rx) = mpsc::channel(1);
-        let (client_tx, client_rx) = mpsc::channel(1);
+    #[test]
+    fn test_add_block() {
+        let mut blockchain = Blockchain::new();
+        blockchain.init_block();
+        blockchain.add_block(b"First block".to_vec());
+        assert_eq!(blockchain.chain.len(), 2);
+        let first_block = &blockchain.chain[1];
+        assert_eq!(first_block.index, 1);
+        assert_eq!(first_block.message, b"First block".to_vec());
+    }
 
-        let blockchain = Arc::new(Mutex::new(Blockchain::new()));
+    #[test]
+    fn test_reorder_blocks_by_time() {
+        let mut blockchain = Blockchain::new();
+        blockchain.init_block();
 
-        let server_handle = task::spawn({
-            let blockchain = Arc::clone(&blockchain);
-            async move {
-                start_server(blockchain, server_rx, client_tx).await;
-            }
-        });
+        let mut block1 = Block {
+            index: 1,
+            timestamp: 100,
+            message: b"Block 1".to_vec(),
+            previous_hash: String::new(),
+            hash: String::new(),
+        };
+        let mut block2 = Block {
+            index: 2,
+            timestamp: 50,
+            message: b"Block 2".to_vec(),
+            previous_hash: String::new(),
+            hash: String::new(),
+        };
 
-        // Give the server a moment to start
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        blockchain.chain.push(block1.clone());
+        blockchain.chain.push(block2.clone());
 
-        // Run the client to sync the blockchain
-        let client_blockchain = sync_blockchain(server_tx, client_rx).await;
+        blockchain.reorder_blocks_by_time();
 
-        // Verify the blockchain has been synced correctly
-        assert_eq!(client_blockchain.blocks.len(), 1);
-        assert_eq!(client_blockchain.blocks[0].transaction.data, "Genesis Block".as_bytes().to_vec());
+        assert_eq!(blockchain.chain[0].timestamp, 50);
+        assert_eq!(blockchain.chain[1].timestamp, 100);
+    }
 
-        // Shut down the server
-        server_handle.abort();
+    #[test]
+    fn test_remove_duplicates() {
+        let mut blockchain = Blockchain::new();
+        blockchain.init_block();
+
+        let block = Block {
+            index: 1,
+            timestamp: 100,
+            message: b"Block".to_vec(),
+            previous_hash: String::new(),
+            hash: String::new(),
+        };
+
+        blockchain.chain.push(block.clone());
+        blockchain.chain.push(block.clone());
+        blockchain.chain.push(block.clone());
+        blockchain.chain.push(block.clone());
+
+        assert_eq!(blockchain.chain.len(), 5);
+        blockchain.remove_duplicates();
+
+        assert_eq!(blockchain.chain.len(), 2);
+        assert_eq!(blockchain.chain[1].timestamp, 100);
+    }
+
+    #[test]
+    fn test_reindex_chain() {
+        let mut blockchain = Blockchain::new();
+        blockchain.init_block();
+
+        let block = Block {
+            index: 1,
+            timestamp: 100,
+            message: b"Block".to_vec(),
+            previous_hash: String::new(),
+            hash: String::new(),
+        };
+
+        blockchain.chain.push(block.clone());
+        blockchain.reindex_chain();
+
+        assert_eq!(blockchain.chain[1].index, 1);
+    }
+
+    #[test]
+    fn test_hash_block() {
+        let block = Block {
+            index: 1,
+            timestamp: 100,
+            message: b"Block".to_vec(),
+            previous_hash: String::new(),
+            hash: String::new(),
+        };
+
+        let hash = Blockchain::hash_block(&block);
+        assert_eq!(hash, "1_100");
     }
 }
 

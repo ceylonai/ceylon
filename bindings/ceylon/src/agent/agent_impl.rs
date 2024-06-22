@@ -10,6 +10,7 @@ use uniffi::deps::log::debug;
 use sangedama::node::node::{create_node, EventType, Message};
 
 use crate::{AgentConfig, AgentDefinition, AgentHandler, EventHandler, MessageHandler, Processor};
+use crate::agent::memory_blockchain::Blockchain;
 
 pub struct AgentCore {
     _id: RwLock<Option<String>>,
@@ -24,7 +25,8 @@ pub struct AgentCore {
 
     _out_side_message_receiver: Arc<Mutex<tokio::sync::mpsc::Receiver<Vec<u8>>>>,
     _out_side_message_sender: tokio::sync::mpsc::Sender<Vec<u8>>,
-    
+
+    _message_block_chain: Arc<Mutex<Blockchain>>,
 }
 
 impl AgentCore {
@@ -52,6 +54,8 @@ impl AgentCore {
 
             _out_side_message_receiver: Arc::new(Mutex::new(rx_0)),
             _out_side_message_sender: tx_0,
+
+            _message_block_chain: Arc::new(Mutex::new(Blockchain::new())),
         }
     }
 
@@ -96,8 +100,32 @@ impl AgentCore {
     pub async fn start(&self, topic: String, port: u16, inputs: Vec<u8>) {
         let definition = self.definition();
         let agent_name = definition.name.clone();
+
+
+        
+
+
         let (mut node_0, mut msg_from_other_nodes, send_to_other_nodes) =
             create_node(agent_name.clone(), self.definition().is_leader);
+
+        let (blockchain_tx, mut blockchain_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
+        
+        let blockchain = self._message_block_chain.clone();
+        let is_leader = self.definition().is_leader;
+        tokio::spawn(async move {
+            let mut blockchain = blockchain.lock().await;
+
+            if is_leader{
+                blockchain.init_block();
+            }
+            
+            while let Some(message) = blockchain_rx.recv().await {
+                blockchain.add_block(message.clone());
+            }
+        });
+        
+        
+        
 
         self._id.write().unwrap().replace(node_0.id.clone());
         self._definition.write().unwrap().id = Some(node_0.id.clone());
@@ -120,11 +148,18 @@ impl AgentCore {
 
 
         let mut dispatched_message_to_boradcats_rx = self._out_side_message_receiver.clone();
+        let blockchain_tx_1 = blockchain_tx.clone();
         let out_side_message_broadcast_handle = tokio::spawn(async move {
             while let Some(message) = dispatched_message_to_boradcats_rx.lock().await.recv().await {
                 info!("Received to dispatched: {:?} {:?}", message.clone(),definition.id);
                 let agent_id = definition.id.clone().unwrap().clone();
                 info!( "Agent id: {:?}", agent_id.clone());
+                
+                
+                // Add data to blockchain
+                blockchain_tx_1.send(message.clone()).await.expect("TODO: panic message");
+                
+                
                 let data = Message::data(
                     agent_id,
                     message,
@@ -150,6 +185,7 @@ impl AgentCore {
             }
         });
 
+        let blockchain_tx_2 = blockchain_tx.clone();
         let message_handler = self.on_message.clone();
         let out_side_message_receiver_handle = tokio::spawn(async move {
             while let Some(msg) = msg_from_other_nodes.recv().await {
@@ -157,6 +193,10 @@ impl AgentCore {
                 let data = msg.data.clone();
 
                 info!("Message From Other Nodes: {:?}", sender_id.clone());
+
+
+                // Add data to blockchain
+                blockchain_tx_2.send(data.clone()).await.expect("TODO: panic message");
 
                 message_handler
                     .lock()
