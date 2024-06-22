@@ -65,7 +65,7 @@ impl AgentCore {
     }
 
     pub async fn broadcast(&self, message: Vec<u8>) {
-        let message = Message::data(self.definition().id.clone().unwrap().clone(),message);
+        let message = Message::data(self.definition().id.clone().unwrap().clone(), message);
     }
 
     pub fn log(&self, message: String) {
@@ -81,76 +81,128 @@ impl AgentCore {
         let (mut node_0, mut rx_o_0) = create_node(agent_name.clone(), self.definition().is_leader, rx_0);
 
         node_0.connect(url.as_str(), topic.as_str());
+        node_0.run().await;
     }
 }
 
-#[tokio::test]
-async fn test_start() {
-    let workspace_id = "test".to_string();
-    env_logger::init();
-    debug!("Workspace {} running",workspace_id);
-    struct OnAgentCoreMessage;
 
-    #[async_trait::async_trait]
-    impl MessageHandler for OnAgentCoreMessage {
-        async fn on_message(&self, agent_id: String, message: Vec<u8>) {
-            println!("{} Received: {:?}", agent_id, message);
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+    use std::sync::Arc;
+    use std::thread;
+    use uniffi::deps::log::debug;
+    use sangedama::node::node::EventType;
+    use crate::{AgentConfig, AgentCore, AgentDefinition, AgentHandler, MessageHandler, Processor};
+
+
+    fn create_agent(agent_definition: AgentDefinition) -> AgentCore {
+        struct OnAgentCoreMessage;
+
+        #[async_trait::async_trait]
+        impl MessageHandler for OnAgentCoreMessage {
+            async fn on_message(&self, agent_id: String, message: Vec<u8>) {
+                println!("{} Received: {:?}", agent_id, message);
+            }
         }
+
+        struct AgentEventHandler;
+
+        #[async_trait::async_trait]
+        impl AgentHandler for AgentEventHandler {
+            async fn on_agent(&self, agent: AgentDefinition) {
+                println!("Agent: {:?}", agent);
+            }
+        }
+
+        struct AgentProcessor;
+
+        #[async_trait::async_trait]
+        impl Processor for AgentProcessor {
+            async fn run(&self, input: Vec<u8>) -> () {
+                todo!()
+            }
+
+            async fn on_start(&self, input: Vec<u8>) -> () {
+                todo!()
+            }
+        }
+
+        let event_handler: HashMap<EventType, Vec<Arc<dyn crate::agent::agent_base::EventHandler>>> = HashMap::new();
+        AgentCore::new(
+            agent_definition,
+            AgentConfig {
+                memory_context_size: 10
+            },
+            Arc::new(OnAgentCoreMessage),
+            Some(Arc::new(AgentProcessor {})),
+            None,
+            Arc::new(AgentEventHandler {}),
+            Some(event_handler),
+        )
     }
 
-    struct AgentEventHandler;
+    #[test]
+    fn test_start() {
+        let workspace_id = "test".to_string();
+        env_logger::init();
+        debug!("Workspace {} running",workspace_id);
 
-    #[async_trait::async_trait]
-    impl AgentHandler for AgentEventHandler {
-        async fn on_agent(&self, agent: AgentDefinition) {
-            println!("Agent: {:?}", agent);
-        }
+
+        let agent_1 = create_agent(AgentDefinition {
+            name: "writer".to_string(),
+            position: "Article Writer".to_string(),
+            is_leader: true,
+            instructions: vec![],
+            responsibilities: vec![],
+            ..Default::default()
+        });
+        let agent_2 = create_agent(AgentDefinition {
+            name: "researcher".to_string(),
+            position: "Web Researcher".to_string(),
+            is_leader: false,
+            instructions: vec![],
+            responsibilities: vec![],
+            ..Default::default()
+        });
+
+        // Set the workspace_id on the AgentCore
+        agent_1.set_workspace_id(workspace_id.clone());
+        agent_2.set_workspace_id(workspace_id.clone());
+
+        let url = format!("{}/{}", "/ip4/0.0.0.0/tcp", "5000");
+        let topic = format!("workspace-{}", workspace_id);
+        let inputs = vec![1, 2, 3, 4];
+
+        // Call the start method
+        // agent_1.start(topic.clone(), url.clone(), inputs.clone()).await;
+        // agent_2.start(topic.clone(), url.clone(), inputs.clone()).await;
+
+        let ag1_input = inputs.clone();
+        let ag1_topic = topic.clone();
+        let ag1_url = url.clone();
+        let ag1_thread = thread::spawn(
+            move || {
+                tokio::runtime::Runtime::new().unwrap().block_on(async move {
+                    agent_1.start(ag1_topic.clone(), ag1_url.clone(), ag1_input.clone()).await;
+                });
+            }
+        );
+
+
+        let ag2_input = inputs.clone();
+        let ag2_topic = topic.clone();
+        let ag2_url = url.clone();
+        let ag2_thread = thread::spawn(
+            move || {
+                tokio::runtime::Runtime::new().unwrap().block_on(async move {
+                    agent_2.start(ag2_topic.clone(), ag2_url.clone(), ag2_input.clone()).await;
+                });
+                println!( "Hello, world!" );
+            }
+        );
+
+        ag1_thread.join().unwrap();
+        ag2_thread.join().unwrap();
     }
-
-    struct AgentProcessor;
-
-    #[async_trait::async_trait]
-    impl Processor for AgentProcessor {
-        async fn run(&self, input: Vec<u8>) -> () {
-            todo!()
-        }
-
-        async fn on_start(&self, input: Vec<u8>) -> () {
-            todo!()
-        }
-    }
-
-    let event_handler: HashMap<EventType, Vec<Arc<dyn crate::agent::agent_base::EventHandler>>> = HashMap::new();
-    // Create an instance of AgentCore with necessary stubs/mocks
-    // mut definition: AgentDefinition,
-    // config: AgentConfig,
-    // on_message: Arc<dyn MessageHandler>,
-    // processor: Option<Arc<dyn Processor>>,
-    // meta: Option<HashMap<String, String>>,
-    // agent_handler: Arc<dyn AgentHandler>,
-    // event_handlers: Option<HashMap<EventType, Vec<Arc<dyn EventHandler>>>>,
-    let agent_core = AgentCore::new(
-        AgentDefinition::default(),
-        AgentConfig {
-            memory_context_size: 10
-        },
-        Arc::new(OnAgentCoreMessage),
-        Some(Arc::new(AgentProcessor {})),
-        None,
-        Arc::new(AgentEventHandler {}),
-        Some(event_handler),
-    );
-    // Set the workspace_id on the AgentCore
-    agent_core.set_workspace_id(workspace_id.clone());
-
-    let url = format!("{}/{}", "/ip4/0.0.0.0/tcp", "5000");
-    let topic = format!("workspace-{}", workspace_id);
-    let inputs = vec![1, 2, 3, 4];
-
-    // Call the start method
-    agent_core.start(topic.clone(), url.clone(), inputs.clone()).await;
-
-    // Assertions to verify the behavior
-    // For example, you might check if the node connected to the correct url and topic
-    // This depends on the implementation details of your Node struct and connect method
 }
