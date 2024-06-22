@@ -65,7 +65,7 @@ impl Workspace {
         let _input = input.clone();
         for agent in self._agents.read().unwrap().iter() {
             let _inputs = _input.clone();
-            let url = format!("{}/{}", self.host, self.port);
+            let url = self.port;
             let topic = format!("workspace-{}", agent.workspace_id());
 
             let agent = agent.clone();

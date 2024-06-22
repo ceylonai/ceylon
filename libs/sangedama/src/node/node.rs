@@ -1,4 +1,5 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
+use std::net::{Ipv4Addr, Ipv6Addr};
 use std::time::{Duration, SystemTime};
 
 use libp2p::{
@@ -7,6 +8,7 @@ use libp2p::{
     swarm::{NetworkBehaviour, Swarm, SwarmEvent},
     Multiaddr, SwarmBuilder,
 };
+use libp2p::multiaddr::Protocol;
 use libp2p_gossipsub::{MessageId, PublishError};
 use log::{debug, error, warn};
 use serde::{Deserialize, Serialize};
@@ -142,25 +144,39 @@ pub struct Node {
 }
 
 impl Node {
-    pub fn connect(&mut self, url: &str, topic_str: &str) {
-        debug!("Connecting to {} with topic {}", url, topic_str);
+    pub fn connect(&mut self, topic_str: &str, use_ipv6: Option<bool>, port: u16) {
+        // debug!("Connecting to {} with topic {}", url, topic_str);
         // Create a Gossipsub topic
         let topic = gossipsub::IdentTopic::new(topic_str);
-        // subscribes to our topic
-        self.swarm
-            .behaviour_mut()
-            .gossipsub
-            .subscribe(&topic)
-            .unwrap();
+        self.swarm.behaviour_mut().gossipsub.subscribe(&topic).unwrap();
+        let listen_addr_quic = Multiaddr::empty()
+            .with(match use_ipv6 {
+                Some(true) => Protocol::from(Ipv6Addr::UNSPECIFIED),
+                _ => Protocol::from(Ipv4Addr::UNSPECIFIED),
+            })
+            .with(Protocol::Udp(port))
+            .with(Protocol::QuicV1);
         if self.is_leader {
-            self.swarm
-                .listen_on(url.to_string().parse().unwrap())
-                .unwrap();
+            self.swarm.listen_on(listen_addr_quic).unwrap();
         } else {
-            self.swarm
-                .dial(url.to_string().parse::<Multiaddr>().unwrap())
-                .unwrap();
+            self.swarm.dial(listen_addr_quic).unwrap();
         }
+
+        // subscribes to our topic
+        // self.swarm
+        //     .behaviour_mut()
+        //     .gossipsub
+        //     .subscribe(&topic)
+        //     .unwrap();
+        // if self.is_leader {
+        //     self.swarm
+        //         .listen_on(url.to_string().parse().unwrap())
+        //         .unwrap();
+        // } else {
+        //     self.swarm
+        //         .dial(url.to_string().parse::<Multiaddr>().unwrap())
+        //         .unwrap();
+        // }
     }
 
     pub fn broadcast(&mut self, message: Message) -> Result<Vec<MessageId>, PublishError> {
@@ -298,6 +314,7 @@ pub fn create_node(
             libp2p::yamux::Config::default,
         )
         .unwrap()
+        .with_quic()
         // .with_quic()
         // .with_behaviour(|| NodeBehaviour {})
         .with_behaviour(|key| {
@@ -410,16 +427,19 @@ mod tests {
             }
         });
         let url_ = url.clone();
+        let port_ = port_id.clone();
+        let topic_ = topic.clone();
         runtime.spawn(async move {
-            node_0.connect(url_.clone().as_str(), topic);
+            node_0.connect(topic.clone(), None, port_);
             node_0.run().await;
         });
         let url_ = url.clone();
+        let port_ = port_id.clone();
+        let topic_ = topic.clone();
         runtime.block_on(async move {
             // wait for 1 event to make sure swarm0 is listening
             tokio::time::sleep(std::time::Duration::from_millis(10000)).await;
-
-            node_1.connect(url_.clone().as_str(), topic);
+            node_1.connect(topic_, None, port_);
             node_1.run().await;
         });
     }

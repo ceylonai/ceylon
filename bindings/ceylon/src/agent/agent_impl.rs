@@ -20,6 +20,9 @@ pub struct AgentCore {
     _meta: HashMap<String, String>,
     agent_handler: Arc<Mutex<Arc<dyn AgentHandler>>>,
     event_handlers: HashMap<EventType, Vec<Arc<dyn EventHandler>>>,
+
+    _out_side_message_receiver: Arc<Mutex<tokio::sync::mpsc::Receiver<Vec<u8>>>>,
+    _out_side_message_sender: tokio::sync::mpsc::Sender<Vec<u8>>,
 }
 
 impl AgentCore {
@@ -32,6 +35,8 @@ impl AgentCore {
         agent_handler: Arc<dyn AgentHandler>,
         event_handlers: Option<HashMap<EventType, Vec<Arc<dyn EventHandler>>>>,
     ) -> Self {
+        let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
+
         Self {
             _id: RwLock::new(None),
             _workspace_id: RwLock::new(None),
@@ -42,6 +47,9 @@ impl AgentCore {
             _meta: meta.unwrap_or_default(),
             agent_handler: Arc::new(Mutex::new(agent_handler)),
             event_handlers: event_handlers.unwrap_or_default(),
+
+            _out_side_message_receiver: Arc::new(Mutex::new(rx_0)),
+            _out_side_message_sender: tx_0,
         }
     }
 
@@ -72,18 +80,28 @@ impl AgentCore {
     pub fn log(&self, message: String) {
         println!("{}", message);
     }
+
+    pub fn get_tx(&self) -> tokio::sync::mpsc::Sender<Vec<u8>> {
+        self._out_side_message_sender.clone()
+    }
 }
 
 impl AgentCore {
-    pub async fn start(&self, topic: String, url: String, inputs: Vec<u8>) {
+    pub async fn start(&self, topic: String, port: u16, inputs: Vec<u8>) {
         let definition = self.definition();
         let agent_name = definition.name.clone();
         let (mut node_0, mut msg_from_other_nodes, send_to_other_nodes) = create_node(agent_name.clone(), self.definition().is_leader);
 
-        node_0.connect(url.as_str(), topic.as_str());
+        node_0.connect(topic.as_str(), None, port.clone());
         let node_start_handle = tokio::spawn(async move {
             debug!("Agent {} started", agent_name);
             node_0.run().await;
+        });
+
+        let out_side_message_broadcast_handle = tokio::spawn(async move {
+            while let Some(message) = msg_from_other_nodes.recv().await {
+                send_to_other_nodes.send(message).await.unwrap();
+            }
         });
 
 
@@ -91,7 +109,10 @@ impl AgentCore {
         select! {
             _ = node_start_handle => {
                 debug!("Agent {} node_start_handle finished", agent_name);
-            },
+            },            
+            _ = out_side_message_broadcast_handle => {
+                debug!("Agent {} out_side_message_broadcast_handle finished", agent_name);
+            }
         }
     }
 }
@@ -100,57 +121,121 @@ impl AgentCore {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
-    use std::sync::Arc;
+    use std::sync::{Arc};
     use std::thread;
+    use std::time::Duration;
+    use async_trait::async_trait;
+    use tokio::sync::Mutex;
     use uniffi::deps::log::debug;
-    use sangedama::node::node::EventType;
+    use sangedama::node::node::{EventType, Message};
     use crate::{AgentConfig, AgentCore, AgentDefinition, AgentHandler, MessageHandler, Processor};
 
 
-    fn create_agent(agent_definition: AgentDefinition) -> AgentCore {
-        struct OnAgentCoreMessage;
+    struct MessageHandlerImpl {
+        send_message_to_broadcast_tx: tokio::sync::mpsc::Sender<Vec<u8>>,
+    }
 
-        #[async_trait::async_trait]
-        impl MessageHandler for OnAgentCoreMessage {
-            async fn on_message(&self, agent_id: String, message: Vec<u8>) {
-                println!("{} Received: {:?}", agent_id, message);
+    #[async_trait]
+    impl MessageHandler for MessageHandlerImpl {
+        async fn on_message(&self, agent_id: String, message: Vec<u8>) {
+            println!("{} Received: {:?}", agent_id, message);
+        }
+    }
+
+    struct AgentHandlerImpl {
+        send_message_to_broadcast_tx: tokio::sync::mpsc::Sender<Vec<u8>>,
+    }
+
+    #[async_trait]
+    impl AgentHandler for AgentHandlerImpl {
+        async fn on_agent(&self, agent: AgentDefinition) {
+            println!("Agent: {:?}", agent);
+        }
+    }
+
+    struct ProcessorImpl {
+        send_message_to_broadcast_tx: tokio::sync::mpsc::Sender<Vec<u8>>,
+    }
+
+    #[async_trait]
+    impl Processor for ProcessorImpl {
+        async fn run(&self, input: Vec<u8>) -> () {
+            loop {
+                thread::sleep(Duration::from_millis(1000));
             }
         }
 
-        struct AgentEventHandler;
+        async fn on_start(&self, input: Vec<u8>) -> () {
+            todo!()
+        }
+    }
 
-        #[async_trait::async_trait]
-        impl AgentHandler for AgentEventHandler {
-            async fn on_agent(&self, agent: AgentDefinition) {
-                println!("Agent: {:?}", agent);
+    struct Agent {
+        definition: AgentDefinition,
+    }
+
+    impl Agent {
+        pub fn new(definition: AgentDefinition) -> Self {
+            Self {
+                definition
             }
         }
 
-        struct AgentProcessor;
 
-        #[async_trait::async_trait]
-        impl Processor for AgentProcessor {
-            async fn run(&self, input: Vec<u8>) -> () {
-                todo!()
-            }
+        pub async fn start(&self, topic: String, port: u16, inputs: Vec<u8>, workspace_id: String) {
+            let event_handler: HashMap<EventType, Vec<Arc<dyn crate::agent::agent_base::EventHandler>>> = HashMap::new();
+            let (send_message_tx, mut send_message_rx) = tokio::sync::mpsc::channel(100);
+            let event_handler: HashMap<EventType, Vec<Arc<dyn crate::agent::agent_base::EventHandler>>> = HashMap::new();
 
-            async fn on_start(&self, input: Vec<u8>) -> () {
-                todo!()
-            }
+
+            let agent_definition = self.definition.clone();
+
+            let agent_core = AgentCore::new(
+                agent_definition,
+                AgentConfig {
+                    memory_context_size: 10
+                },
+                Arc::new(MessageHandlerImpl {
+                    send_message_to_broadcast_tx: send_message_tx.clone()
+                }),
+                Some(Arc::new(ProcessorImpl {
+                    send_message_to_broadcast_tx: send_message_tx.clone()
+                })),
+                None,
+                Arc::new(AgentHandlerImpl {
+                    send_message_to_broadcast_tx: send_message_tx.clone()
+                }),
+                Some(event_handler),
+            );
+
+
+            let topic_clone = topic.clone();
+            let port_clone = port.clone();
+            let inputs_clone = inputs.clone();
+            let workspace_id_clone = workspace_id.clone();
+
+            agent_core.set_workspace_id(workspace_id_clone);
+
+            let agent_broadcaster = agent_core.get_tx();
+
+            let t1 = tokio::spawn(async move {
+                agent_core.start(topic_clone, port_clone, inputs_clone).await;
+            });
+
+
+            let t2 = tokio::spawn(async move {
+                while let Some(message) = send_message_rx.recv().await {
+                    agent_broadcaster.send(message).await.unwrap();
+                }
+            });
+
+
+            let _ = tokio::join!(t1, t2);
         }
+    }
 
-        let event_handler: HashMap<EventType, Vec<Arc<dyn crate::agent::agent_base::EventHandler>>> = HashMap::new();
-        AgentCore::new(
-            agent_definition,
-            AgentConfig {
-                memory_context_size: 10
-            },
-            Arc::new(OnAgentCoreMessage),
-            Some(Arc::new(AgentProcessor {})),
-            None,
-            Arc::new(AgentEventHandler {}),
-            Some(event_handler),
-        )
+    fn create_agent(agent_definition: AgentDefinition) -> Agent {
+        Agent::new(agent_definition)
     }
 
     #[test]
@@ -177,9 +262,6 @@ mod tests {
             ..Default::default()
         });
 
-        // Set the workspace_id on the AgentCore
-        agent_1.set_workspace_id(workspace_id.clone());
-        agent_2.set_workspace_id(workspace_id.clone());
 
         let url = format!("{}/{}", "/ip4/0.0.0.0/tcp", "5000");
         let topic = format!("workspace-{}", workspace_id);
@@ -193,10 +275,11 @@ mod tests {
             let ag1_input = inputs.clone();
             let ag1_topic = topic.clone();
             let ag1_url = url.clone();
+            let workspace_id = workspace_id.clone();
             let ag1_thread = thread::spawn(
                 move || {
                     tokio::runtime::Runtime::new().unwrap().block_on(async move {
-                        agent.start(ag1_topic.clone(), ag1_url.clone(), ag1_input.clone()).await;
+                        agent.start(ag1_topic.clone(), 5800, ag1_input.clone(), workspace_id.clone()).await;
                     });
                 }
             );
