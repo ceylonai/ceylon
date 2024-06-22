@@ -13,7 +13,7 @@ use crate::agent::agent_base::{
 };
 use crate::agent::agent_context::AgentContextManager;
 use crate::agent::message_types::{
-    AgentMessage, AgentMessageConversions, AgentMessageTrait, AgentMessageType, BeaconMessage,
+    AgentMessage, AgentMessageConversions, AgentMessageTrait, AgentMessageType,
     DataMessage, HandshakeMessage, IntroduceMessage,
 };
 use crate::EventHandler;
