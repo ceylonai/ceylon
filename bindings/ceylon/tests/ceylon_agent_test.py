@@ -42,7 +42,7 @@ class Agent(AgentCore, MessageHandler, Processor, AgentHandler):
         print(f"{self.definition().name} on_agent {agent.name}")
 
     async def on_message(self, agent_id, message):
-        print("SELF=", self.definition().name, "AGENT ID=", agent_id, "MESSAGE=", message)
+        self.log(f"SELF={self.definition().name},AGENT ID={agent_id},MESSAGE={message}")
 
     async def run(self, inputs):
         print("run", self.definition().name)
@@ -51,7 +51,7 @@ class Agent(AgentCore, MessageHandler, Processor, AgentHandler):
             await self.broadcast(pickle.dumps({
                 "title": f"Hi Im  {self.definition().name} at {time.time()}",
             }))
-            await asyncio.sleep(random.randint(1, 2))
+            await asyncio.sleep(1)
 
     async def on_start(self, input: "bytes"):
         self.log(f"on_start {input}")

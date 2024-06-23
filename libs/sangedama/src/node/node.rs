@@ -16,6 +16,7 @@ use serde::__private::from_utf8_lossy;
 use serde_json::json;
 use tokio::sync::mpsc;
 use tokio::{io, select};
+use tracing::info;
 use uuid::Uuid;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -145,17 +146,20 @@ pub struct Node {
 
 impl Node {
     pub fn connect(&mut self, topic_str: &str, use_ipv6: Option<bool>, port: u16) {
-        // debug!("Connecting to {} with topic {}", url, topic_str);
+        debug!("Connecting to Node with topic {}", topic_str);
         // Create a Gossipsub topic
         let topic = gossipsub::IdentTopic::new(topic_str);
+        
         self.swarm.behaviour_mut().gossipsub.subscribe(&topic).unwrap();
+        
         let listen_addr_quic = Multiaddr::empty()
             .with(match use_ipv6 {
-                Some(true) => Protocol::from(Ipv6Addr::UNSPECIFIED),
-                _ => Protocol::from(Ipv4Addr::UNSPECIFIED),
+                Some(true) => Protocol::from(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0)),
+                _ => Protocol::from(Ipv4Addr::new(0, 0, 0, 0)),
             })
             .with(Protocol::Udp(port))
-            .with(Protocol::QuicV1);
+            .with(Protocol::Quic);
+        info!("Listening on {:?}", listen_addr_quic);
         if self.is_leader {
             self.swarm.listen_on(listen_addr_quic).unwrap();
         } else {
@@ -194,6 +198,7 @@ impl Node {
                     message_ids.push(id);
                 }
                 Err(e) => {
+                    debug!("{:?} Failed to broadcast message: {:?}", self.name, e);
                     return Err(e);
                 }
             }
@@ -210,7 +215,7 @@ impl Node {
             select! {
                 message =  self.in_rx.recv() => match message {
                     Some(message) => {
-                        debug!("{:?} Received To Broadcast", self.name);
+                        debug!("{:?} Received To Broadcast {:?}", self.name, message.clone());
                         match self.broadcast(message.clone()){
                             Ok(message_ids) => {
                                 debug!("{:?} Message Broad casted", self.name);
@@ -235,8 +240,8 @@ impl Node {
                             debug!("{:?} Connected to {:?}", self.name, peer_id);
                             self.pass_message_to_node(Message::event(self.swarm.local_peer_id().to_string(),EventType::OnConnectionEstablished,)).await
                         },
-                        SwarmEvent::ConnectionClosed { peer_id, .. } => {
-                            debug!("{:?} Disconnected from {:?}", self.name, peer_id);
+                        SwarmEvent::ConnectionClosed { peer_id, cause, .. } => {
+                            debug!("{:?} Disconnected from {:?} {:?}", self.name, peer_id , cause);
                             self.pass_message_to_node(Message::event(self.swarm.local_peer_id().to_string(),EventType::OnConnectionClosed ,)).await
                         },
 
@@ -327,8 +332,6 @@ pub fn create_node(
             // Set a custom gossipsub configuration
             let gossipsub_config = gossipsub::ConfigBuilder::default()
                 .heartbeat_initial_delay(Duration::from_secs(1))
-                .history_length(10)
-                .history_gossip(10)
                 .heartbeat_interval(Duration::from_secs(10)) // This is set to aid debugging by not cluttering the log space
                 .validation_mode(gossipsub::ValidationMode::Strict) // This sets the kind of message validation. The default is Strict (enforce message signing)
                 .message_id_fn(message_id_fn) // content-address messages. No two messages of the same content will be propagated.

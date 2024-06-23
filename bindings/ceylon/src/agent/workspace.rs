@@ -1,5 +1,6 @@
 use std::sync::{Arc, RwLock};
 use std::thread;
+use log::error;
 
 use serde::{Deserialize, Serialize};
 use tokio::runtime::Runtime;
@@ -73,7 +74,13 @@ impl Workspace {
         }
 
         for task in tasks {
-            task.await.unwrap();
+            match task.await {
+                Ok(_) => {}
+                Err(e) => {
+                    error!("Error: {:?}", e);
+                    panic!("Error: {:?}", e);
+                }
+            };
         }
         // let mut handles = vec![];
         //

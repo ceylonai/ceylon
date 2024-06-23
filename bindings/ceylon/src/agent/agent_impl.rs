@@ -7,7 +7,7 @@ use tokio::select;
 use tokio::sync::Mutex;
 use uniffi::deps::log::debug;
 
-use sangedama::node::node::{create_node, EventType, Message};
+use sangedama::node::node::{create_node, EventType, Message, MessageType};
 
 use crate::{AgentConfig, AgentDefinition, AgentHandler, EventHandler, MessageHandler, Processor};
 use crate::agent::memory_blockchain::Blockchain;
@@ -88,7 +88,7 @@ impl AgentCore {
     }
 
     pub fn log(&self, message: String) {
-        println!("{}", message);
+        info!("{:?}", message);
     }
 
     pub fn get_tx(&self) -> tokio::sync::mpsc::Sender<Vec<u8>> {
@@ -185,22 +185,22 @@ impl AgentCore {
 
         let blockchain_tx_2 = blockchain_tx.clone();
         let message_handler = self.on_message.clone();
+        let owner_id = self.definition().clone().id.clone().unwrap().clone();
         let out_side_message_receiver_handle = tokio::spawn(async move {
             while let Some(msg) = msg_from_other_nodes.recv().await {
                 let sender_id = msg.sender.clone();
-                let data = msg.data.clone();
+                info!("Message From Other Nodes: {:?} {:?} {:?}",owner_id.clone(), sender_id.clone(), msg.clone());
+                if msg.r#type == MessageType::Message {
+                    let data = msg.data.clone();
+                    // Add data to blockchain
+                    blockchain_tx_2.send(data.clone()).await.expect("TODO: panic message");
 
-                info!("Message From Other Nodes: {:?} {:?}", sender_id.clone(), data.clone());
-
-
-                // Add data to blockchain
-                blockchain_tx_2.send(data.clone()).await.expect("TODO: panic message");
-
-                message_handler
-                    .lock()
-                    .await
-                    .on_message(sender_id.clone(), data)
-                    .await;
+                    message_handler
+                        .lock()
+                        .await
+                        .on_message(sender_id.clone(), data)
+                        .await;
+                }
             }
         });
 
