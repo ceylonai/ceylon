@@ -37,6 +37,9 @@ interface AgentCore{
     void broadcast(bytes message);
 
     void log(string message);
+
+    [Async]
+    void start(string topic, u16 port,  bytes inputs);
 };
 
  enum EventType {
@@ -97,7 +100,6 @@ interface Processor {
 
 dictionary WorkspaceConfig{
     string name;
-    string host = "/ip4/0.0.0.0/tcp/";
     u16 port = 8888;
 };
 

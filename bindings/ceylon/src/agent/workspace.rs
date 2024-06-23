@@ -10,14 +10,12 @@ use crate::AgentCore;
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct WorkspaceConfig {
     pub name: String,
-    pub host: String,
     pub port: u16,
 }
 
 pub struct Workspace {
     id: String,
     port: u16,
-    host: String,
     _name: String,
     _agents: RwLock<Vec<Arc<AgentCore>>>,
 }
@@ -49,7 +47,6 @@ impl Workspace {
         Self {
             id,
             port: config.port,
-            host: config.host,
             _name,
             _agents: RwLock::new(agents),
         }
