@@ -72,6 +72,65 @@ impl Blockchain {
         // Here you should implement a proper hash function for your block
         format!("{}_{}", block.index, block.timestamp)
     }
+
+    pub fn is_synced(&self, external_last_hash: &str) -> bool {
+        if let Some(last_block) = self.chain.last() {
+            return last_block.hash == external_last_hash;
+        }
+        false
+    }
+
+    pub fn request_missing_messages(&mut self, external_blocks: Vec<Block>) {
+        for block in external_blocks {
+            self.chain.push(block);
+        }
+        self.reorder_blocks_by_time();
+        self.remove_duplicates();
+    }
+
+    pub fn find_missing_indices(&self, external_last_index: u64) -> Vec<u64> {
+        let local_indices: HashSet<u64> = self.chain.iter().map(|block| block.index).collect();
+        (0..=external_last_index)
+            .filter(|index| !local_indices.contains(index))
+            .collect()
+    }
+
+    pub fn verify_block(&self, block: &Block) -> bool {
+        // Ensure the blockchain is not empty
+        if self.chain.is_empty() {
+            return false;
+        }
+
+        // Get the previous block
+        let last_block = self.chain.last().unwrap();
+
+        // Check if the index is correct
+        if block.index != last_block.index + 1 {
+            return false;
+        }
+
+        // Check if the previous hash is correct
+        if block.previous_hash != last_block.hash {
+            return false;
+        }
+
+        // Verify the block's hash
+        if block.hash != Self::hash_block(block) {
+            return false;
+        }
+
+        // Validate the timestamp
+        let current_timestamp = Self::current_timestamp();
+        if block.timestamp > current_timestamp {
+            return false;
+        }
+
+        // Additional validation for transactions (if applicable)
+        // Here you would add any specific validation for the transactions in the block
+        // For this example, we'll assume transactions are valid
+
+        true
+    }
 }
 
 #[cfg(test)]
@@ -191,6 +250,83 @@ mod tests {
 
         let hash = Blockchain::hash_block(&block);
         assert_eq!(hash, "1_100");
+    }
+
+    #[test]
+    fn test_is_synced() {
+        let mut blockchain = Blockchain::new();
+        blockchain.init_block();
+        blockchain.add_block(b"First block".to_vec());
+
+        let last_block = blockchain.chain.last().unwrap();
+        assert!(blockchain.is_synced(&last_block.hash));
+
+        assert!(!blockchain.is_synced("invalid_hash"));
+    }
+
+    #[test]
+    fn test_request_missing_messages() {
+        let mut blockchain = Blockchain::new();
+        blockchain.init_block();
+        blockchain.add_block(b"First block".to_vec());
+
+        let external_blocks = vec![
+            Block {
+                index: 1,
+                timestamp: Blockchain::current_timestamp() + 1,
+                message: b"External block 1".to_vec(),
+                previous_hash: String::new(),
+                hash: String::new(),
+            },
+            Block {
+                index: 2,
+                timestamp: Blockchain::current_timestamp() + 4,
+                message: b"External block 2".to_vec(),
+                previous_hash: String::new(),
+                hash: String::new(),
+            },
+        ];
+
+        blockchain.request_missing_messages(external_blocks);
+
+        assert_eq!(blockchain.chain.len(), 4);
+        assert_eq!(blockchain.chain[2].message, b"External block 1".to_vec());
+        assert_eq!(blockchain.chain[3].message, b"External block 2".to_vec());
+
+        // Create another blockchain instance and test merging blocks
+        let mut blockchain2 = Blockchain::new();
+        blockchain2.init_block();
+        blockchain2.add_block(b"First block".to_vec());
+
+        let external_blocks2 = vec![
+            Block {
+                index: 1,
+                timestamp: Blockchain::current_timestamp() + 10,
+                message: b"Another external block 1".to_vec(),
+                previous_hash: String::new(),
+                hash: String::new(),
+            },
+        ];
+
+        blockchain2.request_missing_messages(external_blocks2);
+
+        assert_eq!(blockchain2.chain.len(), 3);
+        assert_eq!(blockchain2.chain[2].message, b"Another external block 1".to_vec());
+    }
+
+    #[test]
+    fn test_find_missing_indices() {
+        let mut blockchain = Blockchain::new();
+        blockchain.init_block();
+        blockchain.add_block(b"First block".to_vec());
+
+        let missing_indices = blockchain.find_missing_indices(3);
+        assert_eq!(missing_indices, vec![2, 3]);
+
+        blockchain.add_block(b"Second block".to_vec());
+
+        let missing_indices = blockchain.find_missing_indices(3);
+        assert_eq!(missing_indices, vec![3]);
     }
 }
 

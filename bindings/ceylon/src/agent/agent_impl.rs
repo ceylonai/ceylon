@@ -101,31 +101,22 @@ impl AgentCore {
         let definition = self.definition();
         let agent_name = definition.name.clone();
 
-
-        
-
-
         let (mut node_0, mut msg_from_other_nodes, send_to_other_nodes) =
             create_node(agent_name.clone(), self.definition().is_leader);
 
-        let (blockchain_tx, mut blockchain_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
-        
+        let (blockchain_tx, mut blockchain_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(128);
+
         let blockchain = self._message_block_chain.clone();
         let is_leader = self.definition().is_leader;
         tokio::spawn(async move {
             let mut blockchain = blockchain.lock().await;
+            blockchain.init_block();
 
-            if is_leader{
-                blockchain.init_block();
-            }
-            
             while let Some(message) = blockchain_rx.recv().await {
                 blockchain.add_block(message.clone());
             }
         });
-        
-        
-        
+
 
         self._id.write().unwrap().replace(node_0.id.clone());
         self._definition.write().unwrap().id = Some(node_0.id.clone());
@@ -154,12 +145,19 @@ impl AgentCore {
                 info!("Received to dispatched: {:?} {:?}", message.clone(),definition.id);
                 let agent_id = definition.id.clone().unwrap().clone();
                 info!( "Agent id: {:?}", agent_id.clone());
-                
-                
+
+
                 // Add data to blockchain
-                blockchain_tx_1.send(message.clone()).await.expect("TODO: panic message");
-                
-                
+                match blockchain_tx_1.send(message.clone()).await {
+                    Ok(_) => {
+                        debug!("Sent to blockchain");
+                    }
+                    Err(e) => {
+                        error!("Failed to send to blockchain {:?}", e);
+                    }
+                };
+
+
                 let data = Message::data(
                     agent_id,
                     message,
@@ -192,7 +190,7 @@ impl AgentCore {
                 let sender_id = msg.sender.clone();
                 let data = msg.data.clone();
 
-                info!("Message From Other Nodes: {:?}", sender_id.clone());
+                info!("Message From Other Nodes: {:?} {:?}", sender_id.clone(), data.clone());
 
 
                 // Add data to blockchain

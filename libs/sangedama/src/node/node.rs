@@ -305,7 +305,7 @@ pub fn create_node(
     name: String,
     is_leader: bool,
 ) -> (Node, mpsc::Receiver<Message>, mpsc::Sender<Message>) {
-    let (tx_0, in_rx) = mpsc::channel::<Message>(1);
+    let (tx_0, in_rx) = mpsc::channel::<Message>(128);
     let swarm = SwarmBuilder::with_new_identity()
         .with_tokio()
         .with_tcp(
@@ -349,7 +349,7 @@ pub fn create_node(
         .unwrap()
         .build();
 
-    let (out_tx, _rx) = mpsc::channel::<Message>(100);
+    let (out_tx, _rx) = mpsc::channel::<Message>(128);
 
     (
         Node {
