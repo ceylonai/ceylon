@@ -158,8 +158,9 @@ impl Node {
                 _ => Protocol::from(Ipv4Addr::new(0, 0, 0, 0)),
             })
             .with(Protocol::Udp(port))
-            .with(Protocol::Quic);
+            .with(Protocol::QuicV1);
         info!("Listening on {:?}", listen_addr_quic);
+        
         if self.is_leader {
             self.swarm.listen_on(listen_addr_quic).unwrap();
         } else {

@@ -367,8 +367,8 @@ mod tests {
 
     #[test]
     fn test_start() {
-        let workspace_id = "test".to_string();
         env_logger::init();
+        let workspace_id = "test".to_string();
         debug!("Workspace {} running", workspace_id);
 
         let agent_1 = create_agent(AgentDefinition {
