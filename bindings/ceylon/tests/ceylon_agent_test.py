@@ -46,14 +46,15 @@ class Agent(AgentCore, MessageHandler, Processor, AgentHandler):
 
     async def run(self, inputs):
         print("run", self.definition().name)
-        inputs = pickle.loads(inputs)
-        while True:
-            await self.broadcast(pickle.dumps({
-                "title": f"Hi Im  {self.definition().name} at {time.time()}",
-            }))
-            await asyncio.sleep(1)
+        # inputs = pickle.loads(inputs)
+        # while True:
+        #     await self.broadcast(pickle.dumps({
+        #         "title": f"Hi Im  {self.definition().name} at {time.time()}",
+        #     }))
+        #     await asyncio.sleep(1)
 
     async def on_start(self, input: "bytes"):
+
         self.log(f"on_start {input}")
 
 

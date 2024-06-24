@@ -149,9 +149,9 @@ impl Node {
         debug!("Connecting to Node with topic {}", topic_str);
         // Create a Gossipsub topic
         let topic = gossipsub::IdentTopic::new(topic_str);
-        
+
         self.swarm.behaviour_mut().gossipsub.subscribe(&topic).unwrap();
-        
+
         let listen_addr_quic = Multiaddr::empty()
             .with(match use_ipv6 {
                 Some(true) => Protocol::from(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0)),
@@ -160,7 +160,7 @@ impl Node {
             .with(Protocol::Udp(port))
             .with(Protocol::QuicV1);
         info!("Listening on {:?}", listen_addr_quic);
-        
+
         if self.is_leader {
             self.swarm.listen_on(listen_addr_quic).unwrap();
         } else {
@@ -188,6 +188,8 @@ impl Node {
         let mut message_ids = vec![];
         for topic in self.subscribed_topics.clone() {
             let topic = gossipsub::IdentTopic::new(topic);
+
+            debug!("{:?} Broadcasting to topic {:?} {:?}", self.name, topic.to_string(), String::from_utf8_lossy(&message.clone().data));
 
             match self
                 .swarm
@@ -260,7 +262,7 @@ impl Node {
                                 let topic_val = gossipsub::IdentTopic::new(topic.clone().into_string());
                                     debug!("{:?} Subscribed to topic {:?}", self.name, topic.to_string());
                                     self.subscribed_topics.push(topic.into_string());
-                                    self.pass_message_to_node(Message::event_with_data(  peer_id.to_string(),EventType::OnSubscribe,json!({
+                                    self.pass_message_to_node(Message::event_with_data(  self.swarm.local_peer_id().to_string(),EventType::OnSubscribe,json!({
                                         "topic": topic_val.clone().to_string(),
                                         "peer_id": peer_id.to_string(),
                                     }).to_string().as_bytes().to_vec())).await

@@ -189,7 +189,11 @@ impl AgentCore {
         let out_side_message_receiver_handle = tokio::spawn(async move {
             while let Some(msg) = msg_from_other_nodes.recv().await {
                 let sender_id = msg.sender.clone();
-                info!("Message From Other Nodes: {:?} {:?} {:?}",owner_id.clone(), sender_id.clone(), msg.clone());
+                if sender_id == owner_id && msg.r#type == MessageType::Event {
+                    debug!("Event Fired: {:?} {:?} {:?}",owner_id.clone(), sender_id.clone(), msg.clone());
+                    continue;
+                }
+                info!("Message From Other Nodes: {:?} {:?} {:?} {:?} {:?}",owner_id.clone(), sender_id.clone(),msg.event_type,msg.message, String::from_utf8_lossy(msg.data.clone().as_slice()).to_string());
                 if msg.r#type == MessageType::Message {
                     let data = msg.data.clone();
                     // Add data to blockchain
@@ -272,21 +276,21 @@ mod tests {
     #[async_trait]
     impl Processor for ProcessorImpl {
         async fn run(&self, input: Vec<u8>) -> () {
-            loop {
-                let ran_number = rand::random::<u64>() % 10;
-                tokio::time::sleep(Duration::from_millis(1000 * ran_number)).await;
-                self.send_message_to_broadcast_tx
-                    .send(
-                        json!(AgentMessage {
-                            text: format!("Hello {}", self.agent_definition.name),
-                        })
-                            .to_string()
-                            .as_bytes()
-                            .to_vec(),
-                    )
-                    .await
-                    .unwrap();
-            }
+            // loop {
+            //     let ran_number = rand::random::<u64>() % 10;
+            //     tokio::time::sleep(Duration::from_millis(1000 * ran_number)).await;
+            //     self.send_message_to_broadcast_tx
+            //         .send(
+            //             json!(AgentMessage {
+            //                 text: format!("Hello {}", self.agent_definition.name),
+            //             })
+            //                 .to_string()
+            //                 .as_bytes()
+            //                 .to_vec(),
+            //         )
+            //         .await
+            //         .unwrap();
+            // }
         }
 
         async fn on_start(&self, input: Vec<u8>) -> () {
