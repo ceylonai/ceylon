@@ -20,7 +20,7 @@ class AgentRunner:
     config: WorkspaceConfig
     leader_agent = None
 
-    def __init__(self, workspace_name, workspace_host="/ip4/0.0.0.0/tcp", workspace_port=8888):
+    def __init__(self, workspace_name, workspace_host="/ip4/0.0.0.0/udp", workspace_port=8888):
         self.agents = []
         self.config = WorkspaceConfig(name=workspace_name, host=workspace_host, port=workspace_port)
 

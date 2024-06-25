@@ -1,12 +1,7 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::time::{Duration, SystemTime};
 
-use libp2p::{
-    futures::StreamExt,
-    gossipsub, mdns,
-    swarm::{NetworkBehaviour, Swarm, SwarmEvent},
-    Multiaddr, SwarmBuilder,
-};
+use libp2p::{futures::StreamExt, gossipsub, mdns, swarm::{NetworkBehaviour, Swarm, SwarmEvent}, Multiaddr, SwarmBuilder, tcp, noise, yamux};
 use libp2p_gossipsub::{MessageId, PublishError};
 use log::{debug, error};
 use serde::{Deserialize, Serialize};
@@ -57,7 +52,13 @@ pub struct Message {
 }
 
 impl Message {
-    fn new(originator: String, originator_id: String, message: String, data: Vec<u8>, message_type: MessageType) -> Self {
+    fn new(
+        originator: String,
+        originator_id: String,
+        message: String,
+        data: Vec<u8>,
+        message_type: MessageType,
+    ) -> Self {
         Self {
             data,
             time: SystemTime::now()
@@ -71,11 +72,23 @@ impl Message {
         }
     }
     fn event(originator: String, event: EventType) -> Self {
-        Self::new(originator, "SELF".to_string(), event.as_str().to_string(), vec![], MessageType::Event)
+        Self::new(
+            originator,
+            "SELF".to_string(),
+            event.as_str().to_string(),
+            vec![],
+            MessageType::Event,
+        )
     }
 
     pub fn data(from: String, originator_id: String, data: Vec<u8>) -> Self {
-        Self::new(from, originator_id, "DATA-MESSAGE".to_string(), data, MessageType::Message)
+        Self::new(
+            from,
+            originator_id,
+            "DATA-MESSAGE".to_string(),
+            data,
+            MessageType::Message,
+        )
     }
 
     fn to_json(&self) -> String {
@@ -130,15 +143,20 @@ impl Node {
             .gossipsub
             .subscribe(&topic)
             .unwrap();
-        if self.is_leader {
-            self.swarm
-                .listen_on(url.to_string().parse().unwrap())
-                .unwrap();
-        } else {
-            self.swarm
-                .dial(url.to_string().parse::<Multiaddr>().unwrap())
-                .unwrap();
-        }
+
+        self.swarm.listen_on("/ip4/0.0.0.0/udp/0/quic-v1".parse().unwrap()).unwrap();
+        // self.swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse().unwrap()).unwrap();
+
+
+        // if self.is_leader {
+        //     self.swarm
+        //         .listen_on(url.to_string().parse().unwrap())
+        //         .unwrap();
+        // } else {
+        //     self.swarm
+        //         .dial(url.to_string().parse::<Multiaddr>().unwrap())
+        //         .unwrap();
+        // }
     }
 
     pub fn broadcast(&mut self, message: Message) -> Result<Vec<MessageId>, PublishError> {
@@ -261,13 +279,11 @@ pub fn create_node(
     let swarm = SwarmBuilder::with_new_identity()
         .with_tokio()
         .with_tcp(
-            Default::default(),
-            libp2p::tls::Config::new,
-            libp2p::yamux::Config::default,
-        )
-        .unwrap()
-        // .with_quic()
-        // .with_behaviour(|| NodeBehaviour {})
+            tcp::Config::default(),
+            noise::Config::new,
+            yamux::Config::default,
+        ).unwrap()
+        .with_quic()
         .with_behaviour(|key| {
             let message_id_fn = |message: &gossipsub::Message| {
                 let mut s = DefaultHasher::new();
@@ -349,15 +365,17 @@ mod tests {
         runtime.spawn(async move {
             while let Some(message_data) = rx_o_0.recv().await {
                 debug!("Node_0 Received: {:?}", message_data);
-                let msg = Message::data("node_0".to_string(), node_0_id.clone(), json!({
+                let msg = Message::data(
+                    "node_0".to_string(),
+                    node_0_id.clone(),
+                    json!({
                         "data": format!("Hi from Node_0: {}", message_data.message).as_str(),
                     })
-                    .to_string()
-                    .as_bytes()
-                    .to_vec());
-                tx_0.send(msg)
-                    .await
-                    .unwrap();
+                        .to_string()
+                        .as_bytes()
+                        .to_vec(),
+                );
+                tx_0.send(msg).await.unwrap();
                 tokio::time::sleep(std::time::Duration::from_millis(3000)).await;
             }
         });
@@ -365,15 +383,17 @@ mod tests {
         runtime.spawn(async move {
             while let Some(message_data) = rx_o_1.recv().await {
                 debug!("Node_1 Received: {:?}", message_data);
-                let msg = Message::data("node_1".to_string(), node_1_id.clone(), json!({
+                let msg = Message::data(
+                    "node_1".to_string(),
+                    node_1_id.clone(),
+                    json!({
                         "data": format!("Hi from Node_1: {}", message_data.message).as_str(),
                     })
-                    .to_string()
-                    .as_bytes()
-                    .to_vec());
-                tx_1.send(msg)
-                    .await
-                    .unwrap();
+                        .to_string()
+                        .as_bytes()
+                        .to_vec(),
+                );
+                tx_1.send(msg).await.unwrap();
                 tokio::time::sleep(std::time::Duration::from_millis(3000)).await;
             }
         });
