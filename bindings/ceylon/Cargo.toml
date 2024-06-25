@@ -17,6 +17,7 @@ sangedama = { path = "../../libs/sangedama" }
 tokio = { version = "1.38.0", features = ["full"] }
 async-trait = "0.1.80"
 serde = { version = "1.0.203", features = ["derive"] }
+log = "0.4.21"
 
 [build-dependencies]
 uniffi = { version = "0.28.0", features = ["build"] }
