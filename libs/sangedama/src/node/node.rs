@@ -40,7 +40,7 @@ impl EventType {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
 pub enum MessageType {
     Message,
     Event,
@@ -337,7 +337,7 @@ mod tests {
 
         let (mut node_0, mut rx_o_0) = create_node("node_0".to_string(), true, rx_0);
         let (mut node_1, mut rx_o_1) = create_node("node_1".to_string(), false, rx_1);
-        
+
         let node_0_id = node_0.id.clone();
         let node_1_id = node_1.id.clone();
 
@@ -349,7 +349,7 @@ mod tests {
         runtime.spawn(async move {
             while let Some(message_data) = rx_o_0.recv().await {
                 debug!("Node_0 Received: {:?}", message_data);
-                let msg = Message::data("node_0".to_string(),node_0_id.clone(), json!({
+                let msg = Message::data("node_0".to_string(), node_0_id.clone(), json!({
                         "data": format!("Hi from Node_0: {}", message_data.message).as_str(),
                     })
                     .to_string()

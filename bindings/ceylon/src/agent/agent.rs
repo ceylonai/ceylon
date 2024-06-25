@@ -5,7 +5,7 @@ use tokio::select;
 use tokio::sync::Mutex;
 use log::info;
 
-use sangedama::node::node::{create_node, Message};
+use sangedama::node::node::{create_node, Message, MessageType};
 
 // The call-answer, callback interface.
 
@@ -93,7 +93,9 @@ impl AgentCore {
                 }
 
                 if let Some(message) = rx_o_0.recv().await {
-                    on_message.lock().await.on_message(agent_name.clone(), message).await;
+                    if message.r#type == MessageType::Message {
+                        on_message.lock().await.on_message(agent_name.clone(), message).await;
+                    }
                 }
             }
         });
