@@ -506,6 +506,7 @@ name = "ceylon"
 version = "0.12.5"
 dependencies = [
  "async-trait",
+ "env_logger",
  "log",
  "sangedama",
  "serde",

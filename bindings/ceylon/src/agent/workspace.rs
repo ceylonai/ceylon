@@ -38,8 +38,13 @@ impl Workspace {
     }
 
     pub async fn run(&self, inputs: HashMap<String, String>) {
+        env_logger::init();
         debug!("Workspace {} running", self.id);
-        let mut rt = Runtime::new().unwrap();
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
         let mut tasks = vec![];
         let _inputs = inputs.clone();
         for agent in self._agents.iter() {
