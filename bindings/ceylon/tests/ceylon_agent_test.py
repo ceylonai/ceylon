@@ -15,18 +15,11 @@ class Agent(AgentCore, MessageHandler, Processor):
         if message.type == MessageType.MESSAGE:
             dt = bytes(message.data)
             print(self.id(), self.name(), dt.decode("utf-8"), message.originator_id, message.originator)
-        # message = json.loads(str(message, "utf-8"))
-        # if message and message.get("type") == "Message":
-        #     print(self.name(), message["from"])
-        #     if self.name() == message["from"]:
-        #         print("Invalid message")
-        #     # print(f" {self.name()} test {data}")
 
     async def run(self, inputs):
         print(f"{self.name()} run", inputs)
         while True:
             await self.broadcast(bytes("Hi from " + self.name() + " at " + str(time.time()), "utf-8"))
-            # print(f"{self.name()} Broadcast message")
             await asyncio.sleep(random.randint(1, 5))
 
 
