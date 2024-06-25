@@ -1,5 +1,4 @@
 import asyncio
-import json
 import random
 import time
 
@@ -12,6 +11,7 @@ class Agent(AgentCore, MessageHandler, Processor):
         super().__init__(name=name, is_leader=is_leader, on_message=self, processor=self)
 
     async def on_message(self, agent_id, message):
+        print(f"{self.name()} on_message", agent_id, message)
         if message.type == MessageType.MESSAGE:
             dt = bytes(message.data)
             print(self.id(), self.name(), dt.decode("utf-8"), message.originator_id, message.originator)
