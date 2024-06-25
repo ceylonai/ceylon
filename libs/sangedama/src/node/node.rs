@@ -195,7 +195,21 @@ impl Node {
     }
 
     async fn pass_message_to_node(&mut self, message: Message) {
-        self.out_tx.clone().send(message).await.unwrap();
+        match self.out_tx.clone().send(message).await {
+            Ok(()) => {
+                debug!("{:?} Sent", self.name);
+            }
+            Err(e) => {
+                match e {                    
+                    mpsc::error::SendError(er) => {
+                        debug!("{:?} Failed to send message: {:?}", self.name, er);
+                    }
+                    _ => {
+                        debug!("{:?} Failed to send message: {:?}", self.name, e);
+                    }
+                }
+            }
+        };
     }
 
     pub async fn run(mut self) {
@@ -208,15 +222,16 @@ impl Node {
                             Ok(message_ids) => {
                                 debug!("{:?} Message Broad casted", self.name);
                             }
+                            
                             Err(e) => {
                                 debug!("{:?} Failed to broadcast message: {:?} {:?} {:?}", self.name, e, message.clone(), from_utf8_lossy(&message.data));
                             }
                         };
                     }
-               None => {
+                    None => {
                         debug!("{:?} Received: None", self.name);
                     }
-                }  ,
+                },
 
                 event = self.swarm.select_next_some() => match event {
                          SwarmEvent::NewListenAddr { address, .. } => {
@@ -234,28 +249,25 @@ impl Node {
                         },
 
                         SwarmEvent::Behaviour(Event::Gossipsub(event)) => {
-                            debug!("GOSSIP {:?} {:?}", self.name, event);
-
                             match event {
                                 gossipsub::Event::Message { propagation_source, message_id, message } => {
-                                        debug!("{:?} Received message '{:?}' from {:?} on {:?}", self.name, String::from_utf8_lossy(&message.data), propagation_source, message_id);
+                                        debug!("{:?} Received message '{:?}' from {:?} on {:?}", self.id, String::from_utf8_lossy(&message.data), propagation_source, message_id);
                                         let msg =  serde_json::from_slice(message.data.as_slice()).unwrap();
                                         self.pass_message_to_node(msg).await
                                 },
 
                                 gossipsub::Event::Subscribed { peer_id, topic } => {
-                                let topic_val = gossipsub::IdentTopic::new(topic.clone().into_string());
-                                    debug!("{:?} Subscribed to topic {:?}", self.name, topic.to_string());
-                                    self.subscribed_topics.push(topic.into_string());
-                                    self.pass_message_to_node(Message::event_with_data(  self.swarm.local_peer_id().to_string(),EventType::OnSubscribe,json!({
-                                        "topic": topic_val.clone().to_string(),
-                                        "peer_id": peer_id.to_string(),
-                                    }).to_string().as_bytes().to_vec())).await
-                                },
-
+                                    let topic_val = gossipsub::IdentTopic::new(topic.clone().into_string());
+                                        debug!("{:?} Subscribed to topic {:?}", self.name, topic.to_string());
+                                        self.subscribed_topics.push(topic.into_string());
+                                        self.pass_message_to_node(Message::event_with_data(  self.swarm.local_peer_id().to_string(),EventType::OnSubscribe,json!({
+                                            "topic": topic_val.clone().to_string(),
+                                            "peer_id": peer_id.to_string(),
+                                        }).to_string().as_bytes().to_vec())).await
+                                },    
                                 _ => {
-                                 debug!( "{:?}gossip WILD CARD {:?}", self.name, event);
-                            }
+                                    debug!( "{:?}gossip WILD CARD {:?}", self.name, event);
+                                }
                             }
                         },
 

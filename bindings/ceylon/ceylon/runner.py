@@ -56,6 +56,16 @@ class AgentRunner:
             raise AgentRunnerCannotHaveMultipleLeadersError()
         self.agents.append(agent)
 
+    async def run(self, request: dict[str, str], network: Dict[str, List[str]] = None):
+        uniffi_set_event_loop(asyncio.get_event_loop())
+        workspace = Workspace(
+            config=self.config,
+            agents=self.agents,
+        )
+        await workspace.run(pickle.dumps(
+            RunnerInput(request=request, agents=[agent.definition() for agent in self.agents],
+                        network=network)), )
+
     async def run_in_multi_thread(self, request: dict[str, str], network: Dict[str, List[str]] = None):
         agent_tasks = []
         for agent in self.agents:

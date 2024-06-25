@@ -1,28 +1,29 @@
 // The call-answer, callback interface.
 
+use std::fmt::Debug;
 use serde::{Deserialize, Serialize};
 use sangedama::node::node::Message;
 
 #[async_trait::async_trait]
-pub trait MessageHandler: Send + Sync {
+pub trait MessageHandler: Send + Sync + Debug {
     async fn on_message(&self, agent_id: String, message: Vec<u8>);
 }
 
 #[async_trait::async_trait]
-pub trait EventHandler: Send + Sync {
+pub trait EventHandler:  Send + Sync + Debug {
     async fn on_event(&self, message: Message);
 }
 
 
 #[async_trait::async_trait]
-pub trait AgentHandler: Send + Sync {
+pub trait AgentHandler: Send + Sync + Debug {
     async fn on_agent(&self, agent: AgentDefinition);
 }
 
 // The call-answer, callback interface.
 
 #[async_trait::async_trait]
-pub trait Processor: Send + Sync {
+pub trait Processor:  Send + Sync + Debug{
     async fn run(&self, input: Vec<u8>) -> ();
     async fn on_start(&self, input: Vec<u8>) -> ();
 }

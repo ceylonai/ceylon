@@ -19,7 +19,6 @@ pub struct AgentCore {
     config: AgentConfig,
     on_message: Arc<Mutex<Arc<dyn MessageHandler>>>,
     processor: Arc<Mutex<Option<Arc<dyn Processor>>>>,
-    _meta: HashMap<String, String>,
     agent_handler: Arc<Mutex<Arc<dyn AgentHandler>>>,
     event_handlers: HashMap<EventType, Vec<Arc<dyn EventHandler>>>,
 
@@ -35,7 +34,6 @@ impl AgentCore {
         config: AgentConfig,
         on_message: Arc<dyn MessageHandler>,
         processor: Option<Arc<dyn Processor>>,
-        meta: Option<HashMap<String, String>>,
         agent_handler: Arc<dyn AgentHandler>,
         event_handlers: Option<HashMap<EventType, Vec<Arc<dyn EventHandler>>>>,
     ) -> Self {
@@ -48,7 +46,6 @@ impl AgentCore {
             config,
             on_message: Arc::new(Mutex::new(on_message)),
             processor: Arc::new(Mutex::new(processor)),
-            _meta: meta.unwrap_or_default(),
             agent_handler: Arc::new(Mutex::new(agent_handler)),
             event_handlers: event_handlers.unwrap_or_default(),
 
@@ -79,10 +76,6 @@ impl AgentCore {
         self._definition.read().unwrap().clone()
     }
 
-    pub fn meta(&self) -> HashMap<String, String> {
-        self._meta.clone()
-    }
-
     pub async fn broadcast(&self, _message: Vec<u8>) {
         self.get_tx().send(_message.clone()).await.unwrap();
     }
@@ -108,7 +101,7 @@ impl AgentCore {
 
         let blockchain = self._message_block_chain.clone();
         let is_leader = self.definition().is_leader;
-        tokio::spawn(async move {
+        let blockchain_handle = tokio::spawn(async move {
             let mut blockchain = blockchain.lock().await;
             blockchain.init_block();
 
@@ -128,6 +121,7 @@ impl AgentCore {
         let processor = self.processor.clone();
         let processor_on_start = inputs.clone();
         if let Some(processor) = processor.lock().await.clone() {
+            debug!( "Processor on start: {:?}", processor);
             processor.on_start(processor_on_start).await;
         }
 
@@ -212,6 +206,9 @@ impl AgentCore {
 
         let agent_name = definition.name.clone();
         select! {
+            _ = blockchain_handle => {
+                debug!("Agent {} blockchain_handle finished", agent_name);
+            }
             _ = node_start_handle => {
                 debug!("Agent {} node_start_handle finished", agent_name);
             },
@@ -243,17 +240,20 @@ mod tests {
     use tokio::sync::Mutex;
     use uniffi::deps::log::debug;
 
+    #[derive(Debug)]
     struct MessageHandlerImpl {
         send_message_to_broadcast_tx: tokio::sync::mpsc::Sender<Vec<u8>>,
     }
 
-    #[async_trait]
+    #[async_trait] 
     impl MessageHandler for MessageHandlerImpl {
         async fn on_message(&self, agent_id: String, message: Vec<u8>) {
             info!("{}  test Received: {:?}", agent_id, message);
         }
     }
 
+
+    #[derive(Debug)]
     struct AgentHandlerImpl {
         send_message_to_broadcast_tx: tokio::sync::mpsc::Sender<Vec<u8>>,
     }
@@ -265,6 +265,7 @@ mod tests {
         }
     }
 
+    #[derive(Debug)]
     struct ProcessorImpl {
         send_message_to_broadcast_tx: tokio::sync::mpsc::Sender<Vec<u8>>,
         agent_definition: AgentDefinition,
@@ -334,7 +335,6 @@ mod tests {
                     send_message_to_broadcast_tx: send_message_tx.clone(),
                     agent_definition: self.definition.clone(),
                 })),
-                None,
                 Arc::new(AgentHandlerImpl {
                     send_message_to_broadcast_tx: send_message_tx.clone(),
                 }),

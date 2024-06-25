@@ -25,7 +25,7 @@ interface AgentCore{
         AgentDefinition definition,
         AgentConfig config,
         MessageHandler on_message,
-        Processor? processor,record<string,string>? meta,
+        Processor? processor,
         AgentHandler agent_handler,
         record<EventType,sequence<EventHandler>>? event_handlers
     );
@@ -33,9 +33,6 @@ interface AgentCore{
     string id();
     string workspace_id();
     AgentDefinition definition();
-
-
-    record<string,string> meta();
 
     [Async]
     void broadcast(bytes message);

@@ -55,9 +55,7 @@ impl Workspace {
 
     pub async fn run(&self, input: Vec<u8>) {
         debug!("Workspace {} running", self.id);
-        let rt = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build().unwrap();
+        let rt = tokio::runtime::Runtime::new().unwrap();
         let mut tasks = vec![];
         let _input = input.clone();
         for agent in self._agents.read().unwrap().iter() {
@@ -67,19 +65,32 @@ impl Workspace {
 
             let agent = agent.clone();
             let task = rt.spawn(async move {
+                agent.set_workspace_id(agent.workspace_id());
                 agent.start(topic, url, _inputs).await;
             });
             tasks.push(task);
         }
 
-        for task in tasks {
-            match task.await {
-                Ok(_) => {}
-                Err(e) => {
-                    error!("Error: {:?}", e);
+
+        rt.block_on(async {
+            for task in tasks {
+                match task.await {
+                    Ok(_) => {}
+                    Err(e) => {
+                        error!("Error: {:?}", e);
+                    }
                 }
-            };
-        }
+            }
+        })
+
+        // for task in tasks {
+        //     match task.await {
+        //         Ok(_) => {}
+        //         Err(e) => {
+        //             error!("Error: {:?}", e);
+        //         }
+        //     };
+        // }
     }
 }
 
@@ -111,8 +122,8 @@ pub async fn agent_runner_multi_thread(agents: Vec<Arc<AgentCore>>, topic: Strin
 }
 
 pub async fn agent_run_single(agent: Arc<AgentCore>, topic: String, inputs: Vec<u8>, workspace_id: String) {
-    match env_logger::try_init(){        
-        Ok(_) => {},
+    match env_logger::try_init() {
+        Ok(_) => {}
         Err(e) => {
             error!("Error: {:?}", e);
         }
