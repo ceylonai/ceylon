@@ -182,7 +182,12 @@ impl Node {
     }
 
     async fn pass_message_to_node(&mut self, message: Message) {
-        self.out_tx.clone().send(message).await.unwrap();
+        match self.out_tx.clone().send(message).await {
+            Ok(_) => {}
+            Err(e) => {
+                error!("{:?} Failed to send message: {:?}", self.name, e);
+            }
+        };
     }
 
     pub async fn run(mut self) {
