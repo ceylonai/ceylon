@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use tokio::select;
 
 use tokio::sync::Mutex;
+use log::info;
 
 use sangedama::node::node::{create_node, Message};
 
@@ -78,13 +80,13 @@ impl AgentCore {
         let (mut node_0, mut rx_o_0) = create_node(agent_name.clone(), true, rx_0);
         let on_message = self._on_message.clone();
 
-        tokio::spawn(async move {
+        let node_runner = tokio::spawn(async move {
             node_0.connect(url.as_str(), topic.as_str());
             node_0.run().await;
         });
 
         let rx = Arc::clone(&self.rx_0);
-        tokio::spawn(async move {
+        let message_handler_process = tokio::spawn(async move {
             loop {
                 if let Some(message) = rx.lock().await.recv().await {
                     tx_0.clone().send(message).await.unwrap();
@@ -95,8 +97,25 @@ impl AgentCore {
                 }
             }
         });
+
         let processor = self._processor.clone();
-        processor.lock().await.run(inputs).await;
+        let run_process = tokio::spawn(async move {
+            processor.lock().await.run(inputs).await;
+        });
+
+        let agent_name = self._name.clone();
+        select! {
+            _ = node_runner => { 
+                info!("Agent {:?} node_runner stopped", agent_name);
+            },
+            _ = message_handler_process => {
+                info!("Agent {:?} message_handler_process stopped", agent_name);
+            },
+            _ = run_process => {
+                info!("Agent {:?} run_process stopped", agent_name);
+            },
+            
+        }
     }
 }
 
