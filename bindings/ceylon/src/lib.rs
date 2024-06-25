@@ -19,6 +19,8 @@ pub use agent::{
     workspace::{
         Workspace,
         WorkspaceConfig,
+        agent_runner_multi_thread,
+        agent_run_single
     },
 };
 

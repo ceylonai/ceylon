@@ -1,5 +1,9 @@
 namespace ceylon {
   string version();
+  [Async]
+  void agent_runner_multi_thread(sequence<AgentCore> agents, string topic, bytes inputs, string workspace_id);
+  [Async]
+  void agent_run_single(AgentCore agent, string topic, bytes inputs, string workspace_id);
 };
 
 

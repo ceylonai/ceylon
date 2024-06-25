@@ -1,10 +1,9 @@
 import asyncio
 import pickle
-import random
 import time
 
-from ceylon.ceylon import AgentCore, MessageHandler, Processor, AgentDefinition, Message, EventType, \
-    AgentConfig, AgentHandler, EventHandler
+from ceylon.ceylon import AgentCore, MessageHandler, Processor, AgentDefinition, Message, AgentConfig, AgentHandler, \
+    EventHandler, uniffi_set_event_loop
 from ceylon.runner import AgentRunner
 
 
@@ -25,8 +24,7 @@ class Agent(AgentCore, MessageHandler, Processor, AgentHandler):
             position=position,
             is_leader=is_leader,
             responsibilities=responsibilities,
-            instructions=instructions
-        ),
+            instructions=instructions),
             config=AgentConfig(
                 memory_context_size=10
             ),
@@ -34,9 +32,7 @@ class Agent(AgentCore, MessageHandler, Processor, AgentHandler):
             processor=self,
             meta=None,
             agent_handler=self,
-            event_handlers={
-                EventType.ON_SUBSCRIBE: [self.OnSubscribeEvent(self)]
-            })
+            event_handlers={})
 
     async def on_agent(self, agent: AgentDefinition):
         print(f"{self.definition().name} on_agent {agent.name}")
@@ -45,17 +41,17 @@ class Agent(AgentCore, MessageHandler, Processor, AgentHandler):
         self.log(f"SELF={self.definition().name},AGENT ID={agent_id},MESSAGE={message}")
 
     async def run(self, inputs):
-        print("run", self.definition().name)
-        # inputs = pickle.loads(inputs)
-        # while True:
-        #     await self.broadcast(pickle.dumps({
-        #         "title": f"Hi Im  {self.definition().name} at {time.time()}",
-        #     }))
-        #     await asyncio.sleep(1)
+        self.log("run", self.definition().name)
+        inputs = pickle.loads(inputs)
+        while True:
+            await self.broadcast(pickle.dumps({
+                "title": f"Hi Im  {self.definition().name} at {time.time()}",
+            }))
+            await asyncio.sleep(4)
+            print(self.definition().name)
 
     async def on_start(self, input: "bytes"):
-
-        self.log(f"on_start {input}")
+        self.log(f"on_start {self.definition().name}")
 
 
 #
@@ -70,7 +66,7 @@ async def main():
     runner.register_agent(
         Agent(name="ceylon-ai-4", position="PROOF READER", is_leader=False, responsibilities=[], instructions=[]))
 
-    await runner.run({
+    await runner.run_in_single_thread({
         "title": "How to use AI for Machine Learning",
     }, network={})
 

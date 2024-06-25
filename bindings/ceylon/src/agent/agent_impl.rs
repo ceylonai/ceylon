@@ -123,13 +123,15 @@ impl AgentCore {
 
         let definition = self.definition();
 
-        info!("Agent {:?} Started", definition.clone());
+        info!("Agent {:?} Starting...", definition.clone());
 
         let processor = self.processor.clone();
         let processor_on_start = inputs.clone();
         if let Some(processor) = processor.lock().await.clone() {
             processor.on_start(processor_on_start).await;
         }
+
+        info!( "Agent {:?} Started", definition.clone());
 
         node_0.connect(topic.as_str(), None, port.clone());
         let node_start_handle = tokio::spawn(async move {
@@ -228,7 +230,7 @@ impl AgentCore {
 
 #[cfg(test)]
 mod tests {
-    use crate::{AgentConfig, AgentCore, AgentDefinition, AgentHandler, MessageHandler, Processor};
+    use crate::{AgentConfig, AgentCore, AgentDefinition, AgentHandler, MessageHandler, Processor, Workspace, WorkspaceConfig};
     use async_trait::async_trait;
     use log::info;
     use sangedama::node::node::{EventType, Message};
@@ -276,21 +278,21 @@ mod tests {
     #[async_trait]
     impl Processor for ProcessorImpl {
         async fn run(&self, input: Vec<u8>) -> () {
-            // loop {
-            //     let ran_number = rand::random::<u64>() % 10;
-            //     tokio::time::sleep(Duration::from_millis(1000 * ran_number)).await;
-            //     self.send_message_to_broadcast_tx
-            //         .send(
-            //             json!(AgentMessage {
-            //                 text: format!("Hello {}", self.agent_definition.name),
-            //             })
-            //                 .to_string()
-            //                 .as_bytes()
-            //                 .to_vec(),
-            //         )
-            //         .await
-            //         .unwrap();
-            // }
+            loop {
+                let ran_number = rand::random::<u64>() % 10;
+                tokio::time::sleep(Duration::from_millis(1000 * ran_number)).await;
+                self.send_message_to_broadcast_tx
+                    .send(
+                        json!(AgentMessage {
+                            text: format!("Hello {}", self.agent_definition.name),
+                        })
+                            .to_string()
+                            .as_bytes()
+                            .to_vec(),
+                    )
+                    .await
+                    .unwrap();
+            }
         }
 
         async fn on_start(&self, input: Vec<u8>) -> () {
@@ -413,6 +415,32 @@ mod tests {
 
         let agents = vec![agent_1, agent_2, agent_3, agent_4];
 
+
+        agent_runner_multi_thread(agents, topic, inputs, workspace_id);
+
+        // agent_runner_with_tokio_single_run_time(agents, topic, inputs, workspace_id);
+    }
+
+    fn agent_runner_with_tokio_single_run_time(agents: Vec<Agent>, topic: String, inputs: Vec<u8>, workspace_id: String) {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        for agent in agents {
+            rt.block_on(async {
+                agent
+                    .start(
+                        topic.clone(),
+                        5800,
+                        inputs.clone(),
+                        workspace_id.clone(),
+                    )
+                    .await;
+            });
+        }
+    }
+
+    fn agent_runner_multi_thread(agents: Vec<Agent>, topic: String, inputs: Vec<u8>, workspace_id: String) {
         let mut agent_thread_handlers = vec![];
 
         for agent in agents {

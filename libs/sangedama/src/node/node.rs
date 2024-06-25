@@ -161,27 +161,12 @@ impl Node {
             .with(Protocol::QuicV1);
         info!("Listening on {:?}", listen_addr_quic);
 
+
         if self.is_leader {
             self.swarm.listen_on(listen_addr_quic).unwrap();
         } else {
             self.swarm.dial(listen_addr_quic).unwrap();
         }
-
-        // subscribes to our topic
-        // self.swarm
-        //     .behaviour_mut()
-        //     .gossipsub
-        //     .subscribe(&topic)
-        //     .unwrap();
-        // if self.is_leader {
-        //     self.swarm
-        //         .listen_on(url.to_string().parse().unwrap())
-        //         .unwrap();
-        // } else {
-        //     self.swarm
-        //         .dial(url.to_string().parse::<Multiaddr>().unwrap())
-        //         .unwrap();
-        // }
     }
 
     pub fn broadcast(&mut self, message: Message) -> Result<Vec<MessageId>, PublishError> {

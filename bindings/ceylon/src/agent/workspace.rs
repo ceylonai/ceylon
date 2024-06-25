@@ -1,9 +1,8 @@
 use std::sync::{Arc, RwLock};
 use std::thread;
-use log::error;
 
+use log::error;
 use serde::{Deserialize, Serialize};
-use tokio::runtime::Runtime;
 use uniffi::deps::log::debug;
 
 use crate::AgentCore;
@@ -24,6 +23,7 @@ pub struct Workspace {
 
 impl Workspace {
     pub fn new(agents: Vec<Arc<AgentCore>>, config: WorkspaceConfig) -> Self {
+        env_logger::init();
         let _name = config.name;
         let id = format!("workspace-{}", uuid::Uuid::new_v4());
 
@@ -54,7 +54,6 @@ impl Workspace {
     }
 
     pub async fn run(&self, input: Vec<u8>) {
-        env_logger::init();
         debug!("Workspace {} running", self.id);
         let rt = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
@@ -78,30 +77,56 @@ impl Workspace {
                 Ok(_) => {}
                 Err(e) => {
                     error!("Error: {:?}", e);
-                    panic!("Error: {:?}", e);
                 }
             };
         }
-        // let mut handles = vec![];
-        //
-        // for agent in self._agents.read().unwrap().iter() {
-        //     let url = format!("{}/{}", self.host, self.port);
-        //     let topic = format!("workspace-{}", agent.workspace_id());
-        //     let agent_clone = agent.clone();
-        //     let input_val = input.clone();
-        //     let handle = thread::spawn(move || {
-        //         let rt = Runtime::new().unwrap();
-        //         rt.block_on(async {
-        //             let _inputs = input_val.clone();
-        //             agent_clone.start(topic, url, _inputs.clone()).await;
-        //         });
-        //     });
-        //     handles.push(handle);
-        // }
-        //
-        // for handle in handles {
-        //     handle.join().unwrap();
-        // }
     }
 }
 
+pub async fn agent_runner_multi_thread(agents: Vec<Arc<AgentCore>>, topic: String, inputs: Vec<u8>, workspace_id: String) {
+    env_logger::init();
+    let mut agent_thread_handlers = vec![];
+
+    for agent in agents {
+        let ag1_input = inputs.clone();
+        let ag1_topic = topic.clone();
+        let workspace_id = workspace_id.clone();
+        let ag1_thread = thread::spawn(move || {
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(async move {
+                    agent.set_workspace_id(workspace_id.clone());
+                    agent
+                        .start(ag1_topic.clone(), 8445, ag1_input.clone()).await
+                });
+        });
+        agent_thread_handlers.push(ag1_thread);
+    }
+
+    for thread in agent_thread_handlers {
+        thread.join().unwrap();
+    }
+}
+
+pub async fn agent_run_single(agent: Arc<AgentCore>, topic: String, inputs: Vec<u8>, workspace_id: String) {
+    match env_logger::try_init(){        
+        Ok(_) => {},
+        Err(e) => {
+            error!("Error: {:?}", e);
+        }
+    }
+    let ag1_input = inputs.clone();
+    let ag1_topic = topic.clone();
+    let workspace_id = workspace_id.clone();
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async move {
+            agent.set_workspace_id(workspace_id.clone());
+            agent
+                .start(ag1_topic.clone(), 8445, ag1_input.clone()).await
+        });
+}

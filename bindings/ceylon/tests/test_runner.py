@@ -4,13 +4,22 @@ import time
 import unittest
 
 from ceylon import AgentRunner
-from ceylon.ceylon import AgentCore, MessageHandler, Processor
+from ceylon.ceylon import AgentCore, MessageHandler, Processor, AgentHandler, AgentDefinition, AgentConfig
 from ceylon.runner import AgentRunnerNotLeaderError, AgentRunnerCannotHaveMultipleLeadersError
 
 
-class Agent(AgentCore, MessageHandler, Processor):
+class Agent(AgentCore, MessageHandler, Processor, AgentHandler):
     def __init__(self, name, is_leader):
-        super().__init__(name=name, is_leader=is_leader, on_message=self, processor=self)
+        super().__init__(
+            definition=AgentDefinition(name=name, is_leader=is_leader, position="agent", responsibilities=[],
+                                       instructions=[]),
+            config=AgentConfig(memory_context_size=10),
+            on_message=self,
+            processor=self,
+            agent_handler=self,
+            event_handlers={},
+            meta={}
+        )
 
     async def on_message(self, agent_id, message):
         print(f"{self.name()} Received message from = '{agent_id}' message= {message}", agent_id, message)
@@ -23,6 +32,12 @@ class Agent(AgentCore, MessageHandler, Processor):
             await asyncio.sleep(random.randint(1, 5))
             if random.randint(1, 10) % 5 == 0:
                 break
+
+    def on_agent(self, agent: "AgentDefinition"):
+        print(f"{self.name()} on_agent {agent.name}")
+
+    def on_start(self, input: "bytes"):
+        print(f"{self.name()} on_start {input}")
 
 
 class TestAgentRunner(unittest.IsolatedAsyncioTestCase):
