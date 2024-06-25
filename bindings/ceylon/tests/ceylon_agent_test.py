@@ -20,7 +20,7 @@ class Agent(AgentCore, MessageHandler, Processor):
         print(f"{self.name()} run", inputs)
         while True:
             await self.broadcast(bytes("Hi from " + self.name() + " at " + str(time.time()), "utf-8"))
-            await asyncio.sleep(random.randint(1, 5))
+            await asyncio.sleep(random.randint(1, 2))
 
 
 #
