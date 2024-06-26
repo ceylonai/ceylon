@@ -2,29 +2,17 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::select;
 
-use tokio::sync::Mutex;
-use log::info;
+use tokio::sync::{Mutex, RwLock};
+use log::{error, info};
 
 use sangedama::node::node::{create_node, Message, MessageType};
+use crate::agent::agent_base::{AgentDefinition, MessageHandler, Processor};
 
 // The call-answer, callback interface.
 
-#[async_trait::async_trait]
-pub trait MessageHandler: Send + Sync {
-    async fn on_message(&self, agent_id: String, message: Message);
-}
-
-// The call-answer, callback interface.
-
-#[async_trait::async_trait]
-pub trait Processor: Send + Sync {
-    async fn run(&self, message: HashMap<String, String>) -> ();
-}
 
 pub struct AgentCore {
-    _name: String,
-    _is_leader: bool,
-    _id: String,
+    _definition: RwLock<AgentDefinition>,
     _workspace_id: Option<String>,
     _processor: Arc<Mutex<Arc<dyn Processor>>>,
     _on_message: Arc<Mutex<Arc<dyn MessageHandler>>>,
@@ -33,13 +21,11 @@ pub struct AgentCore {
 }
 
 impl AgentCore {
-    pub fn new(name: String, is_leader: bool, on_message: Arc<dyn MessageHandler>, processor: Arc<dyn Processor>) -> Self {
+    pub fn new(definition: AgentDefinition, on_message: Arc<dyn MessageHandler>, processor: Arc<dyn Processor>) -> Self {
         let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Message>(100);
         let id = uuid::Uuid::new_v4().to_string();
         Self {
-            _name: name,
-            _is_leader: is_leader,
-            _id: id,
+            _definition: RwLock::new(definition),
             _workspace_id: None,
             _on_message: Arc::new(Mutex::new(on_message)),
             _processor: Arc::new(Mutex::new(processor)),
@@ -48,16 +34,12 @@ impl AgentCore {
         }
     }
 
-    pub fn name(&self) -> String {
-        self._name.clone()
+    pub async fn definition(&self) -> AgentDefinition {
+        self._definition.read().await.clone()
     }
 
-    pub fn is_leader(&self) -> bool {
-        self._is_leader
-    }
-
-    pub fn id(&self) -> String {
-        self._id.clone()
+    pub async fn id(&self) -> String {
+        self._definition.read().await.id.clone().unwrap_or("".to_string())
     }
 
     pub fn workspace_id(&self) -> String {
@@ -69,22 +51,36 @@ impl AgentCore {
     }
 
     pub async fn broadcast(&self, message: Vec<u8>) {
-        self.tx_0.send(Message::data(self._name.clone(), self._id.clone(), message)).await.unwrap();
+        let definition = self.definition().await;
+        let name = definition.name.clone();
+        match definition.id.clone() {
+            Some(id) => {
+                self.tx_0.send(Message::data(name, id, message)).await.unwrap();
+            }
+            None => {
+                error!("Agent {} has no id", name);
+            }
+        };
     }
 }
 
 impl AgentCore {
-    pub(crate) async fn start(&self, topic: String, url: String, inputs: HashMap<String, String>) {
-        let agent_name = self._name.clone();
+    pub(crate) async fn start(&self, topic: String, url: String, inputs: Vec<u8>) {
+        let definition = self.definition().await;
+        let agent_name = definition.name.clone();
         let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Message>(100);
         let (mut node_0, mut rx_o_0) = create_node(agent_name.clone(), true, rx_0);
         let on_message = self._on_message.clone();
+
+        self._definition.write().await.id = Some(node_0.id.clone());
+        let definition = self.definition().await;
 
 
         let rx = Arc::clone(&self.rx_0);
         let message_handler_process = tokio::spawn(async move {
             loop {
                 if let Some(message) = rx.lock().await.recv().await {
+                    info!( "Agent {:?} received message {:?}", agent_name, message);
                     tx_0.clone().send(message).await.unwrap();
                 }
 
@@ -105,15 +101,14 @@ impl AgentCore {
         node_0.run().await;
 
 
-
-        let agent_name = self._name.clone();
+        let agent_name = definition.name.clone();
         select! {
             _ = message_handler_process => {
                 info!("Agent {:?} message_handler_process stopped", agent_name);
             },
             _ = run_process => {
                 info!("Agent {:?} run_process stopped", agent_name);
-            },            
+            },
         }
     }
 }

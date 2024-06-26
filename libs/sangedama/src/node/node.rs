@@ -163,7 +163,7 @@ pub struct Node {
 
     in_rx: mpsc::Receiver<Message>,
     out_tx: mpsc::Sender<Message>,
-    id: String,
+    pub id: String,
 }
 
 impl Node {
