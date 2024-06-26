@@ -37,8 +37,10 @@ class Agent(AgentCore, MessageHandler, Processor):
 #
 async def main():
     runner = AgentRunner(workspace_name="ceylon-ai")
-    runner.register_agent(Agent(name="ceylon-ai-1", is_leader=True, responsibilities=["writer", "researcher"],
-                                instructions=["How to use AI for Machine Learning"], position="leader"))
+    runner.register_agent(Agent(name="ceylon-ai-1", is_leader=True,
+                                responsibilities=["writer", "researcher"],
+                                instructions=["How to use AI for Machine Learning"],
+                                position="leader"))
     runner.register_agent(Agent(name="ceylon-ai-2", is_leader=False, responsibilities=["writer", "researcher"],
                                 instructions=["How to use AI for Machine Learning"], position="leader"))
     runner.register_agent(Agent(name="ceylon-ai-3", is_leader=False, responsibilities=["writer", "researcher"],

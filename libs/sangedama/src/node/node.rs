@@ -232,7 +232,7 @@ impl Node {
                         debug!("{:?} Received To Broadcast", self.name);
                         match self.broadcast(message){
                             Ok(message_ids) => {
-                                debug!("{:?} Broadcasted message: {:?}", self.name, message_ids);
+                                debug!("{:?} Broad casted message: {:?}", self.name, message_ids);
 
                             }
                             Err(e) => {
