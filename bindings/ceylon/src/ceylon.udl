@@ -38,7 +38,7 @@ dictionary Message{
 [Trait,WithForeign]
 interface MessageHandler {
     [Async]
-    void on_message(string agent_id,Message message);
+    void on_message(string agent_id, bytes data, u64 time);
 };
 
 [Trait,WithForeign]
