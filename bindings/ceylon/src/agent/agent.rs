@@ -1,15 +1,12 @@
-use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::select;
 
+use log::{debug, error};
+use tokio::select;
 use tokio::sync::{Mutex, RwLock};
-use log::{error, info};
 
 use sangedama::node::node::{create_node, Message, MessageType};
+
 use crate::agent::agent_base::{AgentDefinition, MessageHandler, Processor};
-
-// The call-answer, callback interface.
-
 
 pub struct AgentCore {
     _definition: RwLock<AgentDefinition>,
@@ -23,7 +20,6 @@ pub struct AgentCore {
 impl AgentCore {
     pub fn new(definition: AgentDefinition, on_message: Arc<dyn MessageHandler>, processor: Arc<dyn Processor>) -> Self {
         let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Message>(100);
-        let id = uuid::Uuid::new_v4().to_string();
         Self {
             _definition: RwLock::new(definition),
             _workspace_id: None,
@@ -80,7 +76,7 @@ impl AgentCore {
         let message_from_agent_impl_handler_process = tokio::spawn(async move {
             loop {
                 if let Some(message) = rx.lock().await.recv().await {
-                    info!( "Agent {:?}  message to dispatch {:?}", agent_name, message);
+                    debug!( "Agent {:?}  message to dispatch {:?}", agent_name, message);
                     tx_0.clone().send(message).await.unwrap();
                 }
             }
@@ -90,7 +86,7 @@ impl AgentCore {
             loop {
                 if let Some(message) = message_from_node.recv().await {
                     if message.r#type == MessageType::Message {
-                        info!( "Agent {:?} received message from node {:?}", agent_name, message);
+                        debug!( "Agent {:?} received message from node {:?}", agent_name, message);
                         on_message.lock().await.on_message(agent_name.clone(), message).await;
                     }
                 }
@@ -106,18 +102,18 @@ impl AgentCore {
         node_0.run().await;
 
         let agent_name = definition.name.clone();
-        info!( "Agent {:?} started", agent_name);
+        debug!( "Agent {:?} started", agent_name);
 
 
         select! {
             _ = message_from_agent_impl_handler_process => {
-                info!("Agent {:?} message_from_agent_impl_handler_process stopped", agent_name);
+                debug!("Agent {:?} message_from_agent_impl_handler_process stopped", agent_name);
             },
             _ = message_handler_process => {
-                info!("Agent {:?} message_handler_process stopped", agent_name);
+                debug!("Agent {:?} message_handler_process stopped", agent_name);
             },
             _ = run_process => {
-                info!("Agent {:?} run_process stopped", agent_name);
+                debug!("Agent {:?} run_process stopped", agent_name);
             },
         }
     }
