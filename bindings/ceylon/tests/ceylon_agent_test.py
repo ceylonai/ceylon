@@ -18,9 +18,9 @@ class Agent(AgentCore, MessageHandler, Processor):
 
     async def run(self, inputs):
         print(f"{self.name()} run", inputs)
-        while True:
-            await self.broadcast(bytes("Hi from " + self.name() + " at " + str(time.time()), "utf-8"))
-            await asyncio.sleep(random.randint(1, 2))
+        # while True:
+        #     await self.broadcast(bytes("Hi from " + self.name() + " at " + str(time.time()), "utf-8"))
+        #     await asyncio.sleep(random.randint(1, 2))
 
 
 #
