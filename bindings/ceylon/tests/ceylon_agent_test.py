@@ -26,6 +26,10 @@ class Agent(AgentCore, MessageHandler, Processor):
             dt = bytes(message.data)
             print(id, name, dt.decode("utf-8"), message.originator_id, message.originator)
 
+            ## Write to txt file
+            with open(f"test_{name}.txt", "a") as f:
+                f.write(dt.decode("utf-8") + "\n")
+
     async def run(self, inputs):
         definition = await self.definition()
         print(f"{definition.name} run", inputs)
@@ -45,8 +49,10 @@ async def main():
                                 instructions=["How to use AI for Machine Learning"], position="leader"))
     runner.register_agent(Agent(name="ceylon-ai-3", is_leader=False, responsibilities=["writer", "researcher"],
                                 instructions=["How to use AI for Machine Learning"], position="leader"))
-    runner.register_agent(Agent(name="ceylon-ai-4", is_leader=False, responsibilities=["writer", "researcher"],
-                                instructions=["How to use AI for Machine Learning"], position="leader"))
+
+    for i in range(4, 50):
+        runner.register_agent(Agent(name=f"ceylon-ai-{i}", is_leader=False, responsibilities=["writer", "researcher"],
+                                    instructions=["How to use AI for Machine Learning"], position="leader"))
 
     await runner.run({
         "title": "How to use AI for Machine Learning",
