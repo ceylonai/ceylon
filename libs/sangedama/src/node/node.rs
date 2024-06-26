@@ -3,7 +3,7 @@ use std::time::{Duration, SystemTime};
 
 use libp2p::{futures::StreamExt, gossipsub, mdns, swarm::{NetworkBehaviour, Swarm, SwarmEvent}, SwarmBuilder, tcp, noise, yamux};
 use libp2p_gossipsub::{MessageId, PublishError};
-use log::{debug, error};
+use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::sync::mpsc;
@@ -158,7 +158,6 @@ impl From<mdns::Event> for Event {
 pub struct Node {
     name: String,
     swarm: Swarm<NodeBehaviour>,
-    is_leader: bool,
     subscribed_topics: Vec<String>,
 
     in_rx: mpsc::Receiver<Message>,
@@ -168,10 +167,8 @@ pub struct Node {
 
 impl Node {
     pub fn connect(&mut self, url: &str, topic_str: &str) {
-        println!("Connecting to {} with topic {}", url, topic_str);
-        // Create a Gossipsub topic
+        info!("Connecting to {} with topic {}", url, topic_str);
         let topic = gossipsub::IdentTopic::new(topic_str);
-        // subscribes to our topic
         self.swarm
             .behaviour_mut()
             .gossipsub
@@ -179,18 +176,6 @@ impl Node {
             .unwrap();
 
         self.swarm.listen_on("/ip4/0.0.0.0/udp/0/quic-v1".parse().unwrap()).unwrap();
-        // self.swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse().unwrap()).unwrap();
-
-
-        // if self.is_leader {
-        //     self.swarm
-        //         .listen_on(url.to_string().parse().unwrap())
-        //         .unwrap();
-        // } else {
-        //     self.swarm
-        //         .dial(url.to_string().parse::<Multiaddr>().unwrap())
-        //         .unwrap();
-        // }
     }
 
     pub fn broadcast(&mut self, message: Message) -> Result<Vec<MessageId>, PublishError> {
@@ -312,7 +297,6 @@ impl Node {
 
 pub fn create_node(
     name: String,
-    is_leader: bool,
     in_rx: mpsc::Receiver<Message>,
 ) -> (Node, mpsc::Receiver<Message>) {
     let swarm = SwarmBuilder::with_new_identity()
@@ -336,7 +320,6 @@ pub fn create_node(
             name,
             id: swarm.local_peer_id().to_string(),
             swarm,
-            is_leader,
             subscribed_topics: Vec::new(),
             in_rx,
             out_tx,
@@ -364,8 +347,8 @@ mod tests {
         let (tx_0, mut rx_0) = tokio::sync::mpsc::channel::<Message>(100);
         let (tx_1, mut rx_1) = tokio::sync::mpsc::channel::<Message>(100);
 
-        let (mut node_0, mut rx_o_0) = create_node("node_0".to_string(), true, rx_0);
-        let (mut node_1, mut rx_o_1) = create_node("node_1".to_string(), false, rx_1);
+        let (mut node_0, mut rx_o_0) = create_node("node_0".to_string(), rx_0);
+        let (mut node_1, mut rx_o_1) = create_node("node_1".to_string(),  rx_1);
 
         let node_0_id = node_0.id.clone();
         let node_1_id = node_1.id.clone();
