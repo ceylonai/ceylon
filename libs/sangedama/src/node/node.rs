@@ -1,7 +1,7 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::time::{Duration, SystemTime};
 
-use libp2p::{futures::StreamExt, gossipsub, mdns, swarm::{NetworkBehaviour, Swarm, SwarmEvent}, Multiaddr, SwarmBuilder, tcp, noise, yamux};
+use libp2p::{futures::StreamExt, gossipsub, mdns, swarm::{NetworkBehaviour, Swarm, SwarmEvent}, SwarmBuilder, tcp, noise, yamux};
 use libp2p_gossipsub::{MessageId, PublishError};
 use log::{debug, error};
 use serde::{Deserialize, Serialize};
