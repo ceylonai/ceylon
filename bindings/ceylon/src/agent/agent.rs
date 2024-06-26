@@ -69,7 +69,7 @@ impl AgentCore {
         let definition = self.definition().await;
         let agent_name = definition.name.clone();
         let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Message>(100);
-        let (mut node_0, mut rx_o_0) = create_node(agent_name.clone(), true, rx_0);
+        let (mut node_0, mut message_from_node) = create_node(agent_name.clone(), true, rx_0);
         let on_message = self._on_message.clone();
 
         self._definition.write().await.id = Some(node_0.id.clone());
@@ -77,15 +77,20 @@ impl AgentCore {
 
 
         let rx = Arc::clone(&self.rx_0);
-        let message_handler_process = tokio::spawn(async move {
+        let message_from_agent_impl_handler_process = tokio::spawn(async move {
             loop {
                 if let Some(message) = rx.lock().await.recv().await {
-                    info!( "Agent {:?} received message {:?}", agent_name, message);
+                    info!( "Agent {:?}  message to dispatch {:?}", agent_name, message);
                     tx_0.clone().send(message).await.unwrap();
                 }
-
-                if let Some(message) = rx_o_0.recv().await {
+            }
+        });
+        let agent_name = definition.name.clone();
+        let message_handler_process = tokio::spawn(async move {
+            loop {
+                if let Some(message) = message_from_node.recv().await {
                     if message.r#type == MessageType::Message {
+                        info!( "Agent {:?} received message from node {:?}", agent_name, message);
                         on_message.lock().await.on_message(agent_name.clone(), message).await;
                     }
                 }
@@ -100,9 +105,14 @@ impl AgentCore {
         node_0.connect(url.as_str(), topic.as_str());
         node_0.run().await;
 
-
         let agent_name = definition.name.clone();
+        info!( "Agent {:?} started", agent_name);
+
+
         select! {
+            _ = message_from_agent_impl_handler_process => {
+                info!("Agent {:?} message_from_agent_impl_handler_process stopped", agent_name);
+            },
             _ = message_handler_process => {
                 info!("Agent {:?} message_handler_process stopped", agent_name);
             },
