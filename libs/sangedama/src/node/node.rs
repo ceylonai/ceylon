@@ -104,6 +104,40 @@ struct NodeBehaviour {
     mdns: mdns::tokio::Behaviour,
 }
 
+impl NodeBehaviour {
+    fn new(key: &libp2p::identity::Keypair) -> Self {
+        let message_id_fn = |message: &gossipsub::Message| {
+            let mut s = DefaultHasher::new();
+            message.data.hash(&mut s);
+            gossipsub::MessageId::from(s.finish().to_string())
+        };
+
+        // Set a custom gossipsub configuration
+        let gossipsub_config = gossipsub::ConfigBuilder::default()
+            .heartbeat_initial_delay(Duration::from_secs(1))
+            .history_length(10)
+            .history_gossip(10)
+            .heartbeat_interval(Duration::from_secs(10)) // This is set to aid debugging by not cluttering the log space
+            .validation_mode(gossipsub::ValidationMode::Strict) // This sets the kind of message validation. The default is Strict (enforce message signing)
+            .message_id_fn(message_id_fn) // content-address messages. No two messages of the same content will be propagated.
+            .build()
+            .map_err(|msg| io::Error::new(io::ErrorKind::Other, msg))
+            .unwrap(); // Temporary hack because `build` does not return a proper `std::error::Error`.
+
+        // build a gossipsub network behaviour
+        let gossipsub = gossipsub::Behaviour::new(
+            gossipsub::MessageAuthenticity::Signed(key.clone()),
+            gossipsub_config,
+        ).unwrap();
+
+        Self {
+            gossipsub,
+            mdns: mdns::tokio::Behaviour::new(mdns::Config::default(), key.public().to_peer_id())
+                .unwrap(),
+        }
+    }
+}
+
 enum Event {
     Gossipsub(gossipsub::Event),
     Mdns(mdns::Event),
@@ -290,33 +324,7 @@ pub fn create_node(
         ).unwrap()
         .with_quic()
         .with_behaviour(|key| {
-            let message_id_fn = |message: &gossipsub::Message| {
-                let mut s = DefaultHasher::new();
-                message.data.hash(&mut s);
-                gossipsub::MessageId::from(s.finish().to_string())
-            };
-
-            // Set a custom gossipsub configuration
-            let gossipsub_config = gossipsub::ConfigBuilder::default()
-                .heartbeat_initial_delay(Duration::from_secs(1))
-                .history_length(10)
-                .history_gossip(10)
-                .heartbeat_interval(Duration::from_secs(10)) // This is set to aid debugging by not cluttering the log space
-                .validation_mode(gossipsub::ValidationMode::Strict) // This sets the kind of message validation. The default is Strict (enforce message signing)
-                .message_id_fn(message_id_fn) // content-address messages. No two messages of the same content will be propagated.
-                .build()
-                .map_err(|msg| io::Error::new(io::ErrorKind::Other, msg))
-                .unwrap(); // Temporary hack because `build` does not return a proper `std::error::Error`.
-
-            // build a gossipsub network behaviour
-            let gossipsub = gossipsub::Behaviour::new(
-                gossipsub::MessageAuthenticity::Signed(key.clone()),
-                gossipsub_config,
-            )?;
-
-            let mdns =
-                mdns::tokio::Behaviour::new(mdns::Config::default(), key.public().to_peer_id())?;
-            Ok(NodeBehaviour { gossipsub, mdns })
+            Ok(NodeBehaviour::new(key))
         })
         .unwrap()
         .build();
