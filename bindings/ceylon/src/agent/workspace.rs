@@ -37,7 +37,7 @@ impl Workspace {
         }
     }
 
-    pub async fn run(&self, inputs: HashMap<String, String>) {
+    pub async fn run(&self, inputs: Vec<u8>) {
         env_logger::init();
         debug!("Workspace {} running", self.id);
         let rt = tokio::runtime::Builder::new_multi_thread()
