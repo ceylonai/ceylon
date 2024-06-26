@@ -80,10 +80,6 @@ impl AgentCore {
         let (mut node_0, mut rx_o_0) = create_node(agent_name.clone(), true, rx_0);
         let on_message = self._on_message.clone();
 
-        let node_runner = tokio::spawn(async move {
-            node_0.connect(url.as_str(), topic.as_str());
-            node_0.run().await;
-        });
 
         let rx = Arc::clone(&self.rx_0);
         let message_handler_process = tokio::spawn(async move {
@@ -105,18 +101,19 @@ impl AgentCore {
             processor.lock().await.run(inputs).await;
         });
 
+        node_0.connect(url.as_str(), topic.as_str());
+        node_0.run().await;
+
+
+
         let agent_name = self._name.clone();
         select! {
-            _ = node_runner => { 
-                info!("Agent {:?} node_runner stopped", agent_name);
-            },
             _ = message_handler_process => {
                 info!("Agent {:?} message_handler_process stopped", agent_name);
             },
             _ = run_process => {
                 info!("Agent {:?} run_process stopped", agent_name);
-            },
-            
+            },            
         }
     }
 }
