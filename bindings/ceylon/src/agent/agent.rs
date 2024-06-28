@@ -60,7 +60,7 @@ impl AgentCore {
         let definition = self.definition().await;
         let agent_name = definition.name.clone();
         let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Message>(100);
-        let (mut node_0, mut message_from_node) = create_node(agent_name.clone(), rx_0);
+        let (mut node_0, mut message_from_node) = create_node(agent_name.clone(), rx_0).await;
         let on_message = self._on_message.clone();
 
         self._definition.write().await.id = Some(node_0.id.clone());
