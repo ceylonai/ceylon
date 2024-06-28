@@ -51,11 +51,7 @@ impl AgentCore {
     }
 
     pub async fn broadcast(&self, message: Vec<u8>) {
-        let msg = SystemMessage::Content(Message {
-            id: "1".to_string(),
-            content: message,
-            version: 1,
-        });
+        let msg = SystemMessage::Content(Message::new(message));
         self.tx_0.send(msg).await.unwrap();
     }
 
