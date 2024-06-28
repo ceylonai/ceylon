@@ -1,11 +1,22 @@
 use std::collections::{HashMap, HashSet};
+use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Message {
     pub id: String,
     pub content: Vec<u8>,
-    pub version: u64,
+    pub version: u128,
+}
+
+impl Message {
+    pub fn new(content: Vec<u8>) -> Self {
+        Self {
+            id: uuid::Uuid::new_v4().to_string(),
+            content,
+            version: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -43,7 +54,7 @@ impl SystemMessage {
 
 pub struct AgentState {
     received_messages: HashMap<String, Message>,
-    last_version: u64,
+    last_version: u128,
     pending_acks: HashSet<String>,
 }
 
@@ -68,7 +79,7 @@ impl AgentState {
         }
     }
 
-    fn get_messages_after(&self, version: u64) -> Vec<Message> {
+    fn get_messages_after(&self, version: u128) -> Vec<Message> {
         self.received_messages.values()
             .filter(|m| m.version > version)
             .cloned()
