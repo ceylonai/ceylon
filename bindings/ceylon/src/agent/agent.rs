@@ -17,13 +17,13 @@ pub struct AgentCore {
     _workspace_id: Option<String>,
     _processor: Arc<Mutex<Arc<dyn Processor>>>,
     _on_message: Arc<Mutex<Arc<dyn MessageHandler>>>,
-    rx_0: Arc<Mutex<tokio::sync::mpsc::Receiver<Vec<u8>>>>,
-    tx_0: tokio::sync::mpsc::Sender<Vec<u8>>,
+    rx_0: Arc<Mutex<tokio::sync::mpsc::Receiver<SystemMessage>>>,
+    tx_0: tokio::sync::mpsc::Sender<SystemMessage>,
 }
 
 impl AgentCore {
     pub fn new(definition: AgentDefinition, on_message: Arc<dyn MessageHandler>, processor: Arc<dyn Processor>) -> Self {
-        let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
+        let (tx_0, rx_0) = tokio::sync::mpsc::channel::<SystemMessage>(100);
         Self {
             _definition: RwLock::new(definition),
             _workspace_id: None,
@@ -51,10 +51,15 @@ impl AgentCore {
     }
 
     pub async fn broadcast(&self, message: Vec<u8>) {
-        self.tx_0.send(message).await.unwrap();
+        let msg = SystemMessage::Content(Message {
+            id: "1".to_string(),
+            content: message,
+            version: 1,
+        });
+        self.tx_0.send(msg).await.unwrap();
     }
 
-    pub fn get_tx_0(&self) -> tokio::sync::mpsc::Sender<Vec<u8>> {
+    pub fn get_tx_0(&self) -> tokio::sync::mpsc::Sender<SystemMessage> {
         self.tx_0.clone()
     }
 }
@@ -78,13 +83,8 @@ impl AgentCore {
                 if let Some(raw_message) = rx.lock().await.recv().await {
                     let name = definition_handler_process.name.clone();
                     match definition.id.clone() {
-                        Some(id) => {
-                            let msg = SystemMessage::Content(Message {
-                                id: "1".to_string(),
-                                content: raw_message.clone(),
-                                version: 1,
-                            });
-                            tx_0.send(NodeMessage::data(name, id, msg.to_bytes())).await.unwrap();
+                        Some(id) => {                          
+                            tx_0.send(NodeMessage::data(name, id, raw_message.to_bytes())).await.unwrap();
                         }
                         None => {
                             error!("Agent {} has no id", name);
