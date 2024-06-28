@@ -4,9 +4,13 @@ use log::{debug, error};
 use tokio::select;
 use tokio::sync::{Mutex, RwLock};
 
-use sangedama::node::node::{create_node, Message, MessageType};
+use sangedama::node::{
+    node::{create_node},
+    message::{NodeMessage, MessageType},
+};
 
 use crate::agent::agent_base::{AgentDefinition, MessageHandler, Processor};
+use crate::agent::state::{Message, SystemMessage};
 
 pub struct AgentCore {
     _definition: RwLock<AgentDefinition>,
@@ -59,7 +63,7 @@ impl AgentCore {
     pub(crate) async fn start(&self, topic: String, url: String, inputs: Vec<u8>) {
         let definition = self.definition().await;
         let agent_name = definition.name.clone();
-        let (tx_0, rx_0) = tokio::sync::mpsc::channel::<Message>(100);
+        let (tx_0, rx_0) = tokio::sync::mpsc::channel::<NodeMessage>(100);
         let (mut node_0, mut message_from_node) = create_node(agent_name.clone(), rx_0).await;
         let on_message = self._on_message.clone();
 
@@ -71,11 +75,16 @@ impl AgentCore {
         let definition_handler_process = definition.clone();
         let message_from_agent_impl_handler_process = tokio::spawn(async move {
             loop {
-                if let Some(message) = rx.lock().await.recv().await {
+                if let Some(raw_message) = rx.lock().await.recv().await {
                     let name = definition_handler_process.name.clone();
                     match definition.id.clone() {
                         Some(id) => {
-                            tx_0.send(Message::data(name, id, message)).await.unwrap();
+                            let msg = SystemMessage::Content(Message {
+                                id: "1".to_string(),
+                                content: raw_message.clone(),
+                                version: 1,
+                            });
+                            tx_0.send(NodeMessage::data(name, id, msg.to_bytes())).await.unwrap();
                         }
                         None => {
                             error!("Agent {} has no id", name);
@@ -87,11 +96,24 @@ impl AgentCore {
         let agent_name = definition.name.clone();
         let message_handler_process = tokio::spawn(async move {
             loop {
-                if let Some(message) = message_from_node.recv().await {
-                    if message.r#type == MessageType::Message {
-                        debug!( "Agent {:?} received message from node {:?}", agent_name, message);
-                        let data = message.data.clone();
-                        on_message.lock().await.on_message(agent_name.clone(), data, message.time).await;
+                if let Some(node_message) = message_from_node.recv().await {
+                    if node_message.r#type == MessageType::Message {
+                        debug!( "Agent {:?} received message from node {:?}", agent_name, node_message);
+                        let data = SystemMessage::from_bytes(node_message.data.clone());
+                        match data {
+                            SystemMessage::Content(message) => {
+                                on_message.lock().await.on_message(agent_name.clone(), message.content, node_message.time).await;
+                            }
+                            SystemMessage::SyncRequest { last_version } => {
+                                // on_message.lock().await.on_sync_request(last_version).await;
+                            }
+                            SystemMessage::SyncResponse { messages } => {
+                                // on_message.lock().await.on_sync_response(messages).await;
+                            }
+                            SystemMessage::Ack { message_id } => {
+                                // on_message.lock().await.on_ack(message_id).await;
+                            }
+                        }
                     }
                 }
             }
@@ -152,7 +174,7 @@ mod tests {
     #[async_trait::async_trait]
     impl Processor for AgentHandler {
         async fn run(&self, input: Vec<u8>) -> () {
-            println!("Agent received input {:?}",input);
+            println!("Agent received input {:?}", input);
             loop {
                 println!("AgentHandler ");
                 self.tx_0.send(
@@ -175,22 +197,12 @@ mod tests {
                                 Arc::new(AgentHandler {
                                     tx_0: tx_0.clone(),
                                 }), );
-        // let tx = ag.get_tx_0();
-        // tokio::spawn(async move {
-        //     loop {
-        //         if let Some(message) = rx_0.recv().await {
-        //             tx.send(message).await.unwrap();
-        //         }
-        //     }
-        // });
-
         return ag;
     }
 
 
     #[tokio::test]
     async fn test_agent() {
-        env_logger::init();
         let agent = create_agent(AgentDefinition {
             id: None,
             name: "test".to_string(),

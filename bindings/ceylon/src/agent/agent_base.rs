@@ -1,8 +1,6 @@
 use std::fmt::Debug;
-
 use serde::{Deserialize, Serialize};
 
-use sangedama::node::node::Message;
 
 #[async_trait::async_trait]
 pub trait MessageHandler: Send + Sync + Debug {
