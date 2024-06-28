@@ -53,23 +53,4 @@ class LLMAgent(AgentCore, MessageHandler, Processor):
 
         print(self.queue)
 
-    # def update_status(self, agent):
-    #     if agent not in self.queue:
-    #         print(f"Agent {agent} is not ready to execute or has already been executed.")
-    #         return
-    #
-    #     self.queue.remove(agent)
-    #     self.executed.append(agent)
-    #     print(f"Executing {agent}")
-    #
-    #     # Remove the current agent and update the graph
-    #     for successor in list(self.network_graph.successors(agent)):
-    #         self.network_graph.remove_edge(agent, successor)
-    #         if self.network_graph.in_degree(successor) == 0:
-    #             self.queue.append(successor)
-    #     self.network_graph.remove_node(agent)
-    #
-    #     if not self.network_graph.nodes:
-    #         print("Workflow executed successfully.")
-    #     elif not self.queue:
-    #         print("Cycle detected in the workflow!")
+
