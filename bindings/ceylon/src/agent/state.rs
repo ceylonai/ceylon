@@ -14,6 +14,11 @@ pub enum SystemMessage {
     SyncRequest { last_version: u64 },
     SyncResponse { messages: Vec<Message> },
     Ack { message_id: String },
+    Beacon {
+        name: String,
+        sender: String,
+        time: u64,
+    },
 }
 
 impl SystemMessage {
@@ -23,6 +28,7 @@ impl SystemMessage {
             SystemMessage::SyncRequest { .. } => "sync_request".to_string(),
             SystemMessage::SyncResponse { .. } => "sync_response".to_string(),
             SystemMessage::Ack { message_id } => message_id.clone(),
+            SystemMessage::Beacon { .. } => "beacon".to_string(),
         }
     }
 
