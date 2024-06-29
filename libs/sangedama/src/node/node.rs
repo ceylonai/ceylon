@@ -64,7 +64,7 @@ impl Node {
             }
         }
 
-        self.swarm.listen_on("/ip4/0.0.0.0/udp/0/quic-v1".parse().unwrap()).unwrap();
+        self.swarm.listen_on(url.parse().unwrap()).unwrap();
     }
 
     pub fn broadcast(&mut self, message: NodeMessage) -> Result<Vec<MessageId>, PublishError> {
@@ -286,10 +286,10 @@ mod tests {
     #[tokio::test]
     async fn test_ping() {
         env_logger::init();
-        let port_id = 8888;
+        let port_id = 0;
         let topic = "test_topic";
 
-        let url = format!("/ip4/0.0.0.0/tcp/{}", port_id);
+        let url = format!("/ip4/0.0.0.0/udp/{}/quic-v1", port_id);
 
         let (tx_0, mut rx_0) = tokio::sync::mpsc::channel::<NodeMessage>(100);
         let (tx_1, mut rx_1) = tokio::sync::mpsc::channel::<NodeMessage>(100);
