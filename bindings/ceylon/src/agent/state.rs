@@ -1,4 +1,3 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use log::info;
@@ -8,11 +7,11 @@ use tokio::sync::RwLock;
 pub static SYSTEM_MESSAGE_CONTENT_TYPE: &str = "ceylon.system.message.content";
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Message {
-    pub id: String,
-    pub sender_id: Option<String>,
     pub sender: String,
+    pub sender_id: Option<String>,
+    pub id: String,
     pub content: Vec<u8>,
-    pub version: f64,
+    pub version: u128,
 }
 
 impl Message {
@@ -20,7 +19,7 @@ impl Message {
         Self {
             id: uuid::Uuid::new_v4().to_string(),
             content,
-            version: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs_f64(),
+            version: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos(),
             sender_id,
             sender,
         }
@@ -30,13 +29,13 @@ impl Message {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum SystemMessage {
     Content(Message),
-    SyncRequest { versions: Vec<f64> },
+    SyncRequest { versions: Vec<u128> },
     SyncResponse { messages: Vec<Message> },
     Beacon {
         name: String,
         sender: String,
-        time: f64,
-        sync_hash: u64,
+        time: u128,
+        sync_hash: u128,
     },
 }
 
@@ -72,29 +71,26 @@ pub type AgentStateMessageList = Vec<Message>;
 #[derive(Debug)]
 pub struct AgentStateSnap {
     pub messages: AgentStateMessageList,
-    pub last_version: f64,
+    pub last_version: u128,
 }
 
 impl AgentStateSnap {
-    pub fn versions(&self) -> Vec<f64> {
+    pub fn versions(&self) -> Vec<u128> {
         self.messages
             .iter()
             .map(|message| message.version)
             .collect()
     }
 
-    pub fn sync_hash(&self) -> u64 {
-        let versions = self.versions();
-        let mut hash = DefaultHasher::new();
-
-        for version in versions {
-            format!("{}", version).hash(&mut hash);
+    pub fn sync_hash(&self) -> u128 {
+        let mut hash = 0u128;
+        for message in &self.messages {
+            hash ^= message.version;
         }
-
-        hash.finish()
+        hash
     }
 
-    pub fn missing_versions(&self, versions: Vec<f64>) -> Vec<f64> {
+    pub fn missing_versions(&self, versions: Vec<u128>) -> Vec<u128> {
         let mut missing_versions = Vec::new();
         for version in versions {
             if !self.versions().contains(&version) {
@@ -103,8 +99,8 @@ impl AgentStateSnap {
         }
         missing_versions
     }
-
-    pub fn get_messages(&self, versions: Vec<f64>) -> Vec<Message> {
+    
+    pub fn get_messages(&self, versions: Vec<u128>) -> Vec<Message> {
         let mut messages = Vec::new();
         for version in versions {
             if let Some(message) = self.messages.iter().find(|message| message.version == version) {
@@ -118,14 +114,14 @@ impl AgentStateSnap {
 #[derive(Default)]
 pub struct AgentState {
     messages: RwLock<AgentStateMessageList>,
-    last_version: RwLock<f64>,
+    last_version: RwLock<u128>,
 }
 
 impl AgentState {
     pub fn new() -> Self {
         Self {
             messages: RwLock::new(Vec::new()),
-            last_version: RwLock::new(0.0),
+            last_version: RwLock::new(0),
         }
     }
 
@@ -152,7 +148,7 @@ impl AgentState {
         info!("Started updating ordered by version");
         let mut messages = self.messages.read().await.clone();
         let mut ordered_messages = Vec::new();
-        messages.sort_by(|a, b| a.version.partial_cmp(&b.version).unwrap());
+        messages.sort_by(|a, b| a.version.cmp(&b.version));
         for message in messages {
             ordered_messages.push(message);
         }

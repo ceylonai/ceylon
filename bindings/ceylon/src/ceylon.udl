@@ -2,14 +2,6 @@ namespace ceylon {
   string version();
 };
 
-dictionary Message{
-    string id;
-    string? sender_id="";
-    string sender;
-    bytes content;
-    f64 version;
-};
-
 dictionary AgentDefinition{
     string? id="";
     string name;
