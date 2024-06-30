@@ -51,9 +51,7 @@ impl AgentCore {
     }
 
     pub async fn broadcast(&self, message: Vec<u8>) {
-        let name = self.definition().await.name.clone();
-        let id = self.id().await;
-        let msg = SystemMessage::Content(Message::new(message, Some(id), name));
+        let msg = SystemMessage::Content(Message::new(message));
         self.sender_from_outside_tx.send(msg).await.unwrap();
     }
 
@@ -75,7 +73,7 @@ impl AgentCore {
 
         let (agent_state_message_sender_tx, mut agent_state_message_receiver) = tokio::sync::mpsc::channel::<Message>(100);
 
-        // State Message Handle here
+        
         let agent_state = AgentState::new();
         let agent_state_message_processor = tokio::spawn(async move {
             loop {
@@ -94,11 +92,9 @@ impl AgentCore {
         });
 
 
-        // Message distributed to other nodes
         let receiver_from_outside_rx = Arc::clone(&self.receiver_from_outside_rx);
         let definition_handler_process = definition.clone();
         let agent_state_message_sender_tx_c1 = agent_state_message_sender_tx.clone();
-        let agent_id = definition.id.clone().unwrap_or("".to_string());
         let message_from_agent_impl_handler_process = tokio::spawn(async move {
             loop {
                 if let Some(raw_message) = receiver_from_outside_rx.lock().await.recv().await {
@@ -107,14 +103,11 @@ impl AgentCore {
                         Some(id) => {
                             let msg = NodeMessage::data(name, id, raw_message.to_bytes());
                             tx_0.send(msg).await.unwrap();
-
-                            if let SystemMessage::Content(message) = raw_message {
-                                let mut msg = message.clone();
-                                if msg.sender_id.is_none() {
-                                    msg.sender_id = Some(agent_id.clone());
-                                }
-                                agent_state_message_sender_tx_c1.send(msg).await.unwrap();
+                            
+                            if raw_message.get_id() == SYSTEM_MESSAGE_CONTENT_TYPE {
+                                agent_state_message_sender_tx_c1.send(Message::new(raw_message.to_bytes())).await.unwrap();
                             }
+                            
                         }
                         None => {
                             error!("Agent {} has no id", name);
@@ -123,8 +116,6 @@ impl AgentCore {
                 }
             }
         });
-
-        // Agent receive message from other nodes
         let agent_name = definition.name.clone();
         let agent_state_message_sender_tx_c1 = agent_state_message_sender_tx.clone();
         let message_handler_process = tokio::spawn(async move {
@@ -157,13 +148,11 @@ impl AgentCore {
             }
         });
 
-        // Handle run process 
         let processor = self._processor.clone();
         let run_process = tokio::spawn(async move {
             processor.lock().await.run(inputs).await;
         });
 
-        // Handle sync process
         let node_message_sender = self.get_tx_0();
         let definition = self.definition().await;
         let run_sync_request = tokio::spawn(async move {

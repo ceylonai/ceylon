@@ -1,27 +1,24 @@
+use std::collections::{HashMap, HashSet};
 use std::time::{SystemTime, UNIX_EPOCH};
-
 use log::info;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
+
 pub static SYSTEM_MESSAGE_CONTENT_TYPE: &str = "ceylon.system.message.content";
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Message {
-    pub sender: String,
-    pub sender_id: Option<String>,
     pub id: String,
     pub content: Vec<u8>,
     pub version: u128,
 }
 
 impl Message {
-    pub fn new(content: Vec<u8>, sender_id: Option<String>, sender: String) -> Self {
+    pub fn new(content: Vec<u8>) -> Self {
         Self {
             id: uuid::Uuid::new_v4().to_string(),
             content,
             version: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos(),
-            sender_id,
-            sender,
         }
     }
 }
