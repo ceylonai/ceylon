@@ -4,57 +4,36 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.utils.function_calling import format_tool_to_openai_function
 
 
-def process_agent_request(llm, inputs, agent_definition, tools=[]):
+def process_agent_request(llm, inputs, agent_definition, tools=None):
     template = """
-        **Role:** {role}
-        **Responsibilities:** {responsibilities}
-        **Instructions:** {instructions}
-        **Task:**
-        {task_info}
-        """
+    **Role:** {role}
+    **Responsibilities:** {responsibilities}
+    **Instructions:** {instructions}
+    **Task:**
+    {task_info}
+    """
 
-    # Create a PromptTemplate instance
-    prompt = PromptTemplate(template=template,
-                            input_variables=["role", "responsibilities", "instructions", "task_info"])
+    prompt = PromptTemplate(
+        template=template,
+        input_variables=["role", "responsibilities", "instructions", "task_info"]
+    )
 
-    # Define a ToolChain to use the Retriever and Processor tools
+    formatted_inputs = {
+        "role": agent_definition.position,
+        "responsibilities": " ".join(agent_definition.responsibilities),
+        "instructions": " ".join(agent_definition.instructions),
+        "task_info": "\n".join(f"**{key.capitalize()}:** {value}" for key, value in inputs.items())
+    }
 
-    if tools is not None and len(tools) > 0:
-        llm.bind(
-            functions=[format_tool_to_openai_function(t) for t in tools],
-        )
-        agent = (
-                prompt
-                | llm
-                | OpenAIFunctionsAgentOutputParser()
-        )
-        # Initialize the agent executor
-        agent_executor = AgentExecutor(agent=agent,
-                                       tools=tools if tools is not None else [],
-                                       verbose=True)
-
-        response = agent_executor.invoke({
-            "role": agent_definition.position,
-            "responsibilities": " ".join(agent_definition.responsibilities),
-            "instructions": " ".join(agent_definition.instructions),
-            "task_info": "\n".join(
-                [f"**{key.capitalize()}:** {value}" for key, value in inputs.items()])
-        })
-        response = response.get("output")
+    if tools:
+        print(f"Using tools {tools} for {agent_definition.name}")
+        llm = llm.bind(functions=[format_tool_to_openai_function(t) for t in tools])
+        agent = prompt | llm | OpenAIFunctionsAgentOutputParser()
+        executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+        response = executor.invoke(formatted_inputs)
+        return response["output"]
     else:
-        agent = (
-                prompt
-                | llm
-        )
-        response = agent.invoke(
-            {
-                "role": agent_definition.position,
-                "responsibilities": " ".join(agent_definition.responsibilities),
-                "instructions": " ".join(agent_definition.instructions),
-                "task_info": "\n".join(
-                    [f"**{key.capitalize()}:** {value}" for key, value in inputs.items()])
-            }
-        )
-        response = response.content
-
-    return response
+        print("Not using tools")
+        agent = prompt | llm
+        response = agent.invoke(formatted_inputs)
+        return response.content
