@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
+use tokio::sync::RwLock;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Message {
@@ -53,40 +54,42 @@ impl SystemMessage {
 }
 
 pub struct AgentState {
-    received_messages: HashMap<String, Message>,
-    last_version: u128,
-    pending_acks: HashSet<String>,
+    messages: RwLock<Vec<Message>>,
+    last_version: RwLock<u128>,
 }
 
 impl AgentState {
-    fn new() -> Self {
-        AgentState {
-            received_messages: HashMap::new(),
-            last_version: 0,
-            pending_acks: HashSet::new(),
+    pub fn new() -> Self {
+        Self {
+            messages: RwLock::new(Vec::new()),
+            last_version: RwLock::new(0),
         }
     }
 
-    fn add_message(&mut self, message: Message) -> bool {
-        if message.version > self.last_version {
-            let id = message.id.clone();
-            self.received_messages.insert(id.clone(), message.clone());
-            self.last_version = message.version;
-            self.pending_acks.insert(message.id);
-            true
-        } else {
-            false
+    pub async fn add_message(&self, message: Message) {
+        self.messages.write().await.push(message);
+        self.order_by_version().await;
+        let last_message = self.get_last_message().await;
+        let last_version = self.last_version.read().await;
+        if last_version.lt(&last_message.version) {
+            *self.last_version.write().await = last_message.version;
         }
     }
 
-    fn get_messages_after(&self, version: u128) -> Vec<Message> {
-        self.received_messages.values()
-            .filter(|m| m.version > version)
-            .cloned()
-            .collect()
+    pub async fn get_last_message(&self) -> Message {
+        let messages = self.messages.read().await.clone();
+        messages.last().unwrap().clone()
     }
 
-    fn acknowledge_message(&mut self, message_id: &String) {
-        self.pending_acks.remove(message_id);
+    pub async fn order_by_version(&self) {
+        let mut messages = self.messages.read().await.clone();
+        let mut ordered_messages = Vec::new();
+        messages.sort_by(|a, b| a.version.cmp(&b.version));
+        for message in messages {
+            ordered_messages.push(message);
+        }
+        let mut update_messages = self.messages.write().await;
+        update_messages.clear();
+        update_messages.extend(ordered_messages);
     }
 }
