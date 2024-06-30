@@ -20,12 +20,12 @@ class AgentRunner:
     agents = []
     config: WorkspaceConfig
 
-    def __init__(self, workspace_name, workspace_host="0.0.0.0", workspace_port=0):
+    def __init__(self, workspace_name, workspace_host="/ip4/0.0.0.0/udp", workspace_port=8888):
         self.agents = []
         self.config = WorkspaceConfig(name=workspace_name, host=workspace_host, port=workspace_port)
 
     def register_agent(self, agent: AgentCore):
-        self.agents.appendcd(agent)
+        self.agents.append(agent)
 
     async def run(self, inputs, network: Dict[str, List[str]] = None):
         uniffi_set_event_loop(asyncio.get_event_loop())

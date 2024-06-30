@@ -101,13 +101,13 @@ impl AgentCore {
                                 on_message.lock().await.on_message(agent_name.clone(), message.content, node_message.time).await;
                             }
                             SystemMessage::SyncRequest { last_version } => {
-                                // Todo
+                                // on_message.lock().await.on_sync_request(last_version).await;
                             }
                             SystemMessage::SyncResponse { messages } => {
-                                // Todo
+                                // on_message.lock().await.on_sync_response(messages).await;
                             }
                             SystemMessage::Ack { message_id } => {
-                                // Todo
+                                // on_message.lock().await.on_ack(message_id).await;
                             }
                             SystemMessage::Beacon { time, sender, name } => {
                                 info!( "Agent {:?} received beacon {:?} from {:?} at {:?}", agent_name, sender, name, time);
@@ -246,8 +246,8 @@ mod tests {
 
         let workspace = Workspace::new(vec![Arc::new(agent), Arc::new(agent2)], WorkspaceConfig {
             name: "test".to_string(),
-            host: "0.0.0.0".to_string(),
-            port: 0,
+            host: "127.0.0.1".to_string(),
+            port: 8080,
         });
         workspace.run(json!({"test": "test"}).to_string().as_bytes().to_vec()).await;
     }

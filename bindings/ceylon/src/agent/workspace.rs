@@ -47,7 +47,7 @@ impl Workspace {
         let _inputs = inputs.clone();
         for agent in self._agents.iter() {
             let _inputs = _inputs.clone();
-            let url = format!("/ip4/{}/udp/{}/quic-v1", self.host, self.port);
+            let url = format!("{}/{}/quic-v1", self.host, self.port);
             let topic = format!("workspace-{}", agent.workspace_id());
 
             let agent = agent.clone();
