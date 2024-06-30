@@ -1,5 +1,4 @@
 import asyncio
-import pickle
 import random
 import time
 
@@ -17,23 +16,25 @@ class Agent(AgentCore, MessageHandler, Processor):
             responsibilities=responsibilities
         ), on_message=self, processor=self)
 
-    async def on_message(self, agent_id, data, time):
+    async def on_message(self, agent_id, message):
         definition = await self.definition()
-        dt = pickle.loads(data)
-        print(definition.id, agent_id, dt, time)
+        name = definition.name
+        id = definition.id
+        print(f"{name} on_message", agent_id, message)
+        if message.type == MessageType.MESSAGE:
+            dt = bytes(message.data)
+            print(id, name, dt.decode("utf-8"), message.originator_id, message.originator)
 
-        ## Write to txt file
-        # with open(f"test_{name}.txt", "a") as f:
-        #     f.write(dt.decode("utf-8") + "\n")
+            ## Write to txt file
+            with open(f"test_{name}.txt", "a") as f:
+                f.write(dt.decode("utf-8") + "\n")
 
     async def run(self, inputs):
         definition = await self.definition()
+        print(f"{definition.name} run", inputs)
         while True:
-            await self.broadcast(pickle.dumps({
-                "title": "How to use AI for Machine Learning",
-                "sender": definition.name
-            }))
-            await asyncio.sleep(random.randint(1, 10))
+            await self.broadcast(bytes("Hi from " + definition.name + " at " + str(time.time()), "utf-8"))
+            await asyncio.sleep(random.randint(1, 2))
 
 
 #
@@ -48,7 +49,7 @@ async def main():
     runner.register_agent(Agent(name="ceylon-ai-3", responsibilities=["writer", "researcher"],
                                 instructions=["How to use AI for Machine Learning"], position="leader"))
 
-    for i in range(4, 5):
+    for i in range(4, 50):
         runner.register_agent(Agent(name=f"ceylon-ai-{i}", responsibilities=["writer", "researcher"],
                                     instructions=["How to use AI for Machine Learning"], position="leader"))
 

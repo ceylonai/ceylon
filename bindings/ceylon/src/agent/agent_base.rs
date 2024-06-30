@@ -6,7 +6,7 @@ use sangedama::node::node::Message;
 
 #[async_trait::async_trait]
 pub trait MessageHandler: Send + Sync + Debug {
-    async fn on_message(&self, agent_id: String, data: Vec<u8>, time: u64);
+    async fn on_message(&self, agent_id: String, message: Message);
 }
 
 #[async_trait::async_trait]

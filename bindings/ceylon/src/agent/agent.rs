@@ -87,8 +87,7 @@ impl AgentCore {
                 if let Some(message) = message_from_node.recv().await {
                     if message.r#type == MessageType::Message {
                         debug!( "Agent {:?} received message from node {:?}", agent_name, message);
-                        let data = message.data.clone();
-                        on_message.lock().await.on_message(agent_name.clone(), data, message.time).await;
+                        on_message.lock().await.on_message(agent_name.clone(), message).await;
                     }
                 }
             }
