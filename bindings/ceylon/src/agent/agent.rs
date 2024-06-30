@@ -10,15 +10,17 @@ use sangedama::node::{
 };
 
 use crate::agent::agent_base::{AgentDefinition, MessageHandler, Processor};
-use crate::agent::state::{Message, SystemMessage};
+use crate::agent::state::{AgentState, Message, SystemMessage};
 
 pub struct AgentCore {
     _definition: RwLock<AgentDefinition>,
     _workspace_id: Option<String>,
     _processor: Arc<Mutex<Arc<dyn Processor>>>,
     _on_message: Arc<Mutex<Arc<dyn MessageHandler>>>,
-    rx_0: Arc<Mutex<tokio::sync::mpsc::Receiver<SystemMessage>>>,
-    tx_0: tokio::sync::mpsc::Sender<SystemMessage>,
+    receiver_from_outside_rx: Arc<Mutex<tokio::sync::mpsc::Receiver<SystemMessage>>>,
+    sender_from_outside_tx: tokio::sync::mpsc::Sender<SystemMessage>,
+
+    state: Arc<Mutex<RwLock<AgentState>>>,
 }
 
 impl AgentCore {
@@ -29,8 +31,9 @@ impl AgentCore {
             _workspace_id: None,
             _on_message: Arc::new(Mutex::new(on_message)),
             _processor: Arc::new(Mutex::new(processor)),
-            rx_0: Arc::new(Mutex::new(rx_0)),
-            tx_0,
+            receiver_from_outside_rx: Arc::new(Mutex::new(rx_0)),
+            sender_from_outside_tx: tx_0,
+            state: Arc::new(Mutex::new(RwLock::new(AgentState::new()))),
         }
     }
 
@@ -52,16 +55,16 @@ impl AgentCore {
 
     pub async fn broadcast(&self, message: Vec<u8>) {
         let msg = SystemMessage::Content(Message::new(message));
-        self.tx_0.send(msg).await.unwrap();
+        self.sender_from_outside_tx.send(msg).await.unwrap();
     }
 
     pub fn get_tx_0(&self) -> tokio::sync::mpsc::Sender<SystemMessage> {
-        self.tx_0.clone()
+        self.sender_from_outside_tx.clone()
     }
 }
 
 impl AgentCore {
-    pub(crate) async fn start(&self, topic: String, url: String, inputs: Vec<u8>) {
+    pub async fn start(&self, topic: String, url: String, inputs: Vec<u8>) {
         let definition = self.definition().await;
         let agent_name = definition.name.clone();
         let (tx_0, rx_0) = tokio::sync::mpsc::channel::<NodeMessage>(100);
@@ -71,16 +74,30 @@ impl AgentCore {
         self._definition.write().await.id = Some(node_0.id.clone());
         let definition = self.definition().await;
 
+        let (agent_state_message_sender_tx, mut agent_state_message_receiver) = tokio::sync::mpsc::channel::<Message>(100);
 
-        let rx = Arc::clone(&self.rx_0);
+        let agent_state = Arc::clone(&self.state);
+        let agent_state_message_processor = tokio::spawn(async move {
+            loop {
+                if let Some(message) = agent_state_message_receiver.recv().await {
+                    agent_state.lock().await.write().await.add_message(message).await;
+                }
+            }
+        });
+
+
+        let receiver_from_outside_rx = Arc::clone(&self.receiver_from_outside_rx);
         let definition_handler_process = definition.clone();
+        let agent_state_message_sender_tx_c1 = agent_state_message_sender_tx.clone();
         let message_from_agent_impl_handler_process = tokio::spawn(async move {
             loop {
-                if let Some(raw_message) = rx.lock().await.recv().await {
+                if let Some(raw_message) = receiver_from_outside_rx.lock().await.recv().await {
                     let name = definition_handler_process.name.clone();
                     match definition.id.clone() {
                         Some(id) => {
-                            tx_0.send(NodeMessage::data(name, id, raw_message.to_bytes())).await.unwrap();
+                            let msg = NodeMessage::data(name, id, raw_message.to_bytes());
+                            tx_0.send(msg).await.unwrap();
+                            agent_state_message_sender_tx_c1.send(Message::new(raw_message.to_bytes())).await.unwrap();
                         }
                         None => {
                             error!("Agent {} has no id", name);
@@ -90,6 +107,7 @@ impl AgentCore {
             }
         });
         let agent_name = definition.name.clone();
+        let message_from_node_tx = agent_state_message_sender_tx.clone();
         let message_handler_process = tokio::spawn(async move {
             loop {
                 if let Some(node_message) = message_from_node.recv().await {
@@ -123,28 +141,28 @@ impl AgentCore {
             processor.lock().await.run(inputs).await;
         });
 
-        let node_message_sender = self.get_tx_0();
-        let definition = self.definition().await;
-        let run_beacon = tokio::spawn(async move {
-            loop {
-                match definition.clone().id {
-                    Some(id) => {
-                        node_message_sender.send(
-                            SystemMessage::Beacon {
-                                name: definition.clone().name.clone(),
-                                sender: id.clone(),
-                                time: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
-                            }
-                        ).await.expect("TODO: panic message");
-                        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
-                    }
-                    None => {
-                        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-                        continue;
-                    }
-                }
-            }
-        });
+        // let node_message_sender = self.get_tx_0();
+        // let definition = self.definition().await;
+        // let run_beacon = tokio::spawn(async move {
+        //     loop {
+        //         match definition.clone().id {
+        //             Some(id) => {
+        //                 node_message_sender.send(
+        //                     SystemMessage::Beacon {
+        //                         name: definition.clone().name.clone(),
+        //                         sender: id.clone(),
+        //                         time: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+        //                     }
+        //                 ).await.expect("TODO: panic message");
+        //                 tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+        //             }
+        //             None => {
+        //                 tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+        //                 continue;
+        //             }
+        //         }
+        //     }
+        // });
 
         node_0.connect(url.as_str(), topic.as_str());
         node_0.run().await;
@@ -164,8 +182,11 @@ impl AgentCore {
             _ = run_process => {
                 debug!("Agent {:?} run_process stopped", agent_name);
             },
-            _ = run_beacon => {
-                debug!("Agent {:?} run_process stopped", agent_name);
+            // _ = run_beacon => {
+            //     debug!("Agent {:?} run_process stopped", agent_name);
+            // },
+            _ = agent_state_message_processor => {
+                debug!("Agent {:?} agent_state_message_processor stopped", agent_name);
             },
         }
     }
