@@ -1,4 +1,4 @@
 pub mod agent;
 pub mod workspace;
 pub mod agent_base;
-mod state;
+pub mod state;
