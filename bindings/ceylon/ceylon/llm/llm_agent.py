@@ -41,7 +41,7 @@ class LLMAgent(AgentCore, MessageHandler, Processor):
     async def on_message(self, agent_id, data, time):
         definition = await self.definition()
         dt: LLMAgentResponse = pickle.loads(data)
-        print(f"{definition.name} Received message from = '{agent_id}' message= {dt.response}", agent_id, dt.agent_name)
+        print(f"{definition.name} Received message from = '{dt.agent_name}")
 
         next_agent = self.get_next_agent()
         if next_agent == dt.agent_name:
