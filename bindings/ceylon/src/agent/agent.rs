@@ -207,7 +207,7 @@ impl AgentCore {
                     Some(id) => {
                         let snapshot = agent_state_clone_sync_process.lock().await.request_snapshot().await;
                         let beacon_message = SystemMessage::Beacon {
-                            time: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis(),
+                            time: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs_f64(),
                             sender: id.clone(),
                             name: definition.name.clone(),
                             sync_hash: snapshot.sync_hash(),
