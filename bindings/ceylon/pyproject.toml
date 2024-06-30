@@ -34,7 +34,8 @@ dependencies = [
     "pydantic==2.7.4",
     "langchain==0.2.6",
     "duckduckgo-search==6.1.7",
-    "langchain-community==0.2.6"
+    "langchain-community==0.2.6",
+    "openai==1.35.7"
 ]
 
 [project.urls]
