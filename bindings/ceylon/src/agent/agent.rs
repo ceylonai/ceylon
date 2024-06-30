@@ -86,11 +86,11 @@ impl AgentCore {
                     debug!( "Message: {:?}", message);
                     {
                         agent_state_clone.lock().await.add_message(message).await;
-                        println!("AgentState updated");
+                        debug!("AgentState updated");
                     }
                     {
                         let snapshot = agent_state_clone.lock().await.request_snapshot().await;
-                        println!("Snapshot: {:?}", snapshot);
+                        debug!("Snapshot: {:?}", snapshot);
                     }
                 }
             }
