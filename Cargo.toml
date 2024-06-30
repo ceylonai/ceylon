@@ -2,4 +2,4 @@
 members = [
     "libs/sangedama",
     "libs/utils/utils-random-names",
-    "bindings/ceylon", "libs/sangathika", ]
+    "bindings/ceylon", ]
