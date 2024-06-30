@@ -21,6 +21,19 @@ interface AgentCore{
     void broadcast(bytes message);
 };
 
+enum MessageType{
+    "Message",
+    "Event",
+};
+
+dictionary Message{
+    bytes data;
+    string message;
+    u64 time;
+    string originator;
+    string originator_id;
+    MessageType type;
+};
 
 [Trait,WithForeign]
 interface MessageHandler {
