@@ -10,7 +10,7 @@ use sangedama::node::{
 };
 
 use crate::agent::agent_base::{AgentDefinition, MessageHandler, Processor};
-use crate::agent::state::{AgentState, Message, SYSTEM_MESSAGE_CONTENT_TYPE, SystemMessage};
+use crate::agent::state::{AgentState, Message, SystemMessage};
 
 pub struct AgentCore {
     _definition: RwLock<AgentDefinition>,
@@ -19,6 +19,8 @@ pub struct AgentCore {
     _on_message: Arc<Mutex<Arc<dyn MessageHandler>>>,
     receiver_from_outside_rx: Arc<Mutex<tokio::sync::mpsc::Receiver<SystemMessage>>>,
     sender_from_outside_tx: tokio::sync::mpsc::Sender<SystemMessage>,
+
+    state: Arc<Mutex<RwLock<AgentState>>>,
 }
 
 impl AgentCore {
@@ -31,6 +33,7 @@ impl AgentCore {
             _processor: Arc::new(Mutex::new(processor)),
             receiver_from_outside_rx: Arc::new(Mutex::new(rx_0)),
             sender_from_outside_tx: tx_0,
+            state: Arc::new(Mutex::new(RwLock::new(AgentState::new()))),
         }
     }
 
@@ -73,20 +76,11 @@ impl AgentCore {
 
         let (agent_state_message_sender_tx, mut agent_state_message_receiver) = tokio::sync::mpsc::channel::<Message>(100);
 
-        
-        let agent_state = AgentState::new();
+        let agent_state = Arc::clone(&self.state);
         let agent_state_message_processor = tokio::spawn(async move {
             loop {
                 if let Some(message) = agent_state_message_receiver.recv().await {
-                    info!( "Message: {:?}", message);
-                    {
-                        agent_state.add_message(message).await;
-                        println!("AgentState updated");
-                    }
-                    {
-                        let snapshot = agent_state.request_snapshot().await;
-                        println!("Snapshot: {:?}", snapshot);
-                    }
+                    agent_state.lock().await.write().await.add_message(message).await;
                 }
             }
         });
@@ -103,11 +97,7 @@ impl AgentCore {
                         Some(id) => {
                             let msg = NodeMessage::data(name, id, raw_message.to_bytes());
                             tx_0.send(msg).await.unwrap();
-                            
-                            if raw_message.get_id() == SYSTEM_MESSAGE_CONTENT_TYPE {
-                                agent_state_message_sender_tx_c1.send(Message::new(raw_message.to_bytes())).await.unwrap();
-                            }
-                            
+                            agent_state_message_sender_tx_c1.send(Message::new(raw_message.to_bytes())).await.unwrap();
                         }
                         None => {
                             error!("Agent {} has no id", name);
@@ -117,18 +107,16 @@ impl AgentCore {
             }
         });
         let agent_name = definition.name.clone();
-        let agent_state_message_sender_tx_c1 = agent_state_message_sender_tx.clone();
+        let message_from_node_tx = agent_state_message_sender_tx.clone();
         let message_handler_process = tokio::spawn(async move {
             loop {
                 if let Some(node_message) = message_from_node.recv().await {
                     if node_message.r#type == MessageType::Message {
                         debug!( "Agent {:?} received message from node {:?}", agent_name, node_message);
-                        let sender_name = node_message.originator_id;
                         let data = SystemMessage::from_bytes(node_message.data.clone());
                         match data {
                             SystemMessage::Content(message) => {
-                                agent_state_message_sender_tx_c1.send(message.clone()).await.unwrap();
-                                on_message.lock().await.on_message(sender_name, message.content, node_message.time).await;
+                                on_message.lock().await.on_message(agent_name.clone(), message.content, node_message.time).await;
                             }
                             SystemMessage::SyncRequest { last_version } => {
                                 // Todo
@@ -153,28 +141,28 @@ impl AgentCore {
             processor.lock().await.run(inputs).await;
         });
 
-        let node_message_sender = self.get_tx_0();
-        let definition = self.definition().await;
-        let run_sync_request = tokio::spawn(async move {
-            loop {
-                match definition.clone().id {
-                    Some(id) => {
-                        node_message_sender.send(
-                            SystemMessage::Beacon {
-                                name: definition.clone().name.clone(),
-                                sender: id.clone(),
-                                time: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
-                            }
-                        ).await.expect("TODO: panic message");
-                        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
-                    }
-                    None => {
-                        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-                        continue;
-                    }
-                }
-            }
-        });
+        // let node_message_sender = self.get_tx_0();
+        // let definition = self.definition().await;
+        // let run_beacon = tokio::spawn(async move {
+        //     loop {
+        //         match definition.clone().id {
+        //             Some(id) => {
+        //                 node_message_sender.send(
+        //                     SystemMessage::Beacon {
+        //                         name: definition.clone().name.clone(),
+        //                         sender: id.clone(),
+        //                         time: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+        //                     }
+        //                 ).await.expect("TODO: panic message");
+        //                 tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+        //             }
+        //             None => {
+        //                 tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+        //                 continue;
+        //             }
+        //         }
+        //     }
+        // });
 
         node_0.connect(url.as_str(), topic.as_str());
         node_0.run().await;
@@ -194,9 +182,9 @@ impl AgentCore {
             _ = run_process => {
                 debug!("Agent {:?} run_process stopped", agent_name);
             },
-            _ = run_sync_request => {
-                debug!("Agent {:?} run_sync_request stopped", agent_name);
-            },
+            // _ = run_beacon => {
+            //     debug!("Agent {:?} run_process stopped", agent_name);
+            // },
             _ = agent_state_message_processor => {
                 debug!("Agent {:?} agent_state_message_processor stopped", agent_name);
             },

@@ -33,7 +33,7 @@ impl Processor for AgentHandler {
                 line = stdin.next_line() => {
                     let line = line.unwrap();
                     if let Some(line) = line {
-                        println!("Entered : {}" ,line.clone());
+                        println!("{}" ,line.clone());
                         self.tx_0.send(
                             json!({
                                 "data": format!("Human : {}", line),
@@ -78,6 +78,7 @@ async fn main() {
                 message = rx_0.recv() => {
                     if let Some(raw_message) = message {
                         let msg = SystemMessage::Content(Message::new(raw_message));
+                        println!( "Sending message: {:?}", msg);
                         ag_tx.send(msg).await.unwrap();
                     }
                 }
