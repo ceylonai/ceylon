@@ -77,7 +77,7 @@ async fn main() {
             tokio::select! {
                 message = rx_0.recv() => {
                     if let Some(raw_message) = message {
-                        let msg = SystemMessage::Content(Message::new(raw_message));
+                        let msg = SystemMessage::Content(Message::new(raw_message, None, "test".to_string()));
                         ag_tx.send(msg).await.unwrap();
                     }
                 }
