@@ -27,7 +27,7 @@ class AgentRunner:
     def register_agent(self, agent: AgentCore):
         self.agents.append(agent)
 
-    async def run(self, inputs, network: Dict[str, List[str]] = None):
+    async def run(self, inputs, network):
         uniffi_set_event_loop(asyncio.get_event_loop())
         workspace = Workspace(agents=self.agents, config=self.config)
         await workspace.run(pickle.dumps(
@@ -35,6 +35,6 @@ class AgentRunner:
                 request=inputs, agents=[
                     await agent.definition() for agent in self.agents
                 ],
-                network=network if network else {}
+                network=network
             )
         ))
