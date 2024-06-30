@@ -32,14 +32,6 @@ def publish_content(content: str, ):
 async def main():
     runner = AgentRunner(workspace_name="ceylon-ai")
     ollama_llama3 = ChatOllama(model="llama3")
-    # runner.register_agent(LLMManager(ollama_llama3))
-    runner.register_agent(LLMAgent(
-        name="leader",
-        position="Leader",
-        llm=ollama_llama3,
-        responsibilities=[],
-        instructions=[]
-    ))
     runner.register_agent(LLMAgent(
         name="writer",
         position="Assistant Writer",
@@ -103,7 +95,6 @@ async def main():
             "style": "creative"
         },
         network={
-            "leader": [],
             "researcher": [],
             "writer": ["researcher"],
             "editor": ["writer"],
