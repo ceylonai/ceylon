@@ -26,16 +26,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 
-dependencies = [
-    "ollama==0.2.1",
-    "langchain==0.2.6",
-    "langchain-community==0.2.6",
-    "networkx==3.3",
-    "pydantic==2.7.4",
-    "langchain==0.2.6",
-    "duckduckgo-search==6.1.7",
-    "langchain-community==0.2.6"
-]
+dependencies = ["ollama==0.2.1"]
 
 [project.urls]
 Homepage = "https://ceylon.ai"

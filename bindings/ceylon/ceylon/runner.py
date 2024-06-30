@@ -1,19 +1,19 @@
 import asyncio
 import pickle
-from typing import List, Dict
 
-from pydantic import BaseModel
-
-from ceylon.ceylon import Workspace, WorkspaceConfig, uniffi_set_event_loop, AgentCore, AgentDefinition
+from ceylon.ceylon import Workspace, WorkspaceConfig, uniffi_set_event_loop, AgentCore
 
 
-class RunnerInput(BaseModel):
-    request: dict
-    agents: List[AgentDefinition]
-    network: Dict[str, List[str]]
+class AgentRunnerError(Exception):
+    pass
 
-    class Config:
-        arbitrary_types_allowed = True
+
+class AgentRunnerNotLeaderError(AgentRunnerError):
+    pass
+
+
+class AgentRunnerCannotHaveMultipleLeadersError(AgentRunnerError):
+    pass
 
 
 class AgentRunner:
@@ -27,14 +27,7 @@ class AgentRunner:
     def register_agent(self, agent: AgentCore):
         self.agents.append(agent)
 
-    async def run(self, inputs, network):
+    async def run(self, inputs):
         uniffi_set_event_loop(asyncio.get_event_loop())
         workspace = Workspace(agents=self.agents, config=self.config)
-        await workspace.run(pickle.dumps(
-            RunnerInput(
-                request=inputs, agents=[
-                    await agent.definition() for agent in self.agents
-                ],
-                network=network
-            )
-        ))
+        await workspace.run(pickle.dumps(inputs))
