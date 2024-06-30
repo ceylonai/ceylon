@@ -1,6 +1,6 @@
-import dataclasses
 import pickle
 from collections import deque
+from typing import List
 
 import networkx as nx
 from langchain_core.tools import StructuredTool
@@ -22,6 +22,9 @@ class LLMAgent(AgentCore, MessageHandler, Processor):
     tools: list[StructuredTool]
     network_graph: nx.DiGraph
     queue: deque
+    original_goal = None
+
+    agent_replies: List[LLMAgentResponse] = []
 
     def __init__(self, name, position, instructions, responsibilities, llm, tools: list[StructuredTool] = None):
         super().__init__(definition=AgentDefinition(
@@ -45,18 +48,22 @@ class LLMAgent(AgentCore, MessageHandler, Processor):
 
         next_agent = self.get_next_agent()
         if next_agent == dt.agent_name:
+            self.agent_replies.append(dt)
             self.update_status(dt.agent_name)
 
         next_agent = self.get_next_agent()
         if next_agent == definition.name:
-            print("Executing", definition.name)
             await self.execute({
+                "original_request": self.original_goal,
+                "old_responses": self.agent_replies,
                 dt.agent_name: dt.response
             })
 
     async def run(self, inputs):
         inputs: RunnerInput = pickle.loads(inputs)
         self._initialize_graph(inputs.network)
+
+        self.original_goal = inputs.request
 
         await self.execute(inputs.request)
 

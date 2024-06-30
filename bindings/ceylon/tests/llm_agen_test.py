@@ -27,22 +27,23 @@ def search_query(keywords: str, ):
     return results
 
 
-def publish_content(content: str, ):
+def publish_content(content: str, name: str):
     """
         Publishes the given content.
 
         Parameters:
         content (str): The content to be published. This should be a string containing the text or data that needs to be published.
+        name (str): The name of the file to be created. This should be a string containing the name of the file to be created.
 
         Returns:
         None
     """
     print(f"Publishing content")
-    name = f"content-{datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.txt"
+    name = f"content-{name}.txt"
 
     try:
         # Open the file in write mode
-        with open(name, "w") as f:
+        with open(name, "a", encoding="utf-8") as f:
             f.write(content)
         return f"Published {content} in {name}"
     except Exception as e:
@@ -51,7 +52,7 @@ def publish_content(content: str, ):
 
 async def main():
     runner = AgentRunner(workspace_name="ceylon-ai")
-    # llm_lib = ChatOllama(model="phi3:instruct")
+    llm_lib = ChatOllama(model="phi3:instruct")
     llm_lib = ChatOpenAI(model="gpt-4o")
     runner.register_agent(LLMAgent(
         name="writer",
@@ -61,17 +62,31 @@ async def main():
         instructions=[
             "Ensure clarity, accuracy, and proper formatting while respecting ethical guidelines and privacy."]
     ))
+    runner.register_agent(LLMAgent(
+        name="name_chooser",
+        position="Select File name",
+        llm=llm_lib,
+        responsibilities=["Create high-quality, SEO friendly file name."],
+        instructions=[
+            "Easy to read and understand."
+        ]
+    ))
 
     runner.register_agent(LLMAgent(
         name="researcher",
         position="Content Researcher",
         llm=llm_lib,
-        responsibilities=["Conducting thorough and accurate research to support content creation."],
+        responsibilities=[
+            "Conducting thorough and accurate research to support content creation.",
+
+        ],
         instructions=[
+            "Must only Find the most relevant 2 or 3 sources."
             "Find credible sources, verify information, and provide comprehensive and relevant "
             "data while ensuring ethical "
             "standards and privacy are maintained.",
-            "summarize content"],
+            "Must  summarize output without source references."
+        ],
         tools=[
             StructuredTool.from_function(search_query)
         ]
@@ -95,12 +110,10 @@ async def main():
         position="Content Publisher",
         llm=llm_lib,
         responsibilities=[
-            "Publish the finalized content on the designated platform and ensure proper formatting and SEO optimization."
+            "Publish the finalized content using the publishing tools and platforms specified by the writer.",
         ],
         instructions=[
-            "Format the content according to platform guidelines.",
-            "Optimize for SEO by including relevant keywords, meta descriptions, and tags.",
-            "Ensure all links are functional and images are properly placed."
+            "Publish it as finalized and polished content",
         ],
         tools=[
             StructuredTool.from_function(publish_content)
@@ -116,10 +129,11 @@ async def main():
             "style": "creative"
         },
         network={
+            "name_chooser": [],
             "researcher": [],
             "writer": ["researcher"],
             "editor": ["writer"],
-            "publisher": ["editor"]
+            "publisher": ["editor", "name_chooser"]
         }
     )
 
