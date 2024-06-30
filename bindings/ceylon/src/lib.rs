@@ -13,6 +13,9 @@ pub use agent::{
     agent::{
         AgentCore
     },
+    state::{
+        Message
+    },
     workspace::{
         Workspace,
         WorkspaceConfig,
