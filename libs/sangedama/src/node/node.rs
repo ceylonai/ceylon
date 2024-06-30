@@ -10,7 +10,93 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::sync::mpsc;
 use tokio::{io, select};
-use crate::node::message::{EventType, NodeMessage};
+
+pub enum EventType {
+    OnMessage,
+    OnSubscribe,
+    OnUnsubscribe,
+    OnListen,
+    OnExpired,
+    OnDiscovered,
+    OnConnectionClosed,
+    OnConnectionEstablished,
+}
+
+impl EventType {
+    fn as_str(&self) -> &'static str {
+        match self {
+            EventType::OnMessage => "OnMessage",
+            EventType::OnSubscribe => "OnSubscribe",
+            EventType::OnUnsubscribe => "OnUnsubscribe",
+            EventType::OnListen => "OnListen",
+            EventType::OnExpired => "OnExpired",
+            EventType::OnDiscovered => "OnDiscovered",
+            EventType::OnConnectionClosed => "OnConnectionClosed",
+            EventType::OnConnectionEstablished => "OnConnectionEstablished",
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
+pub enum MessageType {
+    Message,
+    Event,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct Message {
+    pub data: Vec<u8>,
+    pub message: String,
+    pub time: u64,
+    pub originator: String,
+    pub originator_id: String,
+    pub r#type: MessageType,
+}
+
+impl Message {
+    fn new(
+        originator: String,
+        originator_id: String,
+        message: String,
+        data: Vec<u8>,
+        message_type: MessageType,
+    ) -> Self {
+        Self {
+            data,
+            time: SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
+            originator,
+            originator_id,
+            r#type: message_type,
+            message,
+        }
+    }
+    fn event(originator: String, event: EventType) -> Self {
+        Self::new(
+            originator,
+            "SELF".to_string(),
+            event.as_str().to_string(),
+            vec![],
+            MessageType::Event,
+        )
+    }
+
+    pub fn data(from: String, originator_id: String, data: Vec<u8>) -> Self {
+        Self::new(
+            from,
+            originator_id,
+            "DATA-MESSAGE".to_string(),
+            data,
+            MessageType::Message,
+        )
+    }
+
+    fn to_json(&self) -> String {
+        json!(self).to_string()
+    }
+}
 
 // We create a custom network behaviour that combines Gossipsub and Mdns.
 #[derive(NetworkBehaviour)]
@@ -42,8 +128,8 @@ pub struct Node {
     swarm: Swarm<NodeBehaviour>,
     subscribed_topics: Vec<String>,
 
-    in_rx: mpsc::Receiver<NodeMessage>,
-    out_tx: mpsc::Sender<NodeMessage>,
+    in_rx: mpsc::Receiver<Message>,
+    out_tx: mpsc::Sender<Message>,
     pub id: String,
 }
 
@@ -67,7 +153,7 @@ impl Node {
         self.swarm.listen_on("/ip4/0.0.0.0/udp/0/quic-v1".parse().unwrap()).unwrap();
     }
 
-    pub fn broadcast(&mut self, message: NodeMessage) -> Result<Vec<MessageId>, PublishError> {
+    pub fn broadcast(&mut self, message: Message) -> Result<Vec<MessageId>, PublishError> {
         let mut message_ids = vec![];
         debug!("Broadcasting message: {:?}",  self.subscribed_topics);
         for topic in self.subscribed_topics.clone() {
@@ -92,7 +178,7 @@ impl Node {
         Ok(message_ids)
     }
 
-    async fn pass_message_to_node(&mut self, message: NodeMessage) {
+    async fn pass_message_to_node(&mut self, message: Message) {
         match self.out_tx.clone().send(message).await {
             Ok(_) => {}
             Err(e) => {
@@ -124,16 +210,16 @@ impl Node {
                 event = self.swarm.select_next_some() => match event {
                          SwarmEvent::NewListenAddr { address, .. } => {
                             debug!("{:?} NewListenAddr {:?}", self.name, address);
-                            self.pass_message_to_node(NodeMessage::event(self.swarm.local_peer_id().to_string(),EventType::OnListen,)).await
+                            self.pass_message_to_node(Message::event(self.swarm.local_peer_id().to_string(),EventType::OnListen,)).await
 
                    },
                         SwarmEvent::ConnectionEstablished { peer_id, .. } => {
                             debug!("{:?} ConnectionEstablished {:?}", self.id, peer_id);
-                            self.pass_message_to_node(NodeMessage::event(self.swarm.local_peer_id().to_string(),EventType::OnConnectionEstablished,)).await
+                            self.pass_message_to_node(Message::event(self.swarm.local_peer_id().to_string(),EventType::OnConnectionEstablished,)).await
                         },
                         SwarmEvent::ConnectionClosed { peer_id, cause ,.. } => {
                             debug!("{:?} ConnectionClosed {:?} {:?}", self.id, peer_id, cause);
-                            self.pass_message_to_node(NodeMessage::event(self.swarm.local_peer_id().to_string(),EventType::OnConnectionClosed ,)).await
+                            self.pass_message_to_node(Message::event(self.swarm.local_peer_id().to_string(),EventType::OnConnectionClosed ,)).await
                         },
 
                         SwarmEvent::Behaviour(Event::Gossipsub(event)) => {
@@ -149,7 +235,7 @@ impl Node {
                                 gossipsub::Event::Subscribed { peer_id, topic } => {
                                     debug!("{:?} Subscribed to topic {:?}", self.name, topic.clone().into_string());
                                     self.subscribed_topics.push(topic.into_string());
-                                    self.pass_message_to_node(NodeMessage::event(  peer_id.to_string(),EventType::OnSubscribe,)).await
+                                    self.pass_message_to_node(Message::event(  peer_id.to_string(),EventType::OnSubscribe,)).await
                                 },
 
                                 _ => {
@@ -166,14 +252,14 @@ impl Node {
                                     for (peer_id, _) in list {
                                         self.swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
                                     }
-                                self.pass_message_to_node(NodeMessage::event(  self.swarm.local_peer_id().to_string(),EventType::OnDiscovered,)).await
+                                self.pass_message_to_node(Message::event(  self.swarm.local_peer_id().to_string(),EventType::OnDiscovered,)).await
                                 },
 
                                 mdns::Event::Expired(list) => {
                                     for (peer_id, _) in list {
                                         self.swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
                                     }
-                                self.pass_message_to_node(NodeMessage::event(  self.swarm.local_peer_id().to_string(),EventType::OnExpired,)).await
+                                self.pass_message_to_node(Message::event(  self.swarm.local_peer_id().to_string(),EventType::OnExpired,)).await
                                 },
                             }
                         },
@@ -222,8 +308,8 @@ impl NodeBehaviour {
 
 pub async fn create_node(
     name: String,
-    in_rx: mpsc::Receiver<NodeMessage>,
-) -> (Node, mpsc::Receiver<NodeMessage>) {
+    in_rx: mpsc::Receiver<Message>,
+) -> (Node, mpsc::Receiver<Message>) {
     let swarm = SwarmBuilder::with_new_identity()
         .with_tokio()
         .with_tcp(
@@ -280,7 +366,7 @@ mod tests {
     use log::{debug, info, trace, warn};
     use serde_json::json;
 
-    use crate::node::node::{create_node, NodeMessage};
+    use crate::node::node::{create_node, Message};
 
 
     #[tokio::test]
@@ -291,8 +377,8 @@ mod tests {
 
         let url = format!("/ip4/0.0.0.0/tcp/{}", port_id);
 
-        let (tx_0, mut rx_0) = tokio::sync::mpsc::channel::<NodeMessage>(100);
-        let (tx_1, mut rx_1) = tokio::sync::mpsc::channel::<NodeMessage>(100);
+        let (tx_0, mut rx_0) = tokio::sync::mpsc::channel::<Message>(100);
+        let (tx_1, mut rx_1) = tokio::sync::mpsc::channel::<Message>(100);
 
         let (mut node_0, mut rx_o_0) = create_node("node_0".to_string(), rx_0).await;
         let (mut node_1, mut rx_o_1) = create_node("node_1".to_string(), rx_1).await;
@@ -308,7 +394,7 @@ mod tests {
         tokio::spawn(async move {
             while let Some(message_data) = rx_o_0.recv().await {
                 debug!("Node_0 Received: {:?}", message_data);
-                let msg = NodeMessage::data(
+                let msg = Message::data(
                     "node_0".to_string(),
                     node_0_id.clone(),
                     json!({
@@ -326,7 +412,7 @@ mod tests {
         tokio::spawn(async move {
             while let Some(message_data) = rx_o_1.recv().await {
                 debug!("Node_1 Received: {:?}", message_data);
-                let msg = NodeMessage::data(
+                let msg = Message::data(
                     "node_1".to_string(),
                     node_1_id.clone(),
                     json!({
