@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
-use log::{debug, error, info};
+use log::{debug, error};
 use tokio::select;
 use tokio::sync::{Mutex, RwLock};
 
@@ -83,7 +83,7 @@ impl AgentCore {
         let agent_state_message_processor = tokio::spawn(async move {
             loop {
                 if let Some(message) = agent_state_message_receiver.recv().await {
-                    info!( "Message: {:?}", message);
+                    debug!( "Message: {:?}", message);
                     {
                         agent_state_clone.lock().await.add_message(message).await;
                         println!("AgentState updated");
@@ -147,7 +147,7 @@ impl AgentCore {
                                 on_message.lock().await.on_message(sender_id, message.content, node_message.time).await;
                             }
                             SystemMessage::SyncRequest { versions } => {
-                                info!( "Agent {:?} received sync request from node {:?}", sender_name, versions);
+                                debug!( "Agent {:?} received sync request from node {:?}", sender_name, versions);
                                 let mut missing_versions = vec![];
 
                                 // If requested list miss something in snapshot
@@ -167,17 +167,17 @@ impl AgentCore {
                                 }
                             }
                             SystemMessage::SyncResponse { messages } => {
-                                info!( "Agent {:?} received sync response from node {:?}", agent_name, messages);
+                                debug!( "Agent {:?} received sync response from node {:?}", agent_name, messages);
 
                                 for message in messages {
                                     agent_state_message_sender_tx_c1.send(message.clone()).await.unwrap();
                                 }
                             }
                             SystemMessage::Beacon { time, sender, name, sync_hash } => {
-                                info!( "Agent {:?} received beacon {:?} from {:?} at {:?}", agent_name, sender, name, time);
+                                debug!( "Agent {:?} received beacon {:?} from {:?} at {:?}", agent_name, sender, name, time);
 
                                 if sync_hash != snapshot.sync_hash() {
-                                    info!("Sync Hash: {:?} from {:?} not equal to snapshot hash: {:?}", sync_hash, sender, snapshot.sync_hash());
+                                    debug!("Sync Hash: {:?} from {:?} not equal to snapshot hash: {:?}", sync_hash, sender, snapshot.sync_hash());
 
                                     let sync_request = SystemMessage::SyncRequest {
                                         versions: snapshot.versions(),
