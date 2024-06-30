@@ -29,13 +29,13 @@ impl Message {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum SystemMessage {
     Content(Message),
-    SyncRequest { versions: Vec<u128> },
+    SyncRequest { last_version: u64 },
     SyncResponse { messages: Vec<Message> },
+    Ack { message_id: String },
     Beacon {
         name: String,
         sender: String,
-        time: u128,
-        sync_hash: u128,
+        time: u64,
     },
 }
 
@@ -45,6 +45,7 @@ impl SystemMessage {
             SystemMessage::Content(message) => message.id.clone(),
             SystemMessage::SyncRequest { .. } => "sync_request".to_string(),
             SystemMessage::SyncResponse { .. } => "sync_response".to_string(),
+            SystemMessage::Ack { message_id } => message_id.clone(),
             SystemMessage::Beacon { .. } => "beacon".to_string(),
         }
     }
@@ -53,6 +54,7 @@ impl SystemMessage {
             SystemMessage::Content(..) => SYSTEM_MESSAGE_CONTENT_TYPE.to_string(),
             SystemMessage::SyncRequest { .. } => "sync_request".to_string(),
             SystemMessage::SyncResponse { .. } => "sync_response".to_string(),
+            SystemMessage::Ack { .. } => "ack".to_string(),
             SystemMessage::Beacon { .. } => "beacon".to_string(),
         }
     }
@@ -72,43 +74,6 @@ pub type AgentStateMessageList = Vec<Message>;
 pub struct AgentStateSnap {
     pub messages: AgentStateMessageList,
     pub last_version: u128,
-}
-
-impl AgentStateSnap {
-    pub fn versions(&self) -> Vec<u128> {
-        self.messages
-            .iter()
-            .map(|message| message.version)
-            .collect()
-    }
-
-    pub fn sync_hash(&self) -> u128 {
-        let mut hash = 0u128;
-        for message in &self.messages {
-            hash ^= message.version;
-        }
-        hash
-    }
-
-    pub fn missing_versions(&self, versions: Vec<u128>) -> Vec<u128> {
-        let mut missing_versions = Vec::new();
-        for version in versions {
-            if !self.versions().contains(&version) {
-                missing_versions.push(version);
-            }
-        }
-        missing_versions
-    }
-    
-    pub fn get_messages(&self, versions: Vec<u128>) -> Vec<Message> {
-        let mut messages = Vec::new();
-        for version in versions {
-            if let Some(message) = self.messages.iter().find(|message| message.version == version) {
-                messages.push(message.clone());
-            }
-        }
-        messages
-    }
 }
 
 #[derive(Default)]

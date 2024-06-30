@@ -75,21 +75,18 @@ impl AgentCore {
 
         let (agent_state_message_sender_tx, mut agent_state_message_receiver) = tokio::sync::mpsc::channel::<Message>(100);
 
-        let agent_state = Arc::new(Mutex::new(AgentState::new()));
-
-
         // State Message Handle here
-        let agent_state_clone = Arc::clone(&agent_state);
+        let agent_state = AgentState::new();
         let agent_state_message_processor = tokio::spawn(async move {
             loop {
                 if let Some(message) = agent_state_message_receiver.recv().await {
                     info!( "Message: {:?}", message);
                     {
-                        agent_state_clone.lock().await.add_message(message).await;
+                        agent_state.add_message(message).await;
                         println!("AgentState updated");
                     }
                     {
-                        let snapshot = agent_state_clone.lock().await.request_snapshot().await;
+                        let snapshot = agent_state.request_snapshot().await;
                         println!("Snapshot: {:?}", snapshot);
                     }
                 }
@@ -130,60 +127,29 @@ impl AgentCore {
         // Agent receive message from other nodes
         let agent_name = definition.name.clone();
         let agent_state_message_sender_tx_c1 = agent_state_message_sender_tx.clone();
-        let agent_state_clone_handle_process = Arc::clone(&agent_state);
-        let node_message_sender = self.get_tx_0();
         let message_handler_process = tokio::spawn(async move {
             loop {
                 if let Some(node_message) = message_from_node.recv().await {
                     if node_message.r#type == MessageType::Message {
                         debug!( "Agent {:?} received message from node {:?}", agent_name, node_message);
-                        let sender_id = node_message.originator_id;
-                        let sender_name = node_message.originator;
+                        let sender_name = node_message.originator_id;
                         let data = SystemMessage::from_bytes(node_message.data.clone());
-                        let snapshot = agent_state_clone_handle_process.lock().await.request_snapshot().await;
                         match data {
                             SystemMessage::Content(message) => {
                                 agent_state_message_sender_tx_c1.send(message.clone()).await.unwrap();
-                                on_message.lock().await.on_message(sender_id, message.content, node_message.time).await;
+                                on_message.lock().await.on_message(sender_name, message.content, node_message.time).await;
                             }
-                            SystemMessage::SyncRequest { versions } => {
-                                info!( "Agent {:?} received sync request from node {:?}", sender_name, versions);
-                                let mut missing_versions = vec![];
-
-                                // If requested list miss something in snapshot
-                                let snapshot_versions = snapshot.versions();
-                                for snapshot_version in snapshot_versions {
-                                    if !versions.contains(&snapshot_version) {
-                                        missing_versions.push(snapshot_version);
-                                    }
-                                }
-
-                                if !missing_versions.is_empty() {
-                                    let missing_messages = snapshot.get_messages(missing_versions.clone());
-                                    let sync_request = SystemMessage::SyncResponse {
-                                        messages: missing_messages,
-                                    };
-                                    node_message_sender.send(sync_request).await.expect("TODO: panic message");
-                                }
+                            SystemMessage::SyncRequest { last_version } => {
+                                // Todo
                             }
                             SystemMessage::SyncResponse { messages } => {
-                                info!( "Agent {:?} received sync response from node {:?}", agent_name, messages);
-
-                                for message in messages {
-                                    agent_state_message_sender_tx_c1.send(message.clone()).await.unwrap();
-                                }
+                                // Todo
                             }
-                            SystemMessage::Beacon { time, sender, name, sync_hash } => {
+                            SystemMessage::Ack { message_id } => {
+                                // Todo
+                            }
+                            SystemMessage::Beacon { time, sender, name } => {
                                 info!( "Agent {:?} received beacon {:?} from {:?} at {:?}", agent_name, sender, name, time);
-
-                                if sync_hash != snapshot.sync_hash() {
-                                    info!("Sync Hash: {:?} from {:?} not equal to snapshot hash: {:?}", sync_hash, sender, snapshot.sync_hash());
-
-                                    let sync_request = SystemMessage::SyncRequest {
-                                        versions: snapshot.versions(),
-                                    };
-                                    node_message_sender.send(sync_request).await.expect("TODO: panic message");
-                                }
                             }
                         }
                     }
@@ -200,19 +166,17 @@ impl AgentCore {
         // Handle sync process
         let node_message_sender = self.get_tx_0();
         let definition = self.definition().await;
-        let agent_state_clone_sync_process = Arc::clone(&agent_state);
         let run_sync_request = tokio::spawn(async move {
             loop {
                 match definition.clone().id {
                     Some(id) => {
-                        let snapshot = agent_state_clone_sync_process.lock().await.request_snapshot().await;
-                        let beacon_message = SystemMessage::Beacon {
-                            time: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis(),
-                            sender: id.clone(),
-                            name: definition.name.clone(),
-                            sync_hash: snapshot.sync_hash(),
-                        };
-                        node_message_sender.send(beacon_message).await.unwrap();
+                        node_message_sender.send(
+                            SystemMessage::Beacon {
+                                name: definition.clone().name.clone(),
+                                sender: id.clone(),
+                                time: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+                            }
+                        ).await.expect("TODO: panic message");
                         tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
                     }
                     None => {
