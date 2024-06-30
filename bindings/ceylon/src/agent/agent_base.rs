@@ -19,6 +19,7 @@ pub struct AgentDefinition {
     pub id: Option<String>,
     pub name: String,
     pub position: String,
+    pub is_leader: bool,
     pub instructions: Vec<String>,
     pub responsibilities: Vec<String>,
 }
