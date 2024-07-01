@@ -9,7 +9,7 @@ use log::{debug, error, info};
 
 
 use tokio::sync::mpsc;
-use tokio::{io, select};
+use tokio::{io, select, signal};
 use crate::node::message::{EventType, NodeMessage};
 
 // We create a custom network behaviour that combines Gossipsub and Mdns.
@@ -101,6 +101,15 @@ impl Node {
         };
     }
 
+    pub async fn stop(&mut self) {
+        for t in self.subscribed_topics.clone() {
+            self.swarm
+                .behaviour_mut()
+                .gossipsub
+                .unsubscribe(&gossipsub::IdentTopic::new(&t));
+        }
+    }
+
     pub async fn run(mut self) {
         loop {
             select! {
@@ -180,7 +189,14 @@ impl Node {
                         _ => {
                            debug!( "WILD CARD");
                     }, // Wildcard pattern to cover all other cases
-                }
+                },
+                
+                _= signal::ctrl_c() => {
+                    debug!("Agent {:?} received exit signal", self.name);
+                    // Perform any necessary cleanup here
+                    self.stop().await;
+                    break;
+                },
             }
         }
     }
