@@ -1,8 +1,8 @@
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use log::{debug, error};
-use tokio::select;
-use tokio::sync::{Mutex, RwLock};
+use tokio::{select, signal};
+use tokio::sync::{mpsc, Mutex, oneshot, RwLock};
 
 use sangedama::node::{
     node::{create_node},
@@ -10,7 +10,7 @@ use sangedama::node::{
 };
 
 use crate::agent::agent_base::{AgentDefinition, MessageHandler, Processor};
-use crate::agent::state::{AgentState, Message, SYSTEM_MESSAGE_CONTENT_TYPE, SystemMessage};
+use crate::agent::state::{AgentState, Message, SystemMessage};
 
 pub struct AgentCore {
     _definition: RwLock<AgentDefinition>,
@@ -19,11 +19,16 @@ pub struct AgentCore {
     _on_message: Arc<Mutex<Arc<dyn MessageHandler>>>,
     receiver_from_outside_rx: Arc<Mutex<tokio::sync::mpsc::Receiver<SystemMessage>>>,
     sender_from_outside_tx: tokio::sync::mpsc::Sender<SystemMessage>,
+
+    shutdown_tx: Arc<mpsc::Sender<()>>,
+    shutdown_rx: Arc<Mutex<mpsc::Receiver<()>>>,
 }
 
 impl AgentCore {
     pub fn new(definition: AgentDefinition, on_message: Arc<dyn MessageHandler>, processor: Arc<dyn Processor>) -> Self {
         let (tx_0, rx_0) = tokio::sync::mpsc::channel::<SystemMessage>(100);
+        let (shutdown_tx, shutdown_rx) = mpsc::channel::<()>(1);
+
         Self {
             _definition: RwLock::new(definition),
             _workspace_id: None,
@@ -31,6 +36,9 @@ impl AgentCore {
             _processor: Arc::new(Mutex::new(processor)),
             receiver_from_outside_rx: Arc::new(Mutex::new(rx_0)),
             sender_from_outside_tx: tx_0,
+
+            shutdown_tx: Arc::new(shutdown_tx),
+            shutdown_rx: Arc::new(Mutex::new(shutdown_rx)),
         }
     }
 
@@ -59,6 +67,10 @@ impl AgentCore {
 
     pub fn get_tx_0(&self) -> tokio::sync::mpsc::Sender<SystemMessage> {
         self.sender_from_outside_tx.clone()
+    }
+
+    pub async fn stop(&self) {
+        self.shutdown_tx.clone().send(()).await.unwrap();
     }
 }
 
@@ -230,6 +242,7 @@ impl AgentCore {
         let agent_name = definition.name.clone();
         debug!( "Agent {:?} started", agent_name);
 
+        let shutdown_rx_ = Arc::clone(&self.shutdown_rx);
 
         select! {
             _ = message_from_agent_impl_handler_process => {
@@ -246,6 +259,14 @@ impl AgentCore {
             },
             _ = agent_state_message_processor => {
                 debug!("Agent {:?} agent_state_message_processor stopped", agent_name);
+            },
+             _ = signal::ctrl_c() => {
+                debug!("Agent {:?} received exit signal", agent_name);
+                // Perform any necessary cleanup here
+            },
+            _ = shutdown_rx_.lock() => {
+                debug!("Agent {:?} received shutdown signal", agent_name);
+                // Perform any necessary cleanup here
             },
         }
     }
