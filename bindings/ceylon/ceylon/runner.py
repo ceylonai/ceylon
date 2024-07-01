@@ -5,6 +5,7 @@ from typing import List, Dict
 from pydantic import BaseModel
 
 from .ceylon import *
+from ceylon.ceylon.ceylon import uniffi_set_event_loop
 
 
 class RunnerInput(BaseModel):
