@@ -49,7 +49,7 @@ class LLMAgent(AgentCore, MessageHandler, Processor):
         next_agent = self.get_next_agent()
         if next_agent == dt.agent_name:
             self.agent_replies.append(dt)
-            self.update_status(dt.agent_name)
+            await self.update_status(dt.agent_name)
 
         next_agent = self.get_next_agent()
         if next_agent == definition.name:
@@ -94,12 +94,12 @@ class LLMAgent(AgentCore, MessageHandler, Processor):
             response = LLMAgentResponse(agent_id=definition.id, agent_name=definition.name, response=result)
             await self.broadcast(pickle.dumps(response))
 
-            self.update_status(next_agent)
+            await self.update_status(next_agent)
 
             next_agent = self.get_next_agent()
             print("Next agent will be:", next_agent)
 
-    def update_status(self, agent):
+    async def update_status(self, agent):
         if agent not in self.queue:
             print(f"Agent {agent} is not ready to execute or has already been executed.")
             return
@@ -116,5 +116,6 @@ class LLMAgent(AgentCore, MessageHandler, Processor):
 
         if not self.network_graph.nodes:
             print("Workflow executed successfully.")
+            await self.stop()
         elif not self.queue:
             print("Cycle detected in the workflow!")
