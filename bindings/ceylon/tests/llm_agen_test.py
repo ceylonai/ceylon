@@ -53,7 +53,7 @@ def publish_content(content: str, name: str):
 async def main():
     runner = AgentRunner(workspace_name="ceylon-ai")
     llm_lib = ChatOllama(model="phi3:instruct")
-    llm_lib = ChatOpenAI(model="gpt-4o")
+    # llm_lib = ChatOpenAI(model="gpt-4o")
     runner.register_agent(LLMAgent(
         name="writer",
         position="Assistant Writer",
