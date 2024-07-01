@@ -261,11 +261,11 @@ impl AgentCore {
                 debug!("Agent {:?} agent_state_message_processor stopped", agent_name);
             },
              _ = signal::ctrl_c() => {
-                debug!("Agent {:?} received exit signal", agent_name);
+                println!("Agent {:?} received exit signal", agent_name);
                 // Perform any necessary cleanup here
             },
             _ = shutdown_rx_.lock() => {
-                debug!("Agent {:?} received shutdown signal", agent_name);
+                println!("Agent {:?} received shutdown signal", agent_name);
                 // Perform any necessary cleanup here
             },
         }
