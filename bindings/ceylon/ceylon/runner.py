@@ -4,7 +4,7 @@ from typing import List, Dict
 
 from pydantic import BaseModel
 
-from ceylon.ceylon import Workspace, WorkspaceConfig, uniffi_set_event_loop, AgentCore, AgentDefinition
+from .ceylon import Workspace, WorkspaceConfig, AgentCore, AgentDefinition, uniffi_set_event_loop
 
 
 class RunnerInput(BaseModel):
