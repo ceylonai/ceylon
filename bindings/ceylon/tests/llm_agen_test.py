@@ -1,9 +1,7 @@
 import asyncio
-import datetime
 
 from duckduckgo_search import DDGS
-from langchain_community.chat_models import ChatOllama, ChatOpenAI
-from langchain_community.llms.openai import OpenAI
+from langchain_community.chat_models import ChatOllama
 from langchain_core.tools import StructuredTool
 
 from ceylon import AgentRunner
