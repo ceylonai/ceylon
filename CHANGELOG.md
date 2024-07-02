@@ -1,3 +1,7 @@
+## v0.13.5
+- Improve LLM calling 
+- Add Example directory
+- Manage shutdown signal
 ## v0.13.4
 - Fix issues in runner with asyncio loop
 ## v0.13.3
