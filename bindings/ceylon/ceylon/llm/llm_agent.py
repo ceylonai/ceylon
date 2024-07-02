@@ -3,7 +3,7 @@ from collections import deque
 from typing import List
 
 import networkx as nx
-from langchain_core.tools import StructuredTool
+from langchain_core.tools import StructuredTool, BaseTool
 from pydantic.dataclasses import dataclass
 
 from ceylon.ceylon import AgentCore, Processor, MessageHandler, AgentDefinition
@@ -26,7 +26,7 @@ class LLMAgent(AgentCore, MessageHandler, Processor):
 
     agent_replies: List[LLMAgentResponse] = []
 
-    def __init__(self, name, position, instructions, responsibilities, llm, tools: list[StructuredTool] = None):
+    def __init__(self, name, position, instructions, responsibilities, llm, tools: list[BaseTool] = None):
         super().__init__(definition=AgentDefinition(
             name=name,
             position=position,
@@ -53,9 +53,18 @@ class LLMAgent(AgentCore, MessageHandler, Processor):
 
         next_agent = self.get_next_agent()
         if next_agent == definition.name:
+            dependencies = list(self.network_graph.predecessors(next_agent))
+            print("Dependencies are:", dependencies, "for", next_agent)
+
+            only_dependencies = {dt.agent_name: dt for dt in self.agent_replies if dt.agent_name in dependencies}
+
+            if len(only_dependencies) == len(dependencies):
+                print("Executing", definition.name)
+                await self.execute(self.original_goal)
+
             await self.execute({
                 "original_request": self.original_goal,
-                "old_responses": self.agent_replies,
+                **only_dependencies,
                 dt.agent_name: dt.response
             })
 
@@ -90,8 +99,9 @@ class LLMAgent(AgentCore, MessageHandler, Processor):
             print("Executing", definition.name)
 
             result = process_agent_request(self.llm, input, definition, tools=self.tools)
-
+            # result = f"{definition.name} executed successfully"
             response = LLMAgentResponse(agent_id=definition.id, agent_name=definition.name, response=result)
+
             await self.broadcast(pickle.dumps(response))
 
             await self.update_status(next_agent)

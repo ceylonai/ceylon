@@ -1,10 +1,9 @@
 from langchain.agents import initialize_agent, AgentType
-from langchain.agents.output_parsers import OpenAIFunctionsAgentOutputParser
 from langchain_core.prompts import PromptTemplate
-from langchain_core.tools import StructuredTool
 from langchain_core.utils.function_calling import format_tool_to_openai_function
 
 from ceylon.ceylon import AgentDefinition
+from ceylon.tools.search_tool import SearchTool
 
 
 def process_agent_request(llm, inputs, agent_definition, tools=None):
@@ -30,20 +29,17 @@ def process_agent_request(llm, inputs, agent_definition, tools=None):
 
     if tools:
         llm = llm.bind(functions=[format_tool_to_openai_function(t) for t in tools])
-        # agent = prompt | llm | OpenAIFunctionsAgentOutputParser()
-        # executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
-
         formatted_prompt = prompt.format(**formatted_inputs)
 
         agent = initialize_agent(
             tools,
             llm,
-            agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+            agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
             verbose=True,
             handle_parsing_errors=True
         )
-        print(formatted_prompt)
         response = agent.run(formatted_prompt)
+        print(response)
         return response
     else:
         print("Not using tools")
@@ -54,33 +50,13 @@ def process_agent_request(llm, inputs, agent_definition, tools=None):
 
 if __name__ == '__main__':
     from langchain_community.llms.ollama import Ollama
-    from duckduckgo_search import DDGS
-
-
-    def search_query(query: str):
-        """
-            Searches the given keywords on DuckDuckGo and returns the search results.
-            Parameters:
-            keywords (str): The keywords to search for. This should be a string containing the search terms.
-
-            Returns:
-            list: A list of dictionaries, where each dictionary contains the following keys:
-                - title (str): The title of the search result.
-                - href (str): The URL of the search result.
-                - body (str): A brief description of the search result.
-       """
-        print(f"Searching for {query}")
-        results = DDGS().text(query, safesearch='off', timelimit='y', max_results=10)
-        return results
-
 
     # Initialize Ollama
-    llm = Ollama(model="llama3")
+    llm = Ollama(model="llama3:instruct")
 
     # Load tools
     tools = [
-        StructuredTool.from_function(search_query, name="Search",
-                                     description="Useful for searching the web for current information.")
+        SearchTool(),
     ]
 
     res = process_agent_request(llm,

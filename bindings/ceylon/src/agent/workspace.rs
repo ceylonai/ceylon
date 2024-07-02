@@ -53,7 +53,6 @@ impl Workspace {
             let agent = agent.clone();
             let task = rt.spawn(async move {
                 agent.start(topic, url, _inputs).await;
-
             });
             tasks.push(task);
         }
