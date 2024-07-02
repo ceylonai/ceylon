@@ -79,6 +79,9 @@ class LLMAgent(AgentCore, MessageHandler, Processor):
 
         await self.execute(inputs.request)
 
+
+        await self.stop()
+
     def _initialize_graph(self, network):
         # Add nodes and edges based on the agents and their dependencies
         for agent, dependencies in network.items():
@@ -91,6 +94,8 @@ class LLMAgent(AgentCore, MessageHandler, Processor):
 
         # Initialize the queue with nodes that have no dependencies (indegree 0)
         self.queue.extend([node for node in self.network_graph if self.network_graph.in_degree(node) == 0])
+
+
 
     def get_next_agent(self):
         if not self.queue:
@@ -138,3 +143,4 @@ class LLMAgent(AgentCore, MessageHandler, Processor):
             await self.stop()
         elif not self.queue:
             print("Cycle detected in the workflow!")
+

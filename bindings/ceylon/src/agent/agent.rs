@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
-use log::{debug, error};
+use log::{debug, error, info};
 use tokio::{select, signal};
 use tokio::sync::{mpsc, Mutex, oneshot, RwLock};
 
@@ -70,6 +70,7 @@ impl AgentCore {
     }
 
     pub async fn stop(&self) {
+        info!( "Agent {} stop", self.definition().await.name);
         self.shutdown_tx.clone().send(()).await.unwrap();
     }
 }
@@ -89,11 +90,15 @@ impl AgentCore {
 
         let agent_state = Arc::new(Mutex::new(AgentState::new()));
 
+        let mut is_requst_to_shutdown = false;
 
         // State Message Handle here
         let agent_state_clone = Arc::clone(&agent_state);
         let agent_state_message_processor = tokio::spawn(async move {
             loop {
+                if is_requst_to_shutdown {
+                    break;
+                }
                 if let Some(message) = agent_state_message_receiver.recv().await {
                     debug!( "Message: {:?}", message);
                     {
@@ -116,6 +121,12 @@ impl AgentCore {
         let agent_id = definition.id.clone().unwrap_or("".to_string());
         let message_from_agent_impl_handler_process = tokio::spawn(async move {
             loop {
+                if is_requst_to_shutdown {
+                    break;
+                }
+                if tx_0.is_closed() {
+                    break;
+                }
                 if let Some(raw_message) = receiver_from_outside_rx.lock().await.recv().await {
                     let name = definition_handler_process.name.clone();
                     match definition.id.clone() {
@@ -146,6 +157,9 @@ impl AgentCore {
         let node_message_sender = self.get_tx_0();
         let message_handler_process = tokio::spawn(async move {
             loop {
+                if is_requst_to_shutdown {
+                    break;
+                }
                 if let Some(node_message) = message_from_node.recv().await {
                     if node_message.r#type == MessageType::Message {
                         debug!( "Agent {:?} received message from node {:?}", agent_name, node_message);
@@ -244,6 +258,17 @@ impl AgentCore {
 
         let shutdown_rx_ = Arc::clone(&self.shutdown_rx);
 
+        let agent_name_clone = definition.name.clone();
+        let task_shutdown = tokio::spawn(async move {
+            loop {
+                if let Some(_) = shutdown_rx_.lock().await.recv().await {
+                    debug!("Agent {:?} received shutdown signal", agent_name_clone);
+                    is_requst_to_shutdown = true;
+                    break;
+                }
+            }
+        });
+
         select! {
             _ = message_from_agent_impl_handler_process => {
                 debug!("Agent {:?} message_from_agent_impl_handler_process stopped", agent_name);
@@ -260,14 +285,15 @@ impl AgentCore {
             _ = agent_state_message_processor => {
                 debug!("Agent {:?} agent_state_message_processor stopped", agent_name);
             },
+            _ = task_shutdown => {
+                debug!("Agent {:?} agent_state_message_processor stopped", agent_name);
+            },
              _ = signal::ctrl_c() => {
                 println!("Agent {:?} received exit signal", agent_name);
                 // Perform any necessary cleanup here
+                is_requst_to_shutdown = true;
             },
-            _ = shutdown_rx_.lock() => {
-                println!("Agent {:?} received shutdown signal", agent_name);
-                // Perform any necessary cleanup here
-            },
+
         }
     }
 }
