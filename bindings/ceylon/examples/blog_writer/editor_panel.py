@@ -12,16 +12,9 @@ from ceylon.tools.search_tool import SearchTool
 
 async def main():
     runner = AgentRunner(workspace_name="ceylon-ai")
-    llm_lib = ChatOllama(model="llama3:instruct")
+    # llm_lib = ChatOllama(model="phi3:instruct")
+    llm_lib = ChatOllama(model="gemma2:latest")
     # llm_lib = ChatOpenAI(model="gpt-4o")
-    runner.register_agent(LLMAgent(
-        name="writer",
-        position="Assistant Writer",
-        llm=llm_lib,
-        responsibilities=["Create high-quality, original content that matches the audience's tone and style."],
-        instructions=[
-            "Ensure clarity, accuracy, and proper formatting while respecting ethical guidelines and privacy."]
-    ))
     runner.register_agent(LLMAgent(
         name="name_chooser",
         position="Select File name",
@@ -38,7 +31,6 @@ async def main():
         llm=llm_lib,
         responsibilities=[
             "Conducting thorough and accurate research to support content creation.",
-            "summarize with source references"
 
         ],
         instructions=[
@@ -46,29 +38,21 @@ async def main():
             "Find credible sources, verify information, and provide comprehensive and relevant "
             "data while ensuring ethical "
             "standards and privacy are maintained.",
-            "Must  summarize output with source references."
+            "Must  summarize output without source references."
         ],
         tools=[
             SearchTool()
         ]
     ))
     #
+
     runner.register_agent(LLMAgent(
-        name="editor",
-        position="Content Editor",
+        name="writer",
+        position="Assistant Writer",
         llm=llm_lib,
-        responsibilities=[
-            "Review and refine content to ensure it meets quality standards and aligns with the editorial guidelines.",
-            "Write content in a clear and concise manner.",
-            "Ensure the content is appropriate for the target audience.",
-            "Ensure the content is engaging and maintains the intended tone and style.",
-            "Include source references when appropriate."
-        ],
+        responsibilities=["Create high-quality, original content that matches the audience's tone and style."],
         instructions=[
-            "Check for grammatical errors, clarity, and coherence.",
-            "Ensure the content is engaging and maintains the intended tone and style.",
-            "Provide constructive feedback to the writer."
-        ]
+            "Ensure clarity, accuracy, and proper formatting while respecting ethical guidelines and privacy."]
     ))
     #
     runner.register_agent(LLMAgent(
@@ -98,8 +82,7 @@ async def main():
             "name_chooser": [],
             "researcher": [],
             "writer": ["researcher"],
-            "editor": ["writer"],
-            "publisher": ["editor", "name_chooser"]
+            "publisher": ["writer", "name_chooser"]
         }
     )
 

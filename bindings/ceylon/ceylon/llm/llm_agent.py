@@ -1,4 +1,6 @@
+import asyncio
 import pickle
+import random
 from collections import deque
 from typing import List
 
@@ -21,6 +23,7 @@ class LLMAgentResponse:
 class LLMAgent(AgentCore, MessageHandler, Processor):
     tools: list[StructuredTool]
     network_graph: nx.DiGraph
+    network_graph_original: nx.DiGraph
     queue: deque
     original_goal = None
 
@@ -53,7 +56,7 @@ class LLMAgent(AgentCore, MessageHandler, Processor):
 
         next_agent = self.get_next_agent()
         if next_agent == definition.name:
-            dependencies = list(self.network_graph.predecessors(next_agent))
+            dependencies = list(self.network_graph_original.predecessors(next_agent))
             print("Dependencies are:", dependencies, "for", next_agent)
 
             only_dependencies = {dt.agent_name: dt for dt in self.agent_replies if dt.agent_name in dependencies}
@@ -79,9 +82,12 @@ class LLMAgent(AgentCore, MessageHandler, Processor):
     def _initialize_graph(self, network):
         # Add nodes and edges based on the agents and their dependencies
         for agent, dependencies in network.items():
+            print(agent)
             self.network_graph.add_node(agent)
             for dependency in dependencies:
                 self.network_graph.add_edge(dependency, agent)
+
+        self.network_graph_original = self.network_graph.copy()
 
         # Initialize the queue with nodes that have no dependencies (indegree 0)
         self.queue.extend([node for node in self.network_graph if self.network_graph.in_degree(node) == 0])
@@ -101,6 +107,7 @@ class LLMAgent(AgentCore, MessageHandler, Processor):
             result = process_agent_request(self.llm, input, definition, tools=self.tools)
             # result = f"{definition.name} executed successfully"
             response = LLMAgentResponse(agent_id=definition.id, agent_name=definition.name, response=result)
+            await asyncio.sleep(random.randint(1, 10))
 
             await self.broadcast(pickle.dumps(response))
 
@@ -108,6 +115,8 @@ class LLMAgent(AgentCore, MessageHandler, Processor):
 
             next_agent = self.get_next_agent()
             print("Next agent will be:", next_agent)
+        else:
+            print("Not executing", definition.name, "as it is not the next agent in the queue.")
 
     async def update_status(self, agent):
         if agent not in self.queue:
