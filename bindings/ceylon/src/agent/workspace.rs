@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
+use tokio::runtime::Runtime;
 use uniffi::deps::log::debug;
 
 use crate::AgentCore;
@@ -18,6 +19,7 @@ pub struct Workspace {
     host: String,
     _name: String,
     _agents: Vec<Arc<AgentCore>>,
+    runtime: Runtime,
 }
 
 
@@ -26,23 +28,25 @@ impl Workspace {
         let _name = config.name;
         let id = format!("workspace-{}", uuid::Uuid::new_v4());
 
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
         Self {
             id,
             port: config.port,
             host: config.host,
             _name,
             _agents: agents,
+
+            runtime: rt,
         }
     }
 
     pub async fn run(&self, inputs: Vec<u8>) {
         env_logger::init();
         debug!("Workspace {} running", self.id);
-        let rt = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .unwrap();
-
         let mut tasks = vec![];
         let _inputs = inputs.clone();
         for agent in self._agents.iter() {
@@ -51,7 +55,7 @@ impl Workspace {
             let topic = format!("workspace-{}", agent.workspace_id());
 
             let agent = agent.clone();
-            let task = rt.spawn(async move {
+            let task = self.runtime.spawn(async move {
                 agent.start(topic, url, _inputs).await;
             });
             tasks.push(task);
@@ -60,7 +64,6 @@ impl Workspace {
         for task in tasks {
             task.await.unwrap();
         }
-        rt.shutdown_background();
     }
 }
 

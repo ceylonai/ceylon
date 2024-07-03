@@ -13,7 +13,8 @@ from ceylon.tools.search_tool import SearchTool
 async def main():
     runner = AgentRunner(workspace_name="ceylon-ai")
     # llm_lib = ChatOllama(model="phi3:instruct")
-    llm_lib = ChatOllama(model="gemma2:latest")
+    # llm_lib = ChatOllama(model="gemma2:latest")
+    llm_lib = ChatOllama(model="gemma2:27b")
     # llm_lib = ChatOpenAI(model="gpt-4o")
     runner.register_agent(LLMAgent(
         name="name_chooser",
@@ -54,6 +55,22 @@ async def main():
         instructions=[
             "Ensure clarity, accuracy, and proper formatting while respecting ethical guidelines and privacy."]
     ))
+
+    runner.register_agent(LLMAgent(
+        name="tweeter",
+        position="Tweet",
+        llm=llm_lib,
+        responsibilities=["Create tweet based on writer's content."],
+        instructions=[
+            "Simple",
+            "Be creative",
+            "Be original",
+            "With Hashtags"
+        ],
+        tools=[
+            FilePublisherTool()
+        ]
+    ))
     #
     runner.register_agent(LLMAgent(
         name="publisher",
@@ -82,7 +99,8 @@ async def main():
             "name_chooser": [],
             "researcher": [],
             "writer": ["researcher"],
-            "publisher": ["writer", "name_chooser"]
+            "publisher": ["writer", "name_chooser"],
+            "tweeter": ["writer", "name_chooser"]
         }
     )
 
