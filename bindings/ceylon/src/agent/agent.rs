@@ -227,27 +227,27 @@ impl AgentCore {
         let node_message_sender = self.get_tx_0();
         let definition = self.definition().await;
         let agent_state_clone_sync_process = Arc::clone(&agent_state);
-        let run_sync_request = tokio::spawn(async move {
-            loop {
-                match definition.clone().id {
-                    Some(id) => {
-                        let snapshot = agent_state_clone_sync_process.lock().await.request_snapshot().await;
-                        let beacon_message = SystemMessage::Beacon {
-                            time: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs_f64(),
-                            sender: id.clone(),
-                            name: definition.name.clone(),
-                            sync_hash: snapshot.sync_hash(),
-                        };
-                        node_message_sender.send(beacon_message).await.unwrap();
-                        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
-                    }
-                    None => {
-                        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-                        continue;
-                    }
-                }
-            }
-        });
+        // let run_sync_request = tokio::spawn(async move {
+        //     loop {
+        //         match definition.clone().id {
+        //             Some(id) => {
+        //                 let snapshot = agent_state_clone_sync_process.lock().await.request_snapshot().await;
+        //                 let beacon_message = SystemMessage::Beacon {
+        //                     time: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs_f64(),
+        //                     sender: id.clone(),
+        //                     name: definition.name.clone(),
+        //                     sync_hash: snapshot.sync_hash(),
+        //                 };
+        //                 node_message_sender.send(beacon_message).await.unwrap();
+        //                 tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+        //             }
+        //             None => {
+        //                 tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+        //                 continue;
+        //             }
+        //         }
+        //     }
+        // });
 
         node_0.connect(url.as_str(), topic.as_str());
         node_0.run().await;
@@ -279,9 +279,9 @@ impl AgentCore {
             _ = run_process => {
                 debug!("Agent {:?} run_process stopped", agent_name);
             },
-            _ = run_sync_request => {
-                debug!("Agent {:?} run_sync_request stopped", agent_name);
-            },
+            // _ = run_sync_request => {
+            //     debug!("Agent {:?} run_sync_request stopped", agent_name);
+            // },
             _ = agent_state_message_processor => {
                 debug!("Agent {:?} agent_state_message_processor stopped", agent_name);
             },
