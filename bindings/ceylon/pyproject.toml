@@ -35,7 +35,8 @@ dependencies = [
     "langchain==0.2.6",
     "duckduckgo-search==6.1.7",
     "langchain-community==0.2.6",
-    "openai==1.35.7"
+    "openai==1.35.7",
+    "expert-ceylon==2.0.0a2",
 ]
 
 [project.urls]
