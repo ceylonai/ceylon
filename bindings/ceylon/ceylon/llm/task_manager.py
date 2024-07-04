@@ -1,83 +1,107 @@
-from expert_ceylon import *
+import enum
+from typing import List, Tuple
+
+from pydantic import dataclasses
 
 
-class Task(Fact):
-    """Information about a task"""
-    pass
+class TaskStatus(enum.Enum):
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
 
 
-class Agent(Fact):
-    """Information about an agent"""
-    pass
+@dataclasses.dataclass
+class Task:
+    name: str
+    dependencies: List[str]
+    status: TaskStatus = TaskStatus.PENDING
 
 
-class TaskManagement(KnowledgeEngine):
-    def __init__(self, dependencies):
-        super().__init__()
-        self.dependencies = dependencies
-        self.create_dynamic_rules()
+class TaskManager:
+    def __init__(self, tasks: List[Task] = None):
+        self.tasks = tasks or []
 
-    def create_dynamic_rules(self):
-        for task, deps in self.dependencies.items():
-            self.add_rule(task, deps)
+    def add_tasks(self, tasks: List[Task]):
+        self.tasks.extend(tasks)
 
-    def add_rule(self, task, dependencies):
-        def rule_method(self):
-            all_deps_completed = all(
-                self.facts.get(Task(name=dep)).get('status') == 'completed'
-                for dep in dependencies
-            )
-            if all_deps_completed:
-                print(f"{task} is being handled.")
-                self.modify(self.facts[Task(name=task)], status='completed')
+    def add_dependencies(self, task_name: str, dependencies: List[str]):
+        task = next((task for task in self.tasks if task.name == task_name), None)
+        if task:
+            task.dependencies.extend(dependencies)
 
-        rule_method.__name__ = f"handle_{task}"
-        setattr(self, rule_method.__name__, Rule(Task(name=task, status='pending'))(rule_method))
+    def update_status(self, task_name: str, status: TaskStatus) -> bool:
+        task = next((task for task in self.tasks if task.name == task_name), None)
+        if task:
+            if status == TaskStatus.RUNNING or status == TaskStatus.COMPLETED:
+                can_start, required_tasks = self.can_start_with_required_tasks(task_name)
+                if not can_start:
+                    print(
+                        f"Cannot update task '{task_name}' to '{status.name}'"
+                        f" because the following tasks need to be completed first: {required_tasks}")
+                    return False
+            task.status = status
+            return True
+        return False
 
+    def find_next_task(self) -> List[Task]:
+        tasks: List[Task] = self.tasks
+        # Create a dictionary to quickly access task status by name
+        task_status = {task.name: task.status for task in tasks}
 
-def add_task(engine, name, status, required_ability, dependency=None):
-    engine.declare(Task(name=name, status=status))
+        # List to hold the names of tasks that can be started next
+        next_tasks = []
 
+        # Iterate through each task to find eligible ones
+        for task in tasks:
+            if task.status == TaskStatus.PENDING:
+                # Check if all dependencies are completed
+                if all(task_status[dep] == TaskStatus.COMPLETED for dep in task.dependencies):
+                    next_tasks.append(task)
 
-def add_agent(engine, name, ability):
-    engine.declare(Agent(name=name, ability=ability))
+        return next_tasks
 
+    def can_start_with_required_tasks(self, task_name: str) -> Tuple[bool, List[str]]:
+        task = next((task for task in self.tasks if task.name == task_name), None)
+        if not task:
+            return False, []
 
-def main():
-    dependencies = {
-        "name_chooser": [],
-        "researcher": [],
-        "writer": ["researcher"],
-        "editor": ["writer"],
-        "publisher": ["editor", "name_chooser"]
-    }
+        required_tasks = self._get_pending_dependencies(task)
+        can_start = len(required_tasks) == 0
 
-    engine = TaskManagement(dependencies)
-    engine.reset()
+        return can_start, required_tasks
 
-    # Initial facts
-    add_task(engine, 'name_chooser', 'pending', 'choose_name')
-    add_task(engine, 'researcher', 'pending', 'research')
-    add_task(engine, 'writer', 'pending', 'write')
-    add_task(engine, 'editor', 'pending', 'edit')
-    add_task(engine, 'publisher', 'pending', 'publish')
+    def _get_pending_dependencies(self, task: Task) -> List[str]:
+        pending_dependencies = []
 
-    add_agent(engine, 'name_chooser', 'choose_name')
-    add_agent(engine, 'researcher', 'research')
-    add_agent(engine, 'writer', 'write')
-    add_agent(engine, 'editor', 'edit')
-    add_agent(engine, 'publisher', 'publish')
+        for dependency_name in task.dependencies:
+            dependency = next((t for t in self.tasks if t.name == dependency_name), None)
+            if dependency and dependency.status != TaskStatus.COMPLETED:
+                pending_dependencies.append(dependency_name)
+                pending_dependencies.extend(self._get_pending_dependencies(dependency))
 
-    # Running the engine
-    engine.run()
-
-    # Adding new tasks and agents dynamically
-    add_task(engine, 'additional_task', 'pending', 'additional_ability', 'publish')
-    add_agent(engine, 'additional_agent', 'additional_ability')
-
-    # Running the engine again to process new tasks
-    engine.run()
+        return list(set(pending_dependencies))
 
 
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    tasks = [
+        Task(name="task1", dependencies=["task2", "task3"]),
+        Task(name="task2", dependencies=["task4"]),
+        Task(name="task3", dependencies=["task4"]),
+        Task(name="task4", dependencies=[]),
+        Task(name="task9", dependencies=[]),
+        Task(name="task5", dependencies=["task3"]),
+        Task(name="task6", dependencies=["task3"])
+    ]
+
+    task_manager = TaskManager(tasks)
+    print(task_manager.find_next_task())
+
+    print(task_manager.can_start_with_required_tasks("task1"))
+
+    task_manager.update_status("task4", TaskStatus.COMPLETED)
+    print(task_manager.can_start_with_required_tasks("task1"))
+    task_manager.update_status("task2", TaskStatus.COMPLETED)
+    print(task_manager.can_start_with_required_tasks("task1"))
+    task_manager.update_status("task3", TaskStatus.COMPLETED)
+    print(task_manager.can_start_with_required_tasks("task1"))
