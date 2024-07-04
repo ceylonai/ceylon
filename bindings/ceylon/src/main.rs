@@ -65,7 +65,7 @@ async fn main() {
         );
         let ag_tx = ag.get_tx_0();
         tokio::spawn(async move {
-            ag.start(
+            ag.start_agent(
                 "test_topic".to_string(),
                 "/ip4/0.0.0.0/udp/0/quic-v1".to_string(),
                 vec![],
