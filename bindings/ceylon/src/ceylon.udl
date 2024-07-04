@@ -29,6 +29,9 @@ interface AgentCore{
     void broadcast(bytes message);
 
     [Async]
+    void start(string topic, string url, bytes inputs);
+
+    [Async]
     void  stop();
 };
 

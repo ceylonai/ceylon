@@ -77,6 +77,16 @@ impl AgentCore {
 
 impl AgentCore {
     pub async fn start(&self, topic: String, url: String, inputs: Vec<u8>) {
+        env_logger::init();
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        rt.block_on(async move {
+            self.start_agent(topic, url, inputs).await;
+        });
+    }
+    pub async fn start_agent(&self, topic: String, url: String, inputs: Vec<u8>) {
         let definition = self.definition().await;
         let agent_name = definition.name.clone();
         let (tx_0, rx_0) = tokio::sync::mpsc::channel::<NodeMessage>(100);

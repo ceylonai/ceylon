@@ -56,7 +56,7 @@ impl Workspace {
 
             let agent = agent.clone();
             let task = self.runtime.spawn(async move {
-                agent.start(topic, url, _inputs).await;
+                agent.start_agent(topic, url, _inputs).await;
             });
             tasks.push(task);
         }
