@@ -39,7 +39,6 @@ impl Workspace {
             host: config.host,
             _name,
             _agents: agents,
-
             runtime: rt,
         }
     }
