@@ -57,6 +57,7 @@ class LLMAgent(AgentCore, MessageHandler, Processor):
         #     dependencies = list(self.network_graph_original.predecessors(next_agent))
         #     print("Dependencies are:", dependencies, "for", next_agent)
         #
+
         #     only_dependencies = {dt.agent_name: dt for dt in self.agent_replies if dt.agent_name in dependencies}
         #
         #     if len(only_dependencies) == len(dependencies):
@@ -73,7 +74,8 @@ class LLMAgent(AgentCore, MessageHandler, Processor):
         print(" Running LLMAgent")
         inputs: RunnerInput = pickle.loads(inputs)
         self.original_goal = inputs.request
-        await self.stop()
+
+        print(inputs.request)
 
     async def execute(self, input):
         definition = await self.definition()

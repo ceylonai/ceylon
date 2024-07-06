@@ -1,6 +1,6 @@
 import asyncio
 import pickle
-from typing import List, Dict
+from typing import List, Dict, Any
 
 from pydantic import BaseModel
 
@@ -9,7 +9,7 @@ from ceylon.ceylon.ceylon import uniffi_set_event_loop
 
 
 class RunnerInput(BaseModel):
-    request: dict
+    request: Any
     agents: List[AgentDefinition]
     network: Dict[str, List[str]]
 

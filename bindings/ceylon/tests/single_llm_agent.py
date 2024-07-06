@@ -18,6 +18,14 @@ async def main():
         instructions=[
             "Ensure clarity, accuracy, and proper formatting while respecting ethical guidelines and privacy."]
     ))
+    runner.register_agent(LLMAgent(
+        name="resercher",
+        position="Assistant Writer",
+        llm=llm_lib,
+        responsibilities=["Create high-quality, original content that matches the audience's tone and style."],
+        instructions=[
+            "Ensure clarity, accuracy, and proper formatting while respecting ethical guidelines and privacy."]
+    ))
 
     await runner.run(
         {

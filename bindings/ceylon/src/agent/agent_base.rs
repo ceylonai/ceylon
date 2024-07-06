@@ -7,6 +7,10 @@ pub trait MessageHandler: Send + Sync + Debug {
     async fn on_message(&self, agent_id: String, data: Vec<u8>, time: u64);
 }
 
+pub trait OnConnectAgentEventHandler: Send + Sync + Debug {
+    fn on_event(&self, event: String);
+}
+
 #[async_trait::async_trait]
 pub trait Processor: Send + Sync + Debug {
     async fn run(&self, input: Vec<u8>) -> ();
