@@ -7,6 +7,7 @@ use libp2p::core::{Multiaddr, multiaddr::Protocol};
 use libp2p::swarm::{NetworkBehaviour, SwarmEvent};
 use tokio::select;
 use tokio::task::JoinHandle;
+use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Debug)]
@@ -21,10 +22,6 @@ impl PeerAdminConfig {
 }
 
 pub async fn create_server(opt: PeerAdminConfig) -> (JoinHandle<()>, PeerId) {
-    let _ = tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
-        .try_init();
-
     let key = identity::Keypair::generate_ed25519();
     let mut swarm = libp2p::SwarmBuilder::with_existing_identity(key)
         .with_tokio()
@@ -45,21 +42,25 @@ pub async fn create_server(opt: PeerAdminConfig) -> (JoinHandle<()>, PeerId) {
             .with(Protocol::Tcp(opt.listen_port.unwrap_or(0))),
     );
     let peer_id = swarm.local_peer_id().clone();
+
+
+    tracing::info!( "Local peer id Admin: {:?}", peer_id.clone());
+
     let server_task = tokio::task::spawn(async move {
         loop {
             select! {
                 event = swarm.select_next_some() => match event {
-                    SwarmEvent::NewListenAddr { address, .. } => println!("Listening on {address:?}"),
+                    SwarmEvent::NewListenAddr { address, .. } => info!("Listening on {address:?}"),
                     _ => {
-                        println!("WILD CARD Server {:?}", event);
+                        info!("WILD CARD Server {:?}", event);
                     }
                 }
             }
 
             match swarm.select_next_some().await {
-                SwarmEvent::NewListenAddr { address, .. } => println!("Listening on {address:?}"),
-                SwarmEvent::Behaviour(event) => println!("{event:?}"),
-                e => println!("{e:?}"),
+                SwarmEvent::NewListenAddr { address, .. } => info!("Listening on {address:?}"),
+                SwarmEvent::Behaviour(event) => info!("{event:?}"),
+                e => info!("{e:?}"),
             }
         }
     });

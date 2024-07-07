@@ -8,7 +8,10 @@ use std::net::Ipv4Addr;
 use std::time::Duration;
 use tokio::select;
 use tokio::task::JoinHandle;
-use tracing_subscriber::EnvFilter;
+use tracing::info;
+use tracing_subscriber::{EnvFilter, fmt};
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 
 #[derive(Debug)]
 pub struct PeerConfig {
@@ -27,11 +30,7 @@ impl PeerConfig {
 }
 
 pub async fn create_client(opt: PeerConfig) -> JoinHandle<()> {
-    let _ = tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
-        .try_init();
-    
-    let key = identity::Keypair::generate_ed25519();    
+    let key = identity::Keypair::generate_ed25519();
     let mut swarm = libp2p::SwarmBuilder::with_existing_identity(key)
         .with_tokio()
         .with_tcp(
@@ -54,17 +53,17 @@ pub async fn create_client(opt: PeerConfig) -> JoinHandle<()> {
         .auto_nat
         .add_server(opt.server_peer_id, Some(opt.server_address));
 
-    
-    
+    info!( "Local peer id Client: {:?}", swarm.local_peer_id());
+
     let task = tokio::spawn(async move {
         loop {
             select! {
                 event = swarm.select_next_some() => match event {
                     SwarmEvent::NewListenAddr { address, .. } => {
-                        println!("{:?} NewListenAddr {:?}", swarm.local_peer_id(), address);
+                        info!("{:?} NewListenAddr {:?}", swarm.local_peer_id(), address);
                     }
                     _ => {
-                        println!("WILD CARD Client {:?}", event);
+                        info!("WILD CARD Client {:?}", event);
                     }
                 }
             }
