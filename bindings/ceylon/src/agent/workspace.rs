@@ -2,8 +2,7 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use tokio::runtime::Runtime;
-use uniffi::deps::log::debug;
-
+use tracing::debug;
 use crate::AgentCore;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]

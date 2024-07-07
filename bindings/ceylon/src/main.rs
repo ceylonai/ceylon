@@ -2,6 +2,7 @@ use std::sync::Arc;
 use serde_json::json;
 use tokio::io;
 use tokio::io::AsyncBufReadExt;
+use tracing::Level;
 
 mod agent;
 pub use agent::{
@@ -48,8 +49,14 @@ impl Processor for AgentHandler {
 
 #[tokio::main]
 async fn main() {
+    let subscriber = tracing_subscriber::FmtSubscriber::builder()
+        .with_level(true)
+        .with_max_level(Level::TRACE)
+        .finish();
+    // use that subscriber to process traces emitted after this point
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+
     tokio::spawn(async move {
-        env_logger::init();
         let (tx_0, mut rx_0) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
         let definition = AgentDefinition {
             id: None,

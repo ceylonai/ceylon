@@ -1,7 +1,7 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use log::info;
+use tracing::info;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
