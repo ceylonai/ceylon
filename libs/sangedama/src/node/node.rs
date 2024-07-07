@@ -5,7 +5,7 @@ use libp2p::{futures::StreamExt, gossipsub, mdns, swarm::{NetworkBehaviour, Swar
 use libp2p::core::muxing::StreamMuxerBox;
 use libp2p::core::transport::dummy::DummyTransport;
 use libp2p_gossipsub::{MessageId, PublishError};
-use log::{debug, error, info};
+use tracing::{debug, error, info};
 
 
 use tokio::sync::mpsc;
@@ -16,18 +16,19 @@ use crate::node::message::{EventType, NodeMessage};
 #[derive(NetworkBehaviour)]
 #[behaviour(to_swarm = "Event")]
 struct NodeBehaviour {
-    gossipsub: gossipsub::Behaviour,
+    gossip_sub: gossipsub::Behaviour,
     mdns: mdns::tokio::Behaviour,
 }
 
+#[derive(Debug)]
 enum Event {
-    Gossipsub(gossipsub::Event),
+    GossipSub(gossipsub::Event),
     Mdns(mdns::Event),
 }
 
 impl From<gossipsub::Event> for Event {
     fn from(event: gossipsub::Event) -> Self {
-        Event::Gossipsub(event)
+        Event::GossipSub(event)
     }
 }
 
@@ -53,7 +54,7 @@ impl Node {
         let topic = gossipsub::IdentTopic::new(topic_str);
         match self.swarm
             .behaviour_mut()
-            .gossipsub
+            .gossip_sub
             .subscribe(&topic) {
             Ok(_) => {
                 // self.subscribed_topics.push(topic_str.to_string());
@@ -76,7 +77,7 @@ impl Node {
             match self
                 .swarm
                 .behaviour_mut()
-                .gossipsub
+                .gossip_sub
                 .publish(topic, message.to_json().as_bytes())
             {
                 Ok(id) => {
@@ -105,7 +106,7 @@ impl Node {
         for t in self.subscribed_topics.clone() {
             self.swarm
                 .behaviour_mut()
-                .gossipsub
+                .gossip_sub
                 .unsubscribe(&gossipsub::IdentTopic::new(&t));
         }
     }
@@ -145,7 +146,7 @@ impl Node {
                             self.pass_message_to_node(NodeMessage::event(self.swarm.local_peer_id().to_string(),EventType::OnConnectionClosed ,)).await
                         },
 
-                        SwarmEvent::Behaviour(Event::Gossipsub(event)) => {
+                        SwarmEvent::Behaviour(Event::GossipSub(event)) => {
                             debug!("GOSSIP {:?} {:?}", self.name, event);
 
                             match event {
@@ -173,14 +174,14 @@ impl Node {
                             match event {
                                 mdns::Event::Discovered(list) => {
                                     for (peer_id, _) in list {
-                                        self.swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
+                                        self.swarm.behaviour_mut().gossip_sub.add_explicit_peer(&peer_id);
                                     }
                                 self.pass_message_to_node(NodeMessage::event(  self.swarm.local_peer_id().to_string(),EventType::OnDiscovered,)).await
                                 },
 
                                 mdns::Event::Expired(list) => {
                                     for (peer_id, _) in list {
-                                        self.swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
+                                        self.swarm.behaviour_mut().gossip_sub.remove_explicit_peer(&peer_id);
                                     }
                                 self.pass_message_to_node(NodeMessage::event(  self.swarm.local_peer_id().to_string(),EventType::OnExpired,)).await
                                 },
@@ -211,8 +212,8 @@ impl NodeBehaviour {
             gossipsub::MessageId::from(s.finish().to_string())
         };
 
-        // Set a custom gossipsub configuration
-        let gossipsub_config = gossipsub::ConfigBuilder::default()
+        // Set a custom gossip_sub_config configuration
+        let gossip_sub_config = gossipsub::ConfigBuilder::default()
             .history_length(10)
             .history_gossip(10)
             .heartbeat_interval(Duration::from_secs(1)) // This is set to aid debugging by not cluttering the log space
@@ -222,14 +223,14 @@ impl NodeBehaviour {
             .map_err(|msg| io::Error::new(io::ErrorKind::Other, msg))
             .unwrap(); // Temporary hack because `build` does not return a proper `std::error::Error`.
 
-        // build a gossipsub network behaviour
-        let gossipsub = gossipsub::Behaviour::new(
+        // build a gossip_sub network behaviour
+        let gossip_sub = gossipsub::Behaviour::new(
             gossipsub::MessageAuthenticity::Signed(key.clone()),
-            gossipsub_config,
+            gossip_sub_config,
         ).unwrap();
 
         Self {
-            gossipsub,
+            gossip_sub: gossip_sub,
             mdns: mdns::tokio::Behaviour::new(mdns::Config::default(), key.public().to_peer_id())
                 .unwrap(),
         }
@@ -240,7 +241,8 @@ pub async fn create_node(
     name: String,
     in_rx: mpsc::Receiver<NodeMessage>,
 ) -> (Node, mpsc::Receiver<NodeMessage>) {
-    let swarm = SwarmBuilder::with_new_identity()
+    let key = libp2p::identity::Keypair::generate_ed25519();
+    let swarm = SwarmBuilder::with_existing_identity(key.clone())
         .with_tokio()
         .with_tcp(
             tcp::Config::default(),
@@ -258,15 +260,9 @@ pub async fn create_node(
         )
         .await
         .unwrap()
-        .with_relay_client(
-            (tls::Config::new, noise::Config::new),
-            yamux::Config::default,
-        )
-        .unwrap()
-        .with_behaviour(|_key, relay| {
+        .with_behaviour(|_key| {
             Ok(NodeBehaviour::new(_key))
         })
-
         .unwrap()
         .with_swarm_config(|cfg| {
             // Edit cfg here.
@@ -276,7 +272,6 @@ pub async fn create_node(
         .build();
 
     let (out_tx, _rx) = mpsc::channel(100);
-
     (
         Node {
             name,
@@ -301,7 +296,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_ping() {
-        env_logger::init();
+        let subscriber = tracing_subscriber::FmtSubscriber::new();
+        // use that subscriber to process traces emitted after this point
+        tracing::subscriber::set_global_default(subscriber).unwrap();
         let port_id = 0;
         let topic = "test_topic";
 

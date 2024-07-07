@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
-use log::{debug, error, info};
+use tracing::{debug, error, info};
 use tokio::{select, signal};
 use tokio::sync::{mpsc, Mutex, oneshot, RwLock};
 
