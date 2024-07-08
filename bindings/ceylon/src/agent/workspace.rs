@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use tokio::runtime::Runtime;
-use tracing::debug;
+use tracing::{debug, Level};
 use crate::AgentCore;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -43,7 +43,12 @@ impl Workspace {
     }
 
     pub async fn run(&self, inputs: Vec<u8>) {
-        env_logger::init();
+        let subscriber = tracing_subscriber::FmtSubscriber::builder()
+            .with_level(true)
+            .with_max_level(Level::TRACE)
+            .finish();
+        // use that subscriber to process traces emitted after this point
+        tracing::subscriber::set_global_default(subscriber).unwrap();
         debug!("Workspace {} running", self.id);
         let mut tasks = vec![];
         let _inputs = inputs.clone();
