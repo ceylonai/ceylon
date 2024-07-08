@@ -53,7 +53,7 @@ impl Node {
         info!("Connecting to {} with topic {}", url, topic_str);
         let topic = gossipsub::IdentTopic::new(topic_str);
         match self.swarm
-            .behaviour_mut()
+            .behaviour_mut()    
             .gossip_sub
             .subscribe(&topic) {
             Ok(_) => {
