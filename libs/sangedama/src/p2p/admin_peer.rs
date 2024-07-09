@@ -16,8 +16,8 @@ pub struct PeerAdminConfig {
 }
 
 impl PeerAdminConfig {
-    pub fn new(listen_port: Option<u16>) -> Self {
-        Self { listen_port }
+    pub fn new(listen_port: u16) -> Self {
+        Self { listen_port: Some(listen_port) }
     }
 }
 

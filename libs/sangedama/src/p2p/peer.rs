@@ -1,17 +1,14 @@
-use futures::StreamExt;
-use libp2p::core::multiaddr::Protocol;
-use libp2p::core::Multiaddr;
-use libp2p::swarm::{NetworkBehaviour, SwarmEvent};
-use libp2p::{autonat, identify, identity, noise, tcp, yamux, PeerId};
-use std::error::Error;
 use std::net::Ipv4Addr;
 use std::time::Duration;
+
+use futures::StreamExt;
+use libp2p::{autonat, identify, identity, noise, PeerId, tcp, yamux};
+use libp2p::core::Multiaddr;
+use libp2p::core::multiaddr::Protocol;
+use libp2p::swarm::{NetworkBehaviour, SwarmEvent};
 use tokio::select;
 use tokio::task::JoinHandle;
 use tracing::info;
-use tracing_subscriber::{EnvFilter, fmt};
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
 
 #[derive(Debug)]
 pub struct PeerConfig {

@@ -9,8 +9,8 @@ pub async fn create_swarm<B>() -> Swarm<B>
 where
     B: PeerBehaviour + 'static,
 {
-    let key = libp2p::identity::Keypair::generate_ed25519();
-    let swarm = SwarmBuilder::with_existing_identity(key.clone())
+    let key = identity::Keypair::generate_ed25519();
+    SwarmBuilder::with_existing_identity(key.clone())
         .with_tokio()
         .with_tcp(
             tcp::Config::default(),
@@ -37,6 +37,5 @@ where
             cfg
                 .with_idle_connection_timeout(Duration::from_secs(240))
         })
-        .build();
-    return swarm;
+        .build()
 }
