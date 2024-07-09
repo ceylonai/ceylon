@@ -19,7 +19,8 @@ libp2p = { version = "0.53.2", features = [
     "tokio",
     "gossipsub", "mdns", "noise", "macros", "tcp", "yamux", "quic", "tls", "relay", "websocket", "dns",
     "autonat",
-    "identify"
+    "identify",
+    "rendezvous"
 ] }
 libp2p-gossipsub = "0.46.1"
 libp2p-noise = "0.44.0"
