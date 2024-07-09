@@ -1,15 +1,14 @@
 use std::net::Ipv4Addr;
-use std::str::FromStr;
 use crate::peer::behaviour::PeerAdminBehaviour;
 use crate::peer::peer_swarm::create_swarm;
 use futures::StreamExt;
 use libp2p::swarm::SwarmEvent;
-use libp2p::{Multiaddr, PeerId, Swarm};
+use libp2p::{Multiaddr,  Swarm};
 use libp2p::multiaddr::Protocol;
 use tokio::select;
 use tracing::{debug, info};
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct AdminPeerConfig {
     pub listen_port: Option<u16>,
 }
@@ -18,7 +17,7 @@ impl AdminPeerConfig {
     pub fn new(listen_port: u16) -> Self {
         Self { listen_port: Some(listen_port) }
     }
-    
+
     pub fn get_listen_address(&self) -> Multiaddr {
         Multiaddr::empty()
             .with(Protocol::Ip4(Ipv4Addr::UNSPECIFIED))

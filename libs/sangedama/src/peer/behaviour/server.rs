@@ -31,13 +31,22 @@ impl PeerAdminBehaviour {
     pub fn process_event(&mut self, event: PeerAdminBehaviourEvent) {
         match event {
             PeerAdminBehaviourEvent::Rendezvous(event) => {
-                info!( "Rendezvous event: {:?}", event);
+                info!( "event: {:?}", event);
+
+                match event {
+                    rendezvous::server::Event::PeerRegistered { peer, .. } => {
+                        info!( "RendezvousServerConnected: {:?}", peer);
+                    }
+                    _ => {
+                        info!( "RendezvousServer: {:?}", event);
+                    }
+                }
             }
             PeerAdminBehaviourEvent::Ping(event) => {
-                info!( "Rendezvous Ping: {:?}", event);
+                info!( "Ping: {:?}", event);
             }
             PeerAdminBehaviourEvent::Identify(event) => {
-                info!( "Rendezvous Identify: {:?}", event);
+                info!( "Identify: {:?}", event);
             }
         }
     }

@@ -44,7 +44,7 @@ pub async fn create_server(opt: PeerAdminConfig) -> (JoinHandle<()>, PeerId) {
     let peer_id = swarm.local_peer_id().clone();
 
 
-    tracing::info!( "Local peer id Admin: {:?}", peer_id.clone());
+    info!( "Local peer id Admin: {:?}", peer_id.clone());
 
     let server_task = tokio::task::spawn(async move {
         loop {
