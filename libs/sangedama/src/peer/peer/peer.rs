@@ -1,14 +1,16 @@
+use std::net::Ipv4Addr;
 use futures::StreamExt;
-use libp2p::Swarm;
+use libp2p::{Multiaddr, PeerId, Swarm};
+use libp2p::multiaddr::Protocol;
 use libp2p::swarm::SwarmEvent;
 use tokio::select;
-use tracing::debug;
+use tracing::{debug, info};
 use crate::peer::behaviour::ClientPeerBehaviour;
 use crate::peer::peer_swarm::create_swarm;
 
 pub struct Peer {
     name: String,
-    id: String,
+    pub id: String,
     swarm: Swarm<ClientPeerBehaviour>,
 }
 
@@ -23,26 +25,33 @@ impl Peer {
         }
     }
 
-    pub async fn run(&mut self) {
-        self.swarm.listen_on("/ip4/0.0.0.0/udp/0/quic-v1".parse().unwrap()).unwrap();
-        self.swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse().unwrap()).unwrap();
+    pub async fn run(&mut self, rendezvous_point_address: Multiaddr, admin_peer_id: PeerId) {
+        info!("Peer {:?}: {:?} Starting..", self.name.clone(), self.id.clone());
+        let ext_address = Multiaddr::empty()
+            .with(Protocol::Ip4(Ipv4Addr::UNSPECIFIED))
+            .with(Protocol::Udp(0))
+            .with(Protocol::QuicV1);
+        self.swarm.add_external_address(ext_address);
+        self.swarm.dial(rendezvous_point_address).unwrap();
+
         let name_copy = self.name.clone();
         loop {
             select! {
                 event = self.swarm.select_next_some() => {
+                    info!( "Event: {:?}", event);
                     match event {
                         SwarmEvent::NewListenAddr { address, .. } => {
-                            debug!("{:?} NewListenAddr {:?}", name_copy, address);
+                            info!("{:?} NewListenAddr {:?}", name_copy, address);
                         }
                         SwarmEvent::Behaviour(ev) =>{
                              match ev {
                                  _ => {
-                                    debug!("{:?} WILD CARD Behaviour {:?}",name_copy, ev);
+                                    info!("{:?} WILD CARD Behaviour {:?}",name_copy, ev);
                                  }
                              }
                         }
                         _ => {
-                           debug!( "{:?} WILD CARD Event {:?}",name_copy, event);
+                           info!( "{:?} WILD CARD Event {:?}",name_copy, event);
                         }, // Wildcard pattern to cover all other cases
                     }
                 }

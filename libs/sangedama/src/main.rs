@@ -1,5 +1,6 @@
 use std::net::Ipv4Addr;
-use libp2p::Multiaddr;
+use std::str::FromStr;
+use libp2p::{Multiaddr, PeerId};
 use libp2p::multiaddr::Protocol;
 use tracing::{info};
 use crate::peer::peer::{AdminPeer, AdminPeerConfig, Peer};
@@ -13,16 +14,31 @@ async fn main() {
     tracing::subscriber::set_global_default(subscriber).unwrap();
     info!("Starting sangedama");
 
-    let admin_config = AdminPeerConfig::new(7845);
-    let admin_address = admin_config.get_listen_address();
-    
-    let mut admin_peer = AdminPeer::create(admin_config).await;
+    let admin_port = 7845;
+    let admin_config = AdminPeerConfig::new(admin_port);
+
+    let mut admin_peer = AdminPeer::create(admin_config.clone()).await;
     let admin_id = admin_peer.id.clone();
 
     let task_admin = tokio::task::spawn(async move {
-        admin_peer.run(Some(admin_address)).await;
+        admin_peer.run(None).await;
     });
 
+    // Here we create localhost address to connect peer with admin
+    let peer_dial_address = Multiaddr::empty()
+        .with(Protocol::Ip4(Ipv4Addr::LOCALHOST))
+        .with(Protocol::Udp(admin_port))
+        .with(Protocol::QuicV1);
+
+
     let mut peer = Peer::create("sangedama-peer1".to_string()).await;
-    peer.run().await;
+    let task_client = tokio::task::spawn(async move {
+        peer.run(
+            peer_dial_address,
+            PeerId::from_str(&admin_id).unwrap(),
+        ).await;
+    });
+
+    task_admin.await.unwrap();
+    task_client.await.unwrap();
 }
