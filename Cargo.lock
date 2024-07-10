@@ -1763,6 +1763,7 @@ dependencies = [
  "libp2p-quic",
  "libp2p-relay",
  "libp2p-rendezvous",
+ "libp2p-request-response",
  "libp2p-swarm",
  "libp2p-tcp",
  "libp2p-tls 0.3.0",
