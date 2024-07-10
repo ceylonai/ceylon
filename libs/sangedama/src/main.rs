@@ -32,13 +32,25 @@ async fn main() {
 
 
     let mut peer = Peer::create("sangedama-peer1".to_string()).await;
+    let peer_dial_address_p1 = peer_dial_address.clone();
+    let admin_id_p1 = admin_id.clone();
     let task_client = tokio::task::spawn(async move {
         peer.run(
-            peer_dial_address,
-            PeerId::from_str(&admin_id).unwrap(),
+            peer_dial_address_p1,
+            PeerId::from_str(&admin_id_p1).unwrap(),
+        ).await;
+    });
+    let mut peer2 = Peer::create("sangedama-peer2".to_string()).await;
+    let peer_dial_address_p2 = peer_dial_address.clone();
+    let admin_id_p2 = admin_id.clone();
+    let task_client2 = tokio::task::spawn(async move {
+        peer2.run(
+            peer_dial_address_p2,
+            PeerId::from_str(&admin_id_p2).unwrap(),
         ).await;
     });
 
     task_admin.await.unwrap();
     task_client.await.unwrap();
+    task_client2.await.unwrap();
 }
