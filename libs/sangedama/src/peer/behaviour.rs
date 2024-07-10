@@ -1,6 +1,6 @@
 mod server;
-mod peer;
+mod client;
 mod base;
 pub use base::PeerBehaviour;
 pub use server::PeerAdminBehaviour;
-pub use peer::ClientPeerBehaviour;
+pub use client::ClientPeerBehaviour;

@@ -27,6 +27,7 @@ impl AdminPeerConfig {
 }
 
 pub struct AdminPeer {
+    
     pub id: String,
     swarm: Swarm<PeerAdminBehaviour>,
     pub config: AdminPeerConfig,
@@ -58,7 +59,6 @@ impl AdminPeer {
         loop {
             select! {
                 event = self.swarm.select_next_some() => {
-                    info!( "Event: {:?}", event);
                     match event {
                        SwarmEvent::ConnectionEstablished { peer_id, .. } => {
                             info!("Connected to {}", peer_id);

@@ -54,12 +54,11 @@ impl ClientPeerBehaviour {
             }
             SwarmEvent::ConnectionEstablished { peer_id, .. } if peer_id == rendezvous_point => {
                 if let Err(error) = self.rendezvous.register(
-                    rendezvous::Namespace::from_static("rendezvous"),
+                    rendezvous::Namespace::from_static("CEYLON-AI-PEER"),
                     rendezvous_point,
                     None,
                 ) {
                     tracing::error!("Failed to register: {error}");
-                    return;
                 }
                 tracing::info!("Connection established with rendezvous point {}", peer_id);
             }
@@ -91,17 +90,16 @@ impl ClientPeerBehaviour {
                     namespace,
                     error
                 );
-                return;
             }
-            SwarmEvent::Behaviour(ClientPeerBehaviourEvent::Ping(ping::Event {
-                                                                     peer,
-                                                                     result: Ok(rtt),
-                                                                     ..
-                                                                 })) if peer != rendezvous_point => {
-                tracing::info!("Ping to {} is {}ms", peer, rtt.as_millis())
-            }
+            // SwarmEvent::Behaviour(ClientPeerBehaviourEvent::Ping(ping::Event {
+            //                                                          peer,
+            //                                                          result: Ok(rtt),
+            //                                                          ..
+            //                                                      })) if peer != rendezvous_point => {
+            //     tracing::info!("Ping to {} is {}ms", peer, rtt.as_millis())
+            // }
             other => {
-                tracing::info!("Unhandled {:?}", other);
+                // tracing::info!("Unhandled {:?}", other);
             }
         }
     }

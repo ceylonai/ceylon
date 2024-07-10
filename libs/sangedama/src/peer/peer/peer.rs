@@ -2,6 +2,7 @@ use std::net::Ipv4Addr;
 use futures::StreamExt;
 use libp2p::{Multiaddr, PeerId, Swarm};
 use libp2p::multiaddr::Protocol;
+use libp2p::swarm::dial_opts::{DialOpts, PeerCondition};
 use libp2p::swarm::SwarmEvent;
 use tokio::select;
 use tracing::{debug, info};
@@ -31,8 +32,16 @@ impl Peer {
             .with(Protocol::Ip4(Ipv4Addr::UNSPECIFIED))
             .with(Protocol::Udp(0))
             .with(Protocol::QuicV1);
-        self.swarm.add_external_address(ext_address);
-        self.swarm.dial(rendezvous_point_address).unwrap();
+        self.swarm.add_external_address(ext_address.clone());
+        let dial_opts = DialOpts::peer_id(admin_peer_id)
+            .addresses(
+                vec![rendezvous_point_address]
+            )
+            // .extend_addresses_through_behaviour()
+            .condition(PeerCondition::Always)
+            .build();
+        self.swarm.dial(dial_opts).unwrap();
+
 
         let name_copy = self.name.clone();
         loop {
