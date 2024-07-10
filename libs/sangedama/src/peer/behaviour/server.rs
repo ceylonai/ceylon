@@ -18,7 +18,7 @@ impl PeerBehaviour for PeerAdminBehaviour {
         let rendezvous_server = rendezvous::server::Behaviour::new(rendezvous::server::Config::default());
         Self {
             rendezvous: rendezvous_server,
-            ping: ping::Behaviour::new(ping::Config::new().with_interval(Duration::from_secs(1))),
+            ping: ping::Behaviour::new(ping::Config::new().with_interval(Duration::from_secs(10))),
             identify: identify::Behaviour::new(identify::Config::new(
                 "/CEYLON-AI-IDENTITY/0.0.1".to_string(),
                 local_public_key.public(),
@@ -31,8 +31,6 @@ impl PeerAdminBehaviour {
     pub fn process_event(&mut self, event: PeerAdminBehaviourEvent) {
         match event {
             PeerAdminBehaviourEvent::Rendezvous(event) => {
-                info!( "event: {:?}", event);
-
                 match event {
                     rendezvous::server::Event::PeerRegistered { peer, .. } => {
                         info!( "RendezvousServerConnected: {:?}", peer);
@@ -43,10 +41,10 @@ impl PeerAdminBehaviour {
                 }
             }
             PeerAdminBehaviourEvent::Ping(event) => {
-                info!( "Ping: {:?}", event);
+                // info!( "Ping: {:?}", event);
             }
             PeerAdminBehaviourEvent::Identify(event) => {
-                info!( "Identify: {:?}", event);
+                // info!( "Identify: {:?}", event);
             }
         }
     }

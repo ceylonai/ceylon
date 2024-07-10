@@ -21,7 +21,8 @@ libp2p = { version = "0.53.2", features = [
     "autonat",
     "identify",
     "rendezvous",
-    "ping"
+    "ping",
+    "request-response"
 ] }
 libp2p-gossipsub = "0.46.1"
 libp2p-noise = "0.44.0"

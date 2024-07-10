@@ -38,22 +38,7 @@ impl Peer {
         loop {
             select! {
                 event = self.swarm.select_next_some() => {
-                    info!( "Event: {:?}", event);
-                    match event {
-                        SwarmEvent::NewListenAddr { address, .. } => {
-                            info!("{:?} NewListenAddr {:?}", name_copy, address);
-                        }
-                        SwarmEvent::Behaviour(ev) =>{
-                             match ev {
-                                 _ => {
-                                    info!("{:?} WILD CARD Behaviour {:?}",name_copy, ev);
-                                 }
-                             }
-                        }
-                        _ => {
-                           info!( "{:?} WILD CARD Event {:?}",name_copy, event);
-                        }, // Wildcard pattern to cover all other cases
-                    }
+                    self.swarm.behaviour_mut().process_event(event, admin_peer_id);
                 }
             }
         }
