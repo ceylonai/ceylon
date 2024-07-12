@@ -3,7 +3,7 @@ use std::str::FromStr;
 use libp2p::{Multiaddr, PeerId};
 use libp2p::multiaddr::Protocol;
 use tracing::{info};
-use crate::peer::peer::{AdminPeer, AdminPeerConfig, Peer};
+use crate::peer::node::{AdminPeer, AdminPeerConfig, MemberPeer};
 
 mod p2p;
 mod peer;
@@ -31,7 +31,7 @@ async fn main() {
         .with(Protocol::QuicV1);
 
 
-    let mut peer = Peer::create("sangedama-peer1".to_string()).await;
+    let mut peer = MemberPeer::create("sangedama-peer1".to_string()).await;
     let peer_dial_address_p1 = peer_dial_address.clone();
     let admin_id_p1 = admin_id.clone();
     let task_client = tokio::task::spawn(async move {
@@ -40,7 +40,7 @@ async fn main() {
             PeerId::from_str(&admin_id_p1).unwrap(),
         ).await;
     });
-    let mut peer2 = Peer::create("sangedama-peer2".to_string()).await;
+    let mut peer2 = MemberPeer::create("sangedama-peer2".to_string()).await;
     let peer_dial_address_p2 = peer_dial_address.clone();
     let admin_id_p2 = admin_id.clone();
     let task_client2 = tokio::task::spawn(async move {
