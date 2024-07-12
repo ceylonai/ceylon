@@ -3,9 +3,10 @@ use std::time::Duration;
 
 use libp2p::{gossipsub, identify, identity, PeerId, ping, rendezvous};
 use libp2p::swarm::{NetworkBehaviour, SwarmEvent};
-
+use tracing::info;
 use crate::peer::behaviour::base::create_gossip_sub_config;
 use crate::peer::behaviour::PeerBehaviour;
+use crate::peer::behaviour::server::PeerAdminBehaviourEvent;
 
 // We create a custom network behaviour that combines Gossipsub and Mdns.
 #[derive(NetworkBehaviour)]
@@ -70,6 +71,9 @@ impl ClientPeerBehaviour {
                                           rendezvous_node,
                                       },
                                   )) => {
+                let topic = gossipsub::IdentTopic::new("test_topic");
+                self.gossip_sub.subscribe(&topic).unwrap();
+
                 tracing::info!(
                     "Registered for namespace '{}' at rendezvous point {} for the next {} seconds",
                     namespace,
@@ -90,6 +94,18 @@ impl ClientPeerBehaviour {
                     namespace,
                     error
                 );
+            }
+
+            SwarmEvent::Behaviour(ClientPeerBehaviourEvent::GossipSub(gossipsub::Event::Message {
+                                                                          propagation_source: peer_id,
+                                                                          message_id,
+                                                                          message,
+                                                                      })) => {
+                info!("Received message '{:?}' from {:?} on {:?}", String::from_utf8_lossy(&message.data), peer_id, message_id);
+            }
+
+            SwarmEvent::Behaviour(ClientPeerBehaviourEvent::GossipSub(gossipsub::Event::Subscribed { peer_id, topic })) => {
+                info!("Subscribed to  {:?} from {:?}", topic, peer_id);
             }
             // SwarmEvent::Behaviour(ClientPeerBehaviourEvent::Ping(ping::Event {
             //                                                          peer,
