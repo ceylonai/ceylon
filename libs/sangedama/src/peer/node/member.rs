@@ -1,22 +1,23 @@
 use std::net::Ipv4Addr;
+
 use futures::StreamExt;
 use libp2p::{Multiaddr, PeerId, Swarm};
 use libp2p::multiaddr::Protocol;
 use libp2p::swarm::dial_opts::{DialOpts, PeerCondition};
-use libp2p::swarm::SwarmEvent;
 use tokio::select;
-use tracing::{debug, info};
+use tracing::{info};
+
 use crate::peer::behaviour::ClientPeerBehaviour;
 use crate::peer::peer_swarm::create_swarm;
 
-pub struct Peer {
+pub struct MemberPeer {
     name: String,
     pub id: String,
     swarm: Swarm<ClientPeerBehaviour>,
 }
 
 
-impl Peer {
+impl MemberPeer {
     pub async fn create(name: String) -> Self {
         let swarm = create_swarm::<ClientPeerBehaviour>().await;
         Self {
