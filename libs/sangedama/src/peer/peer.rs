@@ -1,7 +1,7 @@
 mod admin;
-mod peer;
+mod member;
 
-pub use peer::Peer;
+pub use member::Peer;
 pub use admin::{
     AdminPeer,
     AdminPeerConfig,
