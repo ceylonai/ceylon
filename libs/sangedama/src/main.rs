@@ -3,7 +3,9 @@ use std::str::FromStr;
 use libp2p::{Multiaddr, PeerId};
 use libp2p::multiaddr::Protocol;
 use tracing::{info};
-use crate::peer::node::{AdminPeer, AdminPeerConfig, MemberPeer};
+use tracing_subscriber::fmt::format;
+use uuid::Uuid;
+use crate::peer::node::{AdminPeer, AdminPeerConfig, MemberPeer, MemberPeerConfig};
 
 mod p2p;
 mod peer;
@@ -12,7 +14,8 @@ async fn main() {
     let subscriber = tracing_subscriber::FmtSubscriber::new();
     // use that subscriber to process traces emitted after this point
     tracing::subscriber::set_global_default(subscriber).unwrap();
-    info!("Starting sangedama");
+    let workspace_id = "workspace-test".to_string();
+    info!("Starting {}", workspace_id);
 
     let admin_port = 7845;
     let admin_config = AdminPeerConfig::new(admin_port);
@@ -31,23 +34,25 @@ async fn main() {
         .with(Protocol::QuicV1);
 
 
-    let mut peer = MemberPeer::create("sangedama-peer1".to_string()).await;
-    let peer_dial_address_p1 = peer_dial_address.clone();
-    let admin_id_p1 = admin_id.clone();
+    let mut peer1 = MemberPeer::create(MemberPeerConfig {
+        name: "peer1".to_string(),
+        workspace_id: workspace_id.clone(),
+        admin_peer: PeerId::from_str(&admin_id).unwrap(),
+        rendezvous_point_address: peer_dial_address.clone(),
+    }).await;
     let task_client = tokio::task::spawn(async move {
-        peer.run(
-            peer_dial_address_p1,
-            PeerId::from_str(&admin_id_p1).unwrap(),
-        ).await;
+        peer1.run().await;
     });
-    let mut peer2 = MemberPeer::create("sangedama-peer2".to_string()).await;
-    let peer_dial_address_p2 = peer_dial_address.clone();
-    let admin_id_p2 = admin_id.clone();
+
+
+    let mut peer2 = MemberPeer::create(MemberPeerConfig {
+        name: "peer2".to_string(),
+        workspace_id: workspace_id.clone(),
+        admin_peer: PeerId::from_str(&admin_id).unwrap(),
+        rendezvous_point_address: peer_dial_address.clone(),
+    }).await;
     let task_client2 = tokio::task::spawn(async move {
-        peer2.run(
-            peer_dial_address_p2,
-            PeerId::from_str(&admin_id_p2).unwrap(),
-        ).await;
+        peer2.run().await;
     });
 
     task_admin.await.unwrap();
