@@ -68,33 +68,3 @@ impl PeerBehaviour for PeerAdminBehaviour {
         }
     }
 }
-
-impl PeerAdminBehaviour {
-    pub fn process_event(&mut self, event: PeerAdminEvent) {
-        match event {
-            PeerAdminEvent::Rendezvous(event) => {
-                match event {
-                    rendezvous::server::Event::PeerRegistered { peer, .. } => {
-                        info!( "RendezvousServerConnected: {:?}", peer);
-
-                        let topic = gossipsub::IdentTopic::new("test_topic");
-                        self.gossip_sub.subscribe(&topic).unwrap();
-                    }
-                    _ => {
-                        info!( "RendezvousServer: {:?}", event);
-                    }
-                }
-            }
-            PeerAdminEvent::Ping(event) => {
-                // info!( "Ping: {:?}", event);
-            }
-            PeerAdminEvent::Identify(event) => {
-                // info!( "Identify: {:?}", event);
-            }
-
-            PeerAdminEvent::GossipSub(event) => {
-                info!( "GossipSub: {:?}", event);
-            }
-        }
-    }
-} 
