@@ -1,9 +1,9 @@
 use std::net::Ipv4Addr;
-use crate::peer::behaviour::PeerAdminBehaviour;
+use crate::peer::behaviour::{PeerAdminBehaviour, PeerAdminEvent};
 use crate::peer::peer_swarm::create_swarm;
 use futures::StreamExt;
 use libp2p::swarm::SwarmEvent;
-use libp2p::{Multiaddr,  Swarm};
+use libp2p::{gossipsub, Multiaddr, rendezvous, Swarm};
 use libp2p::multiaddr::Protocol;
 use tokio::select;
 use tracing::{debug, info};
@@ -67,13 +67,42 @@ impl AdminPeer {
                             info!("Disconnected from {}", peer_id);
                         }
                         SwarmEvent::Behaviour(event) => {
-                            self.swarm.behaviour_mut().process_event(event);
+                            self.process_event(event);
                         }
                         other => {
                             debug!("Unhandled {:?}", other);
                         }
                     }
                 }
+            }
+        }
+    }
+
+
+    pub fn process_event(&mut self, event: PeerAdminEvent) {
+        match event {
+            PeerAdminEvent::Rendezvous(event) => {
+                match event {
+                    rendezvous::server::Event::PeerRegistered { peer, .. } => {
+                        info!( "RendezvousServerConnected: {:?}", peer);
+
+                        let topic = gossipsub::IdentTopic::new("test_topic");
+                        self.swarm.behaviour_mut().gossip_sub.subscribe(&topic).unwrap();
+                    }
+                    _ => {
+                        info!( "RendezvousServer: {:?}", event);
+                    }
+                }
+            }
+            PeerAdminEvent::Ping(event) => {
+                // info!( "Ping: {:?}", event);
+            }
+            PeerAdminEvent::Identify(event) => {
+                // info!( "Identify: {:?}", event);
+            }
+
+            PeerAdminEvent::GossipSub(event) => {
+                info!( "GossipSub: {:?}", event);
             }
         }
     }
