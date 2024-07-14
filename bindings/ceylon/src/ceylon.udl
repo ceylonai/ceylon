@@ -1,5 +1,6 @@
 namespace ceylon {
   string version();
+  void enable_log();
 };
 
 dictionary WorkSpaceConfig{
@@ -10,6 +11,18 @@ dictionary WorkSpaceConfig{
 interface WorkSpace{
     constructor(WorkSpaceConfig config);
 
+    [Async]
+    void run(bytes inputs);
+};
+
+dictionary AdminAgentConfig {
+    string name;
+    u16 port;
+};
+
+
+interface AdminAgent{
+    constructor(AdminAgentConfig config);
     [Async]
     void run(bytes inputs);
 };
