@@ -2,18 +2,50 @@ use std::time::Duration;
 
 use libp2p::{gossipsub, identify, ping, rendezvous};
 use libp2p::swarm::NetworkBehaviour;
-use libp2p_gossipsub::Topic;
 use tracing::info;
 use crate::peer::behaviour::base::create_gossip_sub_config;
 use crate::peer::behaviour::PeerBehaviour;
 
 // We create a custom network behaviour that combines Gossipsub and Mdns.
 #[derive(NetworkBehaviour)]
+#[behaviour(to_swarm = "PeerAdminEvent")]
 pub struct PeerAdminBehaviour {
     pub rendezvous: rendezvous::server::Behaviour,
     pub ping: ping::Behaviour,
     pub identify: identify::Behaviour,
     pub gossip_sub: gossipsub::Behaviour,
+}
+
+#[derive(Debug)]
+pub enum PeerAdminEvent {
+    Rendezvous(rendezvous::server::Event),
+    Ping(ping::Event),
+    Identify(identify::Event),
+    GossipSub(gossipsub::Event),
+}
+
+
+impl From<gossipsub::Event> for PeerAdminEvent {
+    fn from(event: gossipsub::Event) -> Self {
+        PeerAdminEvent::GossipSub(event)
+    }
+}
+
+impl From<ping::Event> for PeerAdminEvent {
+    fn from(event: ping::Event) -> Self {
+        PeerAdminEvent::Ping(event)
+    }
+}
+
+impl From<rendezvous::server::Event> for PeerAdminEvent {
+    fn from(event: rendezvous::server::Event) -> Self {
+        PeerAdminEvent::Rendezvous(event)
+    }
+}
+impl From<identify::Event> for PeerAdminEvent {
+    fn from(event: identify::Event) -> Self {
+        PeerAdminEvent::Identify(event)
+    }
 }
 
 impl PeerBehaviour for PeerAdminBehaviour {
@@ -38,9 +70,9 @@ impl PeerBehaviour for PeerAdminBehaviour {
 }
 
 impl PeerAdminBehaviour {
-    pub fn process_event(&mut self, event: PeerAdminBehaviourEvent) {
+    pub fn process_event(&mut self, event: PeerAdminEvent) {
         match event {
-            PeerAdminBehaviourEvent::Rendezvous(event) => {
+            PeerAdminEvent::Rendezvous(event) => {
                 match event {
                     rendezvous::server::Event::PeerRegistered { peer, .. } => {
                         info!( "RendezvousServerConnected: {:?}", peer);
@@ -53,14 +85,14 @@ impl PeerAdminBehaviour {
                     }
                 }
             }
-            PeerAdminBehaviourEvent::Ping(event) => {
+            PeerAdminEvent::Ping(event) => {
                 // info!( "Ping: {:?}", event);
             }
-            PeerAdminBehaviourEvent::Identify(event) => {
+            PeerAdminEvent::Identify(event) => {
                 // info!( "Identify: {:?}", event);
             }
 
-            PeerAdminBehaviourEvent::GossipSub(event) => {
+            PeerAdminEvent::GossipSub(event) => {
                 info!( "GossipSub: {:?}", event);
             }
         }

@@ -1,20 +1,56 @@
-use std::hash::Hash;
 use std::time::Duration;
 
-use libp2p::{gossipsub, identify, identity, PeerId, ping, rendezvous};
+use libp2p::{gossipsub, identify, identity, mdns, PeerId, ping, rendezvous};
 use libp2p::swarm::{NetworkBehaviour, SwarmEvent};
 use tracing::info;
 use crate::peer::behaviour::base::create_gossip_sub_config;
 use crate::peer::behaviour::PeerBehaviour;
-use crate::peer::behaviour::server::PeerAdminBehaviourEvent;
 
 // We create a custom network behaviour that combines Gossipsub and Mdns.
 #[derive(NetworkBehaviour)]
+#[behaviour(to_swarm = "ClientPeerEvent")]
 pub struct ClientPeerBehaviour {
     pub identify: identify::Behaviour,
     pub rendezvous: rendezvous::client::Behaviour,
     pub ping: ping::Behaviour,
     pub gossip_sub: gossipsub::Behaviour,
+}
+
+pub enum ClientPeerEvent {
+    GossipSub(gossipsub::Event),
+    Mdns(mdns::Event),
+    Ping(ping::Event),
+    Identify(identify::Event),
+    Rendezvous(rendezvous::client::Event),
+}
+
+impl From<gossipsub::Event> for ClientPeerEvent {
+    fn from(event: gossipsub::Event) -> Self {
+        ClientPeerEvent::GossipSub(event)
+    }
+}
+
+impl From<mdns::Event> for ClientPeerEvent {
+    fn from(event: mdns::Event) -> Self {
+        ClientPeerEvent::Mdns(event)
+    }
+}
+
+impl From<ping::Event> for ClientPeerEvent {
+    fn from(event: ping::Event) -> Self {
+        ClientPeerEvent::Ping(event)
+    }
+}
+
+impl From<rendezvous::client::Event> for ClientPeerEvent {
+    fn from(event: rendezvous::client::Event) -> Self {
+        ClientPeerEvent::Rendezvous(event)
+    }
+}
+impl From<identify::Event> for ClientPeerEvent {
+    fn from(event: identify::Event) -> Self {
+        ClientPeerEvent::Identify(event)
+    }
 }
 
 
@@ -41,7 +77,7 @@ impl PeerBehaviour for ClientPeerBehaviour {
 
 
 impl ClientPeerBehaviour {
-    pub(crate) fn process_event(&mut self, event: SwarmEvent<ClientPeerBehaviourEvent>, rendezvous_point: PeerId) {
+    pub(crate) fn process_event(&mut self, event: SwarmEvent<ClientPeerEvent>, rendezvous_point: PeerId) {
         match event {
             SwarmEvent::NewListenAddr { address, .. } => {
                 tracing::info!("Listening on {}", address);
@@ -64,7 +100,7 @@ impl ClientPeerBehaviour {
                 tracing::info!("Connection established with rendezvous point {}", peer_id);
             }
             // once `/identify` did its job, we know our external address and can register
-            SwarmEvent::Behaviour(ClientPeerBehaviourEvent::Rendezvous(
+            SwarmEvent::Behaviour(ClientPeerEvent::Rendezvous(
                                       rendezvous::client::Event::Registered {
                                           namespace,
                                           ttl,
@@ -81,7 +117,7 @@ impl ClientPeerBehaviour {
                     ttl
                 );
             }
-            SwarmEvent::Behaviour(ClientPeerBehaviourEvent::Rendezvous(
+            SwarmEvent::Behaviour(ClientPeerEvent::Rendezvous(
                                       rendezvous::client::Event::RegisterFailed {
                                           rendezvous_node,
                                           namespace,
@@ -96,7 +132,7 @@ impl ClientPeerBehaviour {
                 );
             }
 
-            SwarmEvent::Behaviour(ClientPeerBehaviourEvent::GossipSub(gossipsub::Event::Message {
+            SwarmEvent::Behaviour(ClientPeerEvent::GossipSub(gossipsub::Event::Message {
                                                                           propagation_source: peer_id,
                                                                           message_id,
                                                                           message,
@@ -104,7 +140,7 @@ impl ClientPeerBehaviour {
                 info!("Received message '{:?}' from {:?} on {:?}", String::from_utf8_lossy(&message.data), peer_id, message_id);
             }
 
-            SwarmEvent::Behaviour(ClientPeerBehaviourEvent::GossipSub(gossipsub::Event::Subscribed { peer_id, topic })) => {
+            SwarmEvent::Behaviour(ClientPeerEvent::GossipSub(gossipsub::Event::Subscribed { peer_id, topic })) => {
                 info!("Subscribed to  {:?} from {:?}", topic, peer_id);
             }
             // SwarmEvent::Behaviour(ClientPeerBehaviourEvent::Ping(ping::Event {
