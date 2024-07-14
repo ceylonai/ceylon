@@ -6,9 +6,10 @@ use libp2p::multiaddr::Protocol;
 use libp2p::swarm::dial_opts::{DialOpts, PeerCondition};
 use libp2p::swarm::SwarmEvent;
 use tokio::select;
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 
 use crate::peer::behaviour::{ClientPeerBehaviour, ClientPeerEvent};
+use crate::peer::message::data::NodeMessage;
 use crate::peer::peer_swarm::create_swarm;
 
 pub struct MemberPeerConfig {
@@ -22,19 +23,40 @@ pub struct MemberPeer {
     config: MemberPeerConfig,
     pub id: String,
     swarm: Swarm<ClientPeerBehaviour>,
+
+    outside_tx: tokio::sync::mpsc::Sender<NodeMessage>,
+
+    inside_rx: tokio::sync::mpsc::Receiver<Vec<u8>>,
+    inside_tx: tokio::sync::mpsc::Sender<Vec<u8>>,
 }
 
 
 impl MemberPeer {
-    pub async fn create(config: MemberPeerConfig) -> Self {
+    pub async fn create(config: MemberPeerConfig) -> (Self, tokio::sync::mpsc::Receiver<NodeMessage>) {
         let swarm = create_swarm::<ClientPeerBehaviour>().await;
-        Self {
+
+
+        let (outside_tx, outside_rx) = tokio::sync::mpsc::channel::<NodeMessage>(100);
+
+        let (inside_tx, inside_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
+
+        (Self {
             config,
             id: swarm.local_peer_id().to_string(),
             swarm,
-        }
+
+            outside_tx,
+
+            inside_tx,
+            inside_rx,
+        },
+         outside_rx)
     }
 
+
+    pub fn emitter(&self) -> tokio::sync::mpsc::Sender<Vec<u8>> {
+        self.inside_tx.clone()
+    }
     pub async fn run(&mut self) {
         let name = self.config.name.clone();
         info!("Peer {:?}: {:?} Starting..", name.clone(), self.id.clone());
@@ -68,21 +90,39 @@ impl MemberPeer {
                                      self.config.admin_peer,
                                     None,
                                 ) {
-                                    tracing::error!("Failed to register: {error}");
+                                    error!("Failed to register: {error}");
                                 }
                                 info!("Connection established with rendezvous point {}", peer_id);
                             }
                         }
                         SwarmEvent::ConnectionClosed { peer_id, cause,.. } => {
                             if peer_id == self.config.admin_peer {
-                                tracing::error!("Lost connection to rendezvous point {:?}", cause);
+                                error!("Lost connection to rendezvous point {:?}", cause);
                             }
                         }
                         SwarmEvent::Behaviour(event) => {
-                            self.process_event(event);
+                            self.process_event(event).await;
                         }
                         other => {
                             debug!("Unhandled {:?}", other);
+                        }
+                    }
+                }
+
+                message = self.inside_rx.recv() => {
+                    if let Some(message) = message {
+                        let topic = gossipsub::IdentTopic::new(self.config.workspace_id.clone());
+
+                        let distributed_message = NodeMessage::Message {
+                            data: message,
+                            time: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs_f64() as u64,
+                            created_by: self.id.clone(),
+                        };
+                        match self.swarm.behaviour_mut().gossip_sub.publish(topic.clone(),distributed_message.to_bytes()){
+                            Ok(_) => {}
+                            Err(e) => {
+                                error!("Failed to broadcast message from {}: {:?} Topic {:?}",name_copy, e, topic.to_string());
+                            }
                         }
                     }
                 }
@@ -91,7 +131,8 @@ impl MemberPeer {
     }
 
 
-    fn process_event(&mut self, event: ClientPeerEvent) {
+    async fn process_event(&mut self, event: ClientPeerEvent) {
+        let name_ = self.config.name.clone();
         match event {
             ClientPeerEvent::Rendezvous(event) => {
                 match event {
@@ -111,6 +152,25 @@ impl MemberPeer {
 
             ClientPeerEvent::GossipSub(event) => {
                 match event {
+                    gossipsub::Event::Subscribed { peer_id, topic } => {
+                        info!("Subscribed to topic: {:?} from peer: {:?}", topic, peer_id);
+                        if peer_id.to_string() == self.config.admin_peer.to_string() {
+                            info!( "Member {} Subscribe with Admin",name_.clone() );
+                        }
+                    }
+
+                    gossipsub::Event::Unsubscribed { peer_id, topic } => {
+                        info!("Unsubscribed from topic: {:?} from peer: {:?}", topic, peer_id);
+                        if peer_id.to_string() == self.config.admin_peer.to_string() {
+                            info!( "Member {} Unsubscribe with Admin",name_.clone() );
+                        }
+                    }
+
+                    gossipsub::Event::Message { message, .. } => {
+                        let msg = NodeMessage::from_bytes(message.data);
+                        self.outside_tx.send(msg).await.unwrap();
+                    }
+
                     _ => {
                         info!( "GossipSub: {:?}", event);
                     }

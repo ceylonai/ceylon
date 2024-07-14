@@ -6,6 +6,7 @@ use tokio::select;
 use tracing::{info};
 use tracing_subscriber::fmt::format;
 use uuid::Uuid;
+use crate::peer::message::data::NodeMessage;
 use crate::peer::node::{AdminPeer, AdminPeerConfig, MemberPeer, MemberPeerConfig};
 
 mod p2p;
@@ -31,8 +32,18 @@ async fn main() {
     let task_admin_listener = tokio::spawn(async move {
         loop {
             select! {
-                event = admin_listener.recv() => {
-                    info!("Admin listener {:?}", event);
+               event = admin_listener.recv() => {
+                    if event.is_some() {
+                        let event = event.unwrap();
+                        match event{
+                            NodeMessage::Message{ data,created_by, ..} => {
+                                info!("Admin listener Message {:?} from {:?}",String::from_utf8(data),created_by);
+                            }
+                            _ => {
+                                info!("peer1 listener {:?}", event);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -40,8 +51,8 @@ async fn main() {
 
     let task_run_admin = tokio::task::spawn(async move {
         loop {
-            admin_emitter.send("test".to_string().as_bytes().to_vec()).await;
-            tokio::time::sleep(std::time::Duration::from_millis(10000)).await;
+            admin_emitter.send("Admin Send regards".to_string().as_bytes().to_vec()).await;
+            tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
         }
     });
 
@@ -52,31 +63,101 @@ async fn main() {
         .with(Protocol::QuicV1);
 
 
-    let mut peer1 = MemberPeer::create(MemberPeerConfig {
+    let (mut peer1, mut peer1_listener) = MemberPeer::create(MemberPeerConfig {
         name: "peer1".to_string(),
         workspace_id: workspace_id.clone(),
         admin_peer: PeerId::from_str(&admin_id).unwrap(),
         rendezvous_point_address: peer_dial_address.clone(),
     }).await;
-    let task_client = tokio::task::spawn(async move {
+
+    let peer1_emitter = peer1.emitter();
+    let peer1_id = peer1.id.clone();
+
+    let task_peer_1 = tokio::task::spawn(async move {
         peer1.run().await;
     });
 
+    let task_peer_1_listener = tokio::spawn(async move {
+        loop {
+            select! {
+                event = peer1_listener.recv() => {
+                    if event.is_some() {
+                        let event = event.unwrap();
+                        match event{
+                            NodeMessage::Message{ data,created_by, ..} => {
+                                info!("Peer 1 {} listener Message {:?} from {:?}",peer1_id, String::from_utf8(data),created_by);
+                            }
+                            _ => {
+                                info!("peer1 listener {:?}", event);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
 
-    let mut peer2 = MemberPeer::create(MemberPeerConfig {
+    let task_run_peer_1 = tokio::task::spawn(async move {
+        loop {
+            peer1_emitter.send("test peer 1".to_string().as_bytes().to_vec()).await;
+            tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
+        }
+    });
+
+
+    let (mut peer2, mut peer2_listener) = MemberPeer::create(MemberPeerConfig {
         name: "peer2".to_string(),
         workspace_id: workspace_id.clone(),
         admin_peer: PeerId::from_str(&admin_id).unwrap(),
         rendezvous_point_address: peer_dial_address.clone(),
     }).await;
-    let task_client2 = tokio::task::spawn(async move {
+
+
+    let peer2_emitter = peer2.emitter();
+    let peer2_id = peer2.id.clone();
+
+    let task_peer_2 = tokio::task::spawn(async move {
         peer2.run().await;
     });
+
+    let task_peer_2_listener = tokio::spawn(async move {
+        loop {
+            select! {
+                event = peer2_listener.recv() => {
+                  if event.is_some() {
+                        let event = event.unwrap();
+                        match event{
+                            NodeMessage::Message{ data,created_by, ..} => {
+                                info!("Peer 2 {} listener Message {:?} from {:?}",peer2_id, String::from_utf8(data),created_by);
+                            }
+                            _ => {
+                                info!("peer1 listener {:?}", event);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    let task_run_peer_2 = tokio::task::spawn(async move {
+        loop {
+            peer2_emitter.send("test peer 2".to_string().as_bytes().to_vec()).await;
+            tokio::time::sleep(std::time::Duration::from_millis(3000)).await;
+        }
+    });
+
 
     task_admin.await.unwrap();
     task_admin_listener.await.unwrap();
     task_run_admin.await.unwrap();
-    
-    task_client.await.unwrap();
-    task_client2.await.unwrap();
+
+    task_peer_1.await.unwrap();
+    task_peer_1_listener.await.unwrap();
+    task_run_peer_1.await.unwrap();
+
+
+    task_peer_2.await.unwrap();
+    task_peer_2_listener.await.unwrap();
+    task_run_peer_2.await.unwrap();
 }
