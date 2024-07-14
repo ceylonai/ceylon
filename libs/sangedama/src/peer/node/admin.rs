@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::net::Ipv4Addr;
-use std::str::FromStr;
 use crate::peer::behaviour::{PeerAdminBehaviour, PeerAdminEvent};
 use crate::peer::peer_swarm::create_swarm;
 use futures::StreamExt;
@@ -129,7 +128,7 @@ impl AdminPeer {
                     rendezvous::server::Event::PeerRegistered { peer, .. } => {
                         info!( "RendezvousServerConnected: {:?}", peer);
 
-                        let topic = gossipsub::IdentTopic::new("test_topic");
+                        let topic = gossipsub::IdentTopic::new(self.config.workspace_id.clone());
                         self.swarm.behaviour_mut().gossip_sub.subscribe(&topic).unwrap();
                     }
                     _ => {
@@ -162,7 +161,10 @@ impl AdminPeer {
                             event: EventType::Subscribe,
                         }).await.expect("Outside tx failed");
                     }
-
+                    gossipsub::Event::Message { message, .. } => {
+                        let msg = NodeMessage::from_bytes(message.data);
+                        self.outside_tx.send(msg).await.unwrap();
+                    }
                     _ => {
                         info!( "GossipSub: {:?}", event);
                     }
