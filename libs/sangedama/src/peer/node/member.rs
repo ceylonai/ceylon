@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::net::Ipv4Addr;
 
 use futures::StreamExt;
@@ -5,6 +6,7 @@ use libp2p::{gossipsub, Multiaddr, PeerId, rendezvous, Swarm};
 use libp2p::multiaddr::Protocol;
 use libp2p::swarm::dial_opts::{DialOpts, PeerCondition};
 use libp2p::swarm::SwarmEvent;
+use libp2p_gossipsub::TopicHash;
 use tokio::select;
 use tracing::{debug, info};
 
@@ -22,6 +24,8 @@ pub struct MemberPeer {
     config: MemberPeerConfig,
     pub id: String,
     swarm: Swarm<ClientPeerBehaviour>,
+
+    connected_peers: HashMap<TopicHash, Vec<PeerId>>,
 }
 
 
@@ -32,6 +36,7 @@ impl MemberPeer {
             config,
             id: swarm.local_peer_id().to_string(),
             swarm,
+            connected_peers: HashMap::new(),
         }
     }
 
@@ -44,14 +49,13 @@ impl MemberPeer {
             .with(Protocol::QuicV1);
         self.swarm.add_external_address(ext_address.clone());
 
-        let admin_peer_id = self.config.admin_peer.clone();
+        let admin_peer_id = self.config.admin_peer;
         let rendezvous_point_address = self.config.rendezvous_point_address.clone();
 
         let dial_opts = DialOpts::peer_id(admin_peer_id)
             .addresses(
                 vec![rendezvous_point_address]
             )
-            // .extend_addresses_through_behaviour()
             .condition(PeerCondition::Always)
             .build();
         self.swarm.dial(dial_opts).unwrap();
@@ -63,10 +67,10 @@ impl MemberPeer {
                 event = self.swarm.select_next_some() => {
                     match event {
                        SwarmEvent::ConnectionEstablished { peer_id, .. } => {
-                            if peer_id ==  self.config.admin_peer.clone() {
+                            if peer_id ==  self.config.admin_peer {
                                 if let Err(error) = self.swarm.behaviour_mut().rendezvous.register(
                                     rendezvous::Namespace::from_static("CEYLON-AI-PEER"),
-                                     self.config.admin_peer.clone(),
+                                     self.config.admin_peer,
                                     None,
                                 ) {
                                     tracing::error!("Failed to register: {error}");
@@ -75,7 +79,7 @@ impl MemberPeer {
                             }
                         }
                         SwarmEvent::ConnectionClosed { peer_id, cause,.. } => {
-                            if peer_id == self.config.admin_peer.clone() {
+                            if peer_id == self.config.admin_peer {
                                 tracing::error!("Lost connection to rendezvous point {:?}", cause);
                             }
                         }
@@ -94,21 +98,41 @@ impl MemberPeer {
 
     fn process_event(&mut self, event: ClientPeerEvent) {
         match event {
-            ClientPeerEvent::Rendezvous( event) => {
+            ClientPeerEvent::Rendezvous(event) => {
                 match event {
                     rendezvous::client::Event::Registered { namespace, ttl, rendezvous_node } => {
                         info!(
                             "Registered for namespace '{}' at rendezvous point {} for the next {} seconds",
                             namespace, rendezvous_node, ttl
                         );
-                         let topic = gossipsub::IdentTopic::new("test_topic");
-                         self.swarm.behaviour_mut().gossip_sub.subscribe(&topic).unwrap();
+                        let topic = gossipsub::IdentTopic::new("test_topic");
+                        self.swarm.behaviour_mut().gossip_sub.subscribe(&topic).unwrap();
                     }
                     _ => {
                         info!( "Rendezvous: {:?}", event);
                     }
                 }
             }
+
+            ClientPeerEvent::GossipSub(event) => {
+                match event {
+                    gossipsub::Event::Unsubscribed { topic, peer_id } => {
+                        info!( "GossipSub: Unsubscribed from topic {:?}", topic);
+                        let peers = self.connected_peers.get_mut(&topic);
+                        if let Some(peers) = peers {
+                            peers.retain(|p| p != &peer_id);
+                        }
+                    }
+                    gossipsub::Event::Subscribed { topic, peer_id } => {
+                        info!( "GossipSub: Subscribed to topic {:?}", topic);
+                        self.connected_peers.get_mut(&topic).unwrap_or(&mut vec![]).push(peer_id);
+                    }
+                    _ => {
+                        info!( "GossipSub: {:?}", event);
+                    }
+                }
+            }
+
             other => {
                 // tracing::info!("Unhandled {:?}", other);
             }
