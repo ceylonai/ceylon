@@ -6,7 +6,7 @@ use libp2p::multiaddr::Protocol;
 use libp2p::swarm::dial_opts::{DialOpts, PeerCondition};
 use libp2p::swarm::SwarmEvent;
 use tokio::select;
-use tracing::{info};
+use tracing::{debug, info};
 
 use crate::peer::behaviour::{ClientPeerBehaviour, ClientPeerEvent};
 use crate::peer::peer_swarm::create_swarm;
@@ -61,86 +61,54 @@ impl MemberPeer {
         loop {
             select! {
                 event = self.swarm.select_next_some() => {
-                    self.process_event(event, admin_peer_id);
+                    match event {
+                       SwarmEvent::ConnectionEstablished { peer_id, .. } => {
+                            if peer_id ==  self.config.admin_peer.clone() {
+                                if let Err(error) = self.swarm.behaviour_mut().rendezvous.register(
+                                    rendezvous::Namespace::from_static("CEYLON-AI-PEER"),
+                                     self.config.admin_peer.clone(),
+                                    None,
+                                ) {
+                                    tracing::error!("Failed to register: {error}");
+                                }
+                                info!("Connection established with rendezvous point {}", peer_id);
+                            }
+                        }
+                        SwarmEvent::ConnectionClosed { peer_id, cause,.. } => {
+                            if peer_id == self.config.admin_peer.clone() {
+                                tracing::error!("Lost connection to rendezvous point {:?}", cause);
+                            }
+                        }
+                        SwarmEvent::Behaviour(event) => {
+                            self.process_event(event);
+                        }
+                        other => {
+                            debug!("Unhandled {:?}", other);
+                        }
+                    }
                 }
             }
         }
     }
 
 
-    pub(crate) fn process_event(&mut self, event: SwarmEvent<ClientPeerEvent>, rendezvous_point: PeerId) {
+    fn process_event(&mut self, event: ClientPeerEvent) {
         match event {
-            SwarmEvent::NewListenAddr { address, .. } => {
-                info!("Listening on {}", address);
-            }
-            SwarmEvent::ConnectionClosed {
-                peer_id,
-                cause: Some(error),
-                ..
-            } if peer_id == rendezvous_point => {
-                tracing::error!("Lost connection to rendezvous point {}", error);
-            }
-            SwarmEvent::ConnectionEstablished { peer_id, .. } if peer_id == rendezvous_point => {
-                if let Err(error) = self.swarm.behaviour_mut().rendezvous.register(
-                    rendezvous::Namespace::from_static("CEYLON-AI-PEER"),
-                    rendezvous_point,
-                    None,
-                ) {
-                    tracing::error!("Failed to register: {error}");
+            ClientPeerEvent::Rendezvous( event) => {
+                match event {
+                    rendezvous::client::Event::Registered { namespace, ttl, rendezvous_node } => {
+                        info!(
+                            "Registered for namespace '{}' at rendezvous point {} for the next {} seconds",
+                            namespace, rendezvous_node, ttl
+                        );
+                         let topic = gossipsub::IdentTopic::new("test_topic");
+                         self.swarm.behaviour_mut().gossip_sub.subscribe(&topic).unwrap();
+                    }
+                    _ => {
+                        info!( "Rendezvous: {:?}", event);
+                    }
                 }
-                info!("Connection established with rendezvous point {}", peer_id);
             }
-            // once `/identify` did its job, we know our external address and can register
-            SwarmEvent::Behaviour(ClientPeerEvent::Rendezvous(
-                                      rendezvous::client::Event::Registered {
-                                          namespace,
-                                          ttl,
-                                          rendezvous_node,
-                                      },
-                                  )) => {
-                let topic = gossipsub::IdentTopic::new("test_topic");
-                self.swarm.behaviour_mut().gossip_sub.subscribe(&topic).unwrap();
-
-                info!(
-                    "Registered for namespace '{}' at rendezvous point {} for the next {} seconds",
-                    namespace,
-                    rendezvous_node,
-                    ttl
-                );
-            }
-            SwarmEvent::Behaviour(ClientPeerEvent::Rendezvous(
-                                      rendezvous::client::Event::RegisterFailed {
-                                          rendezvous_node,
-                                          namespace,
-                                          error,
-                                      },
-                                  )) => {
-                tracing::error!(
-                    "Failed to register: rendezvous_node={}, namespace={}, error_code={:?}",
-                    rendezvous_node,
-                    namespace,
-                    error
-                );
-            }
-
-            SwarmEvent::Behaviour(ClientPeerEvent::GossipSub(gossipsub::Event::Message {
-                                                                 propagation_source: peer_id,
-                                                                 message_id,
-                                                                 message,
-                                                             })) => {
-                info!("Received message '{:?}' from {:?} on {:?}", String::from_utf8_lossy(&message.data), peer_id, message_id);
-            }
-
-            SwarmEvent::Behaviour(ClientPeerEvent::GossipSub(gossipsub::Event::Subscribed { peer_id, topic })) => {
-                info!("Subscribed to  {:?} from {:?}", topic, peer_id);
-            }
-            // SwarmEvent::Behaviour(ClientPeerBehaviourEvent::Ping(ping::Event {
-            //                                                          peer,
-            //                                                          result: Ok(rtt),
-            //                                                          ..
-            //                                                      })) if peer != rendezvous_point => {
-            //     tracing::info!("Ping to {} is {}ms", peer, rtt.as_millis())
-            // }
             other => {
                 // tracing::info!("Unhandled {:?}", other);
             }

@@ -16,6 +16,7 @@ pub struct ClientPeerBehaviour {
     pub gossip_sub: gossipsub::Behaviour,
 }
 
+#[derive(Debug)]
 pub enum ClientPeerEvent {
     GossipSub(gossipsub::Event),
     Mdns(mdns::Event),

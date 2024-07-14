@@ -79,7 +79,7 @@ impl AdminPeer {
     }
 
 
-    pub fn process_event(&mut self, event: PeerAdminEvent) {
+    fn process_event(&mut self, event: PeerAdminEvent) {
         match event {
             PeerAdminEvent::Rendezvous(event) => {
                 match event {
