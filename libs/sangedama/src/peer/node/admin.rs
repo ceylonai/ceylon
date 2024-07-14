@@ -99,11 +99,17 @@ impl AdminPeer {
                         }
                     }
                 }
-                
+
                 message = self.inside_rx.recv() => {
                     if let Some(message) = message {
                         let topic = gossipsub::IdentTopic::new(self.config.workspace_id.clone());
-                        match self.swarm.behaviour_mut().gossip_sub.publish(topic,message){                            
+
+                        let distributed_message = NodeMessage::Message {
+                            data: message,
+                            time: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs_f64() as u64,
+                            created_by: self.id.clone(),
+                        };
+                        match self.swarm.behaviour_mut().gossip_sub.publish(topic,distributed_message.to_bytes()){
                             Ok(_) => {}
                             Err(e) => {
                                 error!("Failed to broadcast message: {:?}", e);
@@ -152,7 +158,7 @@ impl AdminPeer {
                         self.connected_peers.get_mut(&topic).unwrap_or(&mut vec![]).push(peer_id);
                         self.outside_tx.send(NodeMessage::Event {
                             time: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs_f64() as u64,
-                            created_by: PeerId::from_str(&self.id).unwrap(),
+                            created_by: peer_id.to_string(),
                             event: EventType::Subscribe,
                         }).await.expect("Outside tx failed");
                     }
