@@ -3,7 +3,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use tokio::runtime::Runtime;
 use tracing::{debug, Level};
-use crate::AgentCore;
+use crate::agent::agent::AgentCore;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct WorkspaceConfig {
