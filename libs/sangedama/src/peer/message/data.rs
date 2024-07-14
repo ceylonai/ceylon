@@ -1,6 +1,6 @@
 use libp2p::PeerId;
+#[derive(Debug)]
 pub enum EventType {
-    Message,
     Subscribe,
     Unsubscribe,
     Listen,
@@ -10,6 +10,7 @@ pub enum EventType {
     ConnectionEstablished,
 }
 
+#[derive(Debug)]
 pub enum NodeMessage {
     Event {
         time: u64,
