@@ -2,6 +2,7 @@ use std::net::Ipv4Addr;
 use std::str::FromStr;
 use libp2p::{Multiaddr, PeerId};
 use libp2p::multiaddr::Protocol;
+use tokio::select;
 use tracing::{info};
 use tracing_subscriber::fmt::format;
 use uuid::Uuid;
@@ -18,13 +19,30 @@ async fn main() {
     info!("Starting {}", workspace_id);
 
     let admin_port = 7845;
-    let admin_config = AdminPeerConfig::new(admin_port);
+    let admin_config = AdminPeerConfig::new(admin_port, workspace_id.clone());
 
-    let mut admin_peer = AdminPeer::create(admin_config.clone()).await;
+    let (mut admin_peer, mut admin_listener) = AdminPeer::create(admin_config.clone()).await;
     let admin_id = admin_peer.id.clone();
-
+    let admin_emitter = admin_peer.emitter();
     let task_admin = tokio::task::spawn(async move {
         admin_peer.run(None).await;
+    });
+
+    let task_admin_listener = tokio::spawn(async move {
+        loop {
+            select! {
+                event = admin_listener.recv() => {
+                    info!("Admin listener {:?}", event);
+                }
+            }
+        }
+    });
+
+    let task_run_admin = tokio::task::spawn(async move {
+        loop {
+            admin_emitter.send("test".to_string().as_bytes().to_vec()).await;
+            tokio::time::sleep(std::time::Duration::from_millis(10000)).await;
+        }
     });
 
     // Here we create localhost address to connect peer with admin
@@ -56,6 +74,9 @@ async fn main() {
     });
 
     task_admin.await.unwrap();
+    task_admin_listener.await.unwrap();
+    task_run_admin.await.unwrap();
+    
     task_client.await.unwrap();
     task_client2.await.unwrap();
 }

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::net::Ipv4Addr;
+use std::str::FromStr;
 use crate::peer::behaviour::{PeerAdminBehaviour, PeerAdminEvent};
 use crate::peer::peer_swarm::create_swarm;
 use futures::StreamExt;
@@ -8,16 +9,18 @@ use libp2p::{gossipsub, Multiaddr, PeerId, rendezvous, Swarm};
 use libp2p::multiaddr::Protocol;
 use libp2p_gossipsub::TopicHash;
 use tokio::select;
-use tracing::{debug, info};
+use tracing::{debug, error, info};
+use crate::peer::message::data::{EventType, NodeMessage};
 
 #[derive(Default, Clone)]
 pub struct AdminPeerConfig {
+    pub workspace_id: String,
     pub listen_port: Option<u16>,
 }
 
 impl AdminPeerConfig {
-    pub fn new(listen_port: u16) -> Self {
-        Self { listen_port: Some(listen_port) }
+    pub fn new(listen_port: u16, workspace_id: String) -> Self {
+        Self { listen_port: Some(listen_port), workspace_id }
     }
 
     pub fn get_listen_address(&self) -> Multiaddr {
@@ -34,17 +37,35 @@ pub struct AdminPeer {
     pub config: AdminPeerConfig,
 
     connected_peers: HashMap<TopicHash, Vec<PeerId>>,
+
+    outside_tx: tokio::sync::mpsc::Sender<NodeMessage>,
+
+    inside_rx: tokio::sync::mpsc::Receiver<Vec<u8>>,
+    inside_tx: tokio::sync::mpsc::Sender<Vec<u8>>,
 }
 
 impl AdminPeer {
-    pub async fn create(config: AdminPeerConfig) -> Self {
+    pub async fn create(config: AdminPeerConfig) -> (Self, tokio::sync::mpsc::Receiver<NodeMessage>) {
         let swarm = create_swarm::<PeerAdminBehaviour>().await;
-        Self {
+        let (outside_tx, outside_rx) = tokio::sync::mpsc::channel::<NodeMessage>(100);
+
+        let (inside_tx, inside_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
+
+        (Self {
             config,
             id: swarm.local_peer_id().to_string(),
             swarm,
             connected_peers: HashMap::new(),
-        }
+            outside_tx,
+
+            inside_tx,
+            inside_rx,
+        },
+         outside_rx)
+    }
+
+    pub fn emitter(&self) -> tokio::sync::mpsc::Sender<Vec<u8>> {
+        self.inside_tx.clone()
     }
 
     pub async fn run(&mut self, address: Option<Multiaddr>) {
@@ -71,10 +92,22 @@ impl AdminPeer {
                             info!("Disconnected from {}", peer_id);
                         }
                         SwarmEvent::Behaviour(event) => {
-                            self.process_event(event);
+                            self.process_event(event).await;
                         }
                         other => {
                             debug!("Unhandled {:?}", other);
+                        }
+                    }
+                }
+                
+                message = self.inside_rx.recv() => {
+                    if let Some(message) = message {
+                        let topic = gossipsub::IdentTopic::new(self.config.workspace_id.clone());
+                        match self.swarm.behaviour_mut().gossip_sub.publish(topic,message){                            
+                            Ok(_) => {}
+                            Err(e) => {
+                                error!("Failed to broadcast message: {:?}", e);
+                            }
                         }
                     }
                 }
@@ -83,7 +116,7 @@ impl AdminPeer {
     }
 
 
-    fn process_event(&mut self, event: PeerAdminEvent) {
+    async fn process_event(&mut self, event: PeerAdminEvent) {
         match event {
             PeerAdminEvent::Rendezvous(event) => {
                 match event {
@@ -117,6 +150,11 @@ impl AdminPeer {
                     gossipsub::Event::Subscribed { topic, peer_id } => {
                         info!( "GossipSub: Subscribed to topic {:?}", topic);
                         self.connected_peers.get_mut(&topic).unwrap_or(&mut vec![]).push(peer_id);
+                        self.outside_tx.send(NodeMessage::Event {
+                            time: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs_f64() as u64,
+                            created_by: PeerId::from_str(&self.id).unwrap(),
+                            event: EventType::Subscribe,
+                        }).await.expect("Outside tx failed");
                     }
 
                     _ => {
