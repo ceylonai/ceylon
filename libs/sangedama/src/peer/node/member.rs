@@ -21,7 +21,7 @@ pub struct MemberPeerConfig {
 pub struct MemberPeer {
     config: MemberPeerConfig,
     pub id: String,
-    swarm: Swarm<ClientPeerBehaviour>
+    swarm: Swarm<ClientPeerBehaviour>,
 }
 
 
@@ -100,7 +100,7 @@ impl MemberPeer {
                             "Registered for namespace '{}' at rendezvous point {} for the next {} seconds",
                             namespace, rendezvous_node, ttl
                         );
-                        let topic = gossipsub::IdentTopic::new("test_topic");
+                        let topic = gossipsub::IdentTopic::new(self.config.workspace_id.clone());
                         self.swarm.behaviour_mut().gossip_sub.subscribe(&topic).unwrap();
                     }
                     _ => {
@@ -110,9 +110,9 @@ impl MemberPeer {
             }
 
             ClientPeerEvent::GossipSub(event) => {
-                match event {                    
+                match event {
                     _ => {
-                        // info!( "GossipSub: {:?}", event);
+                        info!( "GossipSub: {:?}", event);
                     }
                 }
             }
