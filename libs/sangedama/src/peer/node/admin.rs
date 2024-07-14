@@ -1,10 +1,12 @@
+use std::collections::HashMap;
 use std::net::Ipv4Addr;
 use crate::peer::behaviour::{PeerAdminBehaviour, PeerAdminEvent};
 use crate::peer::peer_swarm::create_swarm;
 use futures::StreamExt;
 use libp2p::swarm::SwarmEvent;
-use libp2p::{gossipsub, Multiaddr, rendezvous, Swarm};
+use libp2p::{gossipsub, Multiaddr, PeerId, rendezvous, Swarm};
 use libp2p::multiaddr::Protocol;
+use libp2p_gossipsub::TopicHash;
 use tokio::select;
 use tracing::{debug, info};
 
@@ -27,10 +29,11 @@ impl AdminPeerConfig {
 }
 
 pub struct AdminPeer {
-    
     pub id: String,
     swarm: Swarm<PeerAdminBehaviour>,
     pub config: AdminPeerConfig,
+
+    connected_peers: HashMap<TopicHash, Vec<PeerId>>,
 }
 
 impl AdminPeer {
@@ -40,6 +43,7 @@ impl AdminPeer {
             config,
             id: swarm.local_peer_id().to_string(),
             swarm,
+            connected_peers: HashMap::new(),
         }
     }
 
@@ -102,7 +106,23 @@ impl AdminPeer {
             }
 
             PeerAdminEvent::GossipSub(event) => {
-                info!( "GossipSub: {:?}", event);
+                match event {
+                    gossipsub::Event::Unsubscribed { topic, peer_id } => {
+                        info!( "GossipSub: Unsubscribed from topic {:?}", topic);
+                        let peers = self.connected_peers.get_mut(&topic);
+                        if let Some(peers) = peers {
+                            peers.retain(|p| p != &peer_id);
+                        }
+                    }
+                    gossipsub::Event::Subscribed { topic, peer_id } => {
+                        info!( "GossipSub: Subscribed to topic {:?}", topic);
+                        self.connected_peers.get_mut(&topic).unwrap_or(&mut vec![]).push(peer_id);
+                    }
+
+                    _ => {
+                        info!( "GossipSub: {:?}", event);
+                    }
+                }
             }
         }
     }
