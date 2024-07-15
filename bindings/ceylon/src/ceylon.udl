@@ -25,4 +25,8 @@ interface AdminAgent{
     constructor(AdminAgentConfig config);
     [Async]
     void run(bytes inputs);
+
+    [Async]
+    void stop();
+
 };
