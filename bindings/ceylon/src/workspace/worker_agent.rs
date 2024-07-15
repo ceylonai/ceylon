@@ -1,9 +1,12 @@
+use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use tokio::{select, signal};
+use tokio::sync::Mutex;
 use tracing::info;
 
 use sangedama::peer::message::data::NodeMessage;
 use sangedama::peer::node::{MemberPeer, MemberPeerConfig};
+use crate::{MessageHandler,Processor};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkerAgentConfig {
@@ -16,14 +19,21 @@ pub struct WorkerAgentConfig {
 
 pub struct WorkerAgent {
     pub config: WorkerAgentConfig,
+
+    _processor: Arc<Mutex<Arc<dyn Processor>>>,
+    _on_message: Arc<Mutex<Arc<dyn MessageHandler>>>,
 }
 
 impl WorkerAgent {
-    pub fn new(config: WorkerAgentConfig) -> Self {
-        Self { config }
+    pub fn new(config: WorkerAgentConfig, on_message: Arc<dyn MessageHandler>, processor: Arc<dyn Processor>) -> Self {
+        Self {
+            config,
+            _processor: Arc::new(Mutex::new(processor)),
+            _on_message: Arc::new(Mutex::new(on_message)),
+        }
     }
 
-    pub async fn run(&self, inputs: Vec<u8>) {
+    pub async fn start(&self, inputs: Vec<u8>) {
         let rt = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
@@ -62,6 +72,8 @@ impl WorkerAgent {
         });
 
         let name = self.config.name.clone();
+
+        let on_message = self._on_message.clone();
         let task_admin_listener = tokio::spawn(async move {
             loop {
                 if is_request_to_shutdown {
@@ -71,8 +83,12 @@ impl WorkerAgent {
                    event = peer_listener_.recv() => {
                         if let Some(event) = event {
                             match event {
-                                NodeMessage::Message{ data, created_by, ..} => {
-                                    info!("Agent listener Message {:?} from {:?}", String::from_utf8(data), created_by);
+                                NodeMessage::Message{ data, created_by, time} => {
+                                    on_message.lock().await.on_message(
+                                        created_by,
+                                        data.clone(),
+                                        time
+                                    ).await;
                                 }
                                 _ => {
                                     info!("Agent listener {:?}", event);
@@ -84,12 +100,20 @@ impl WorkerAgent {
             }
         });
 
+        let processor = self._processor.clone();
+        let run_process = tokio::spawn(async move {
+            processor.lock().await.run(inputs).await;
+        });
+
         select! {
             _ = task_admin => {
                 info!("Agent {} task_admin done", name);
             }
             _ = task_admin_listener => {
                 info!("Agent {} task_admin_listener done", name);
+            }
+            _ = run_process => {
+                info!("Agent {} run_process done", name);
             }
             _ = signal::ctrl_c() => {
                 println!("Agent {:?} received exit signal", name);

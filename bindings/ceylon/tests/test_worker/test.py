@@ -1,12 +1,13 @@
 import asyncio
 import pickle
 
-from ceylon.ceylon import enable_log
+from ceylon.ceylon import enable_log, uniffi_set_event_loop
 from ceylon.workspace.admin import Admin
 from ceylon.workspace.worker import Worker
 
 
 async def main():
+    uniffi_set_event_loop(asyncio.get_event_loop())
     admin = Admin(
         name="admin",
         port=8000
@@ -23,7 +24,7 @@ async def main():
         admin_peer="admin",
         workspace_id="admin"
     )
-    await admin.run(pickle.dumps({
+    await admin.start(pickle.dumps({
         "title": "How to use AI for Machine Learning",
     }), [
         worker1,

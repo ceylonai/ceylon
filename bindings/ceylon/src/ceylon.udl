@@ -22,9 +22,9 @@ dictionary AdminAgentConfig {
 
 
 interface AdminAgent{
-    constructor(AdminAgentConfig config);
+    constructor(AdminAgentConfig config,MessageHandler on_message, Processor processor);
     [Async]
-    void run(bytes inputs, sequence<WorkerAgent> workers);
+    void start(bytes inputs, sequence<WorkerAgent> workers);
 
     [Async]
     void stop();
@@ -38,10 +38,23 @@ dictionary WorkerAgentConfig {
     u16 admin_port;
 };
 interface WorkerAgent{
-    constructor(WorkerAgentConfig config);
+    constructor(WorkerAgentConfig config,MessageHandler on_message, Processor processor);
     [Async]
-    void run(bytes inputs);
+    void start(bytes inputs);
 
     [Async]
     void stop();
+};
+
+// Handle Agents behaviours
+[Trait,WithForeign]
+interface MessageHandler {
+    [Async]
+    void on_message(string agent_id, bytes data, u64 time);
+};
+
+[Trait,WithForeign]
+interface Processor {
+    [Async]
+    void run(bytes inputs);
 };
