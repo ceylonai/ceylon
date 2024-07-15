@@ -2,11 +2,11 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use tokio::{select, signal};
 use tokio::sync::Mutex;
-use tracing::info;
+use tracing::{error, info};
 
 use sangedama::peer::message::data::NodeMessage;
 use sangedama::peer::node::{MemberPeer, MemberPeerConfig};
-use crate::{MessageHandler,Processor};
+use crate::{MessageHandler, Processor};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkerAgentConfig {
@@ -22,17 +22,31 @@ pub struct WorkerAgent {
 
     _processor: Arc<Mutex<Arc<dyn Processor>>>,
     _on_message: Arc<Mutex<Arc<dyn MessageHandler>>>,
+
+    pub broadcast_emitter: tokio::sync::mpsc::Sender<Vec<u8>>,
+    pub broadcast_receiver: Arc<Mutex<tokio::sync::mpsc::Receiver<Vec<u8>>>>,
 }
 
 impl WorkerAgent {
     pub fn new(config: WorkerAgentConfig, on_message: Arc<dyn MessageHandler>, processor: Arc<dyn Processor>) -> Self {
+        let (broadcast_emitter, broadcast_receiver) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
         Self {
             config,
             _processor: Arc::new(Mutex::new(processor)),
             _on_message: Arc::new(Mutex::new(on_message)),
+
+            broadcast_emitter,
+            broadcast_receiver: Arc::new(Mutex::new(broadcast_receiver)),
         }
     }
-
+    pub async fn broadcast(&self, message: Vec<u8>) {
+        match self.broadcast_emitter.send(message).await {
+            Ok(_) => {}
+            Err(_) => {
+                error!("Failed to send broadcast message");
+            }
+        }
+    }
     pub async fn start(&self, inputs: Vec<u8>) {
         let rt = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
@@ -61,6 +75,8 @@ impl WorkerAgent {
             config.admin_port,
         );
         let (mut peer_, mut peer_listener_) = MemberPeer::create(member_config.clone()).await;
+
+        let peer_emitter = peer_.emitter();
 
         let peer_id = peer_.id.clone();
         let peer_emitter = peer_.emitter();
@@ -105,6 +121,18 @@ impl WorkerAgent {
             processor.lock().await.run(inputs).await;
         });
 
+        let broadcast_receiver = self.broadcast_receiver.clone();
+        let run_broadcast = tokio::spawn(async move {
+            loop {
+                if is_request_to_shutdown {
+                    break;
+                }
+                if let Some(raw_data) = broadcast_receiver.lock().await.recv().await {
+                    peer_emitter.send(raw_data).await.unwrap();
+                }
+            }
+        });
+
         select! {
             _ = task_admin => {
                 info!("Agent {} task_admin done", name);
@@ -114,6 +142,9 @@ impl WorkerAgent {
             }
             _ = run_process => {
                 info!("Agent {} run_process done", name);
+            }
+            _ = run_broadcast => {
+                info!("Agent {} run_broadcast done", name);
             }
             _ = signal::ctrl_c() => {
                 println!("Agent {:?} received exit signal", name);
