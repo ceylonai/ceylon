@@ -3,6 +3,11 @@ mod admin_agent;
 mod agent;
 mod worker_agent;
 
+pub use agent::{
+    MessageHandler,
+    Processor,
+};
+
 pub use workspace::{
     WorkSpace,
     WorkSpaceConfig,

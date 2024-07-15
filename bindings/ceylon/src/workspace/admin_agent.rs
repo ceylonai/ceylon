@@ -1,11 +1,11 @@
 use std::sync::Arc;
 use tokio::{select, signal};
+use tokio::sync::Mutex;
 use tracing::info;
 
 use sangedama::peer::message::data::NodeMessage;
 use sangedama::peer::node::{AdminPeer, AdminPeerConfig};
-
-use crate::WorkerAgent;
+use crate::{MessageHandler, WorkerAgent, Processor};
 
 #[derive(Clone)]
 pub struct AdminAgentConfig {
@@ -15,14 +15,21 @@ pub struct AdminAgentConfig {
 
 pub struct AdminAgent {
     pub config: AdminAgentConfig,
+
+    _processor: Arc<Mutex<Arc<dyn Processor>>>,
+    _on_message: Arc<Mutex<Arc<dyn MessageHandler>>>,
 }
 
 impl AdminAgent {
-    pub fn new(config: AdminAgentConfig) -> Self {
-        Self { config }
+    pub fn new(config: AdminAgentConfig, on_message: Arc<dyn MessageHandler>, processor: Arc<dyn Processor>) -> Self {
+        Self {
+            config,
+            _on_message: Arc::new(Mutex::new(on_message)),
+            _processor: Arc::new(Mutex::new(processor)),
+        }
     }
 
-    pub async fn run(&self, inputs: Vec<u8>, agents: Vec<Arc<WorkerAgent>>) {
+    pub async fn start(&self, inputs: Vec<u8>, agents: Vec<Arc<WorkerAgent>>) {
         let rt = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
@@ -53,6 +60,7 @@ impl AdminAgent {
         });
 
         let name = self.config.name.clone();
+        let on_message = self._on_message.clone();
         let task_admin_listener = tokio::spawn(async move {
             loop {
                 if is_request_to_shutdown {
@@ -62,8 +70,12 @@ impl AdminAgent {
                    event = peer_listener_.recv() => {
                         if let Some(event) = event {
                             match event {
-                                NodeMessage::Message{ data, created_by, ..} => {
-                                    info!("Agent listener Message {:?} from {:?}", String::from_utf8(data), created_by);
+                                NodeMessage::Message{ data, created_by, time} => {
+                                    on_message.lock().await.on_message(
+                                        created_by,
+                                        data,
+                                        time
+                                    ).await;
                                 }
                                 _ => {
                                     info!("Agent listener {:?}", event);
@@ -73,6 +85,12 @@ impl AdminAgent {
                     }
                 }
             }
+        });
+
+        let processor = self._processor.clone();
+        let processor_input_clone = inputs.clone();
+        let run_process = tokio::spawn(async move {
+            processor.lock().await.run(processor_input_clone).await;
         });
 
 
@@ -86,7 +104,7 @@ impl AdminAgent {
             let _admin_id_ = admin_id_.clone();
             let task = tokio::spawn(async move {
                 let mut config = agent_.config.clone();
-                config.admin_peer = _admin_id_.clone();                
+                config.admin_peer = _admin_id_.clone();
                 agent_.run_with_config(_inputs_.clone(), config).await;
             });
             worker_tasks.push(task);
