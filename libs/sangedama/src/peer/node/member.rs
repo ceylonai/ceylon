@@ -1,5 +1,5 @@
 use std::net::Ipv4Addr;
-
+use std::str::FromStr;
 use futures::StreamExt;
 use libp2p::{gossipsub, Multiaddr, PeerId, rendezvous, Swarm};
 use libp2p::multiaddr::Protocol;
@@ -12,11 +12,29 @@ use crate::peer::behaviour::{ClientPeerBehaviour, ClientPeerEvent};
 use crate::peer::message::data::NodeMessage;
 use crate::peer::peer_swarm::create_swarm;
 
+#[derive(Debug, Clone)]
 pub struct MemberPeerConfig {
     pub name: String,
     pub workspace_id: String,
     pub admin_peer: PeerId,
     pub rendezvous_point_address: Multiaddr,
+}
+
+impl MemberPeerConfig {
+    pub fn new(name: String, workspace_id: String, admin_peer: String, rendezvous_point_admin_port: u16) -> Self {
+
+        let rendezvous_point_address = Multiaddr::empty()
+            .with(Protocol::Ip4(Ipv4Addr::LOCALHOST))
+            .with(Protocol::Udp(rendezvous_point_admin_port))
+            .with(Protocol::QuicV1);
+
+        Self {
+            name,
+            workspace_id,
+            admin_peer: PeerId::from_str(&admin_peer).unwrap(),
+            rendezvous_point_address,
+        }
+    }
 }
 
 pub struct MemberPeer {

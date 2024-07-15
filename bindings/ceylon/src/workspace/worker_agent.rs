@@ -1,29 +1,66 @@
-use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use tokio::{select, signal};
 use tracing::info;
-use sangedama::peer::message::data::NodeMessage;
-use sangedama::peer::node::{AdminPeer, AdminPeerConfig};
-use crate::workspace::agent::{Agent, AgentBase, AgentConfig};
 
-pub type AdminAgent = Agent;
-pub type AdminAgentConfig = AgentConfig;
+use sangedama::peer::message::data::NodeMessage;
+use sangedama::peer::node::{MemberPeer, MemberPeerConfig};
+use crate::workspace::agent::{AgentBase};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkerAgentConfig {
+    pub name: String,
+    pub work_space_id: String,
+    pub admin_peer: String,
+    pub admin_port: u16,
+}
+
+
+pub struct WorkerAgent {
+    pub config: WorkerAgentConfig,
+}
+
+impl WorkerAgent {
+    pub fn new(config: WorkerAgentConfig) -> Self {
+        Self { config }
+    }
+
+    pub async fn run(&self, inputs: Vec<u8>) {
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        rt.block_on(async {
+            self.run_(inputs).await;
+        });
+    }
+
+    pub async fn stop(&self) {
+        info!("Agent {} stop called", self.config.name);
+    }
+}
 
 #[async_trait::async_trait]
-impl AgentBase for AdminAgent {
+impl AgentBase for WorkerAgent {
     async fn run_(&self, inputs: Vec<u8>) {
         info!("Agent {} running", self.config.name);
 
         let config = self.config.clone();
-        let admin_config = AdminPeerConfig::new(config.port, config.name.clone());
-        let (mut peer_, mut peer_listener_) = AdminPeer::create(admin_config.clone()).await;
+        let member_config = MemberPeerConfig::new(
+            config.name.clone(),
+            config.work_space_id.clone(),
+            config.admin_peer.clone(),
+            config.admin_port.clone(),
+        );
+        let (mut peer_, mut peer_listener_) = MemberPeer::create(member_config.clone()).await;
 
-        let admin_id = peer_.id.clone();
-        let admin_emitter = peer_.emitter();
+        let peer_id = peer_.id.clone();
+        let peer_emitter = peer_.emitter();
 
         let mut is_request_to_shutdown = false;
 
         let task_admin = tokio::task::spawn(async move {
-            peer_.run(None).await;
+            peer_.run().await;
         });
 
         let name = self.config.name.clone();
@@ -63,4 +100,4 @@ impl AgentBase for AdminAgent {
             }
         }
     }
-}
+} 

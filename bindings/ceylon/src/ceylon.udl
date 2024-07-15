@@ -30,3 +30,18 @@ interface AdminAgent{
     void stop();
 
 };
+
+dictionary WorkerAgentConfig {
+    string name;
+    string work_space_id;
+    string admin_peer;
+    u16 admin_port;
+};
+interface WorkerAgent{
+    constructor(WorkerAgentConfig config);
+    [Async]
+    void run(bytes inputs);
+
+    [Async]
+    void stop();
+};
