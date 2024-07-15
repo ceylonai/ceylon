@@ -11,22 +11,26 @@ async def main():
         name="admin",
         port=8000
     )
-    worker = Worker(
+    worker1 = Worker(
         name="worker1",
         admin_port=8000,
         admin_peer="admin",
         workspace_id="admin"
     )
-    admin_task = admin.run(pickle.dumps({
+    worker2 = Worker(
+        name="worker2",
+        admin_port=8000,
+        admin_peer="admin",
+        workspace_id="admin"
+    )
+    await admin.run(pickle.dumps({
         "title": "How to use AI for Machine Learning",
-    }))
-    worker_task = worker.run(pickle.dumps({
-        "title": "How to use AI for Machine Learning",
-    }))
-
-    await asyncio.gather(admin_task, worker_task)
+    }), [
+        worker1,
+        worker2
+    ])
 
 
 if __name__ == '__main__':
-    enable_log()
+    enable_log("INFO")
     asyncio.run(main())
