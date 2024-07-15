@@ -16,14 +16,18 @@ pub struct AdminAgent {
 
 impl AdminAgent {
     pub fn new(config: AdminAgentConfig) -> AdminAgent {
-
-        AdminAgent {
-            config,
-        }
+        AdminAgent { config }
     }
 
     pub async fn run(&self, inputs: Vec<u8>) {
-        self.run_(inputs).await;
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        rt.block_on(async {
+            self.run_(inputs).await;
+        });
     }
     pub async fn run_(&self, inputs: Vec<u8>) {
         info!("Workspace {} running", self.config.name);
@@ -37,33 +41,46 @@ impl AdminAgent {
 
         let mut is_request_to_shutdown = false;
 
+        let task_admin = tokio::task::spawn(async move {
+            peer_.run(None).await;
+        });
 
         let name = self.config.name.clone();
-        loop {
-            if is_request_to_shutdown {
-                break;
-            }
-            select! {
-               event = peer_listener_.recv() => {
-                    if event.is_some() {
-                        let event = event.unwrap();
-                        match event{
-                            NodeMessage::Message{ data,created_by, ..} => {
-                                info!("Admin listener Message {:?} from {:?}",String::from_utf8(data),created_by);
-                            }
-                            _ => {
-                                info!("peer1 listener {:?}", event);
+        let task_admin_listener = tokio::spawn(async move {
+            loop {
+                if is_request_to_shutdown {
+                    break;
+                }
+                select! {
+                   event = peer_listener_.recv() => {
+                        if event.is_some() {
+                            let event = event.unwrap();
+                            match event{
+                                NodeMessage::Message{ data,created_by, ..} => {
+                                    info!("Admin listener Message {:?} from {:?}",String::from_utf8(data),created_by);
+                                }
+                                _ => {
+                                    info!("peer1 listener {:?}", event);
+                                }
                             }
                         }
                     }
                 }
+            }
+        });
 
-                 _ = signal::ctrl_c() => {
+        select! {
+            _ = task_admin => {
+                info!("Agent {} task_admin done", name);
+            }
+            _ = task_admin_listener => {
+                info!("Agent {} task_admin_listener done", name);
+            }
+            _ = signal::ctrl_c() => {
                     println!("Agent {:?} received exit signal", name);
                     // Perform any necessary cleanup here
                     is_request_to_shutdown = true;
-                },
-            }
+                }
         }
     }
 
