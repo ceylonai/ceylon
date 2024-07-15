@@ -4,7 +4,6 @@ use tracing::info;
 
 use sangedama::peer::message::data::NodeMessage;
 use sangedama::peer::node::{MemberPeer, MemberPeerConfig};
-use crate::workspace::agent::{AgentBase};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkerAgentConfig {
@@ -31,7 +30,7 @@ impl WorkerAgent {
             .unwrap();
 
         rt.block_on(async {
-            self.run_(inputs).await;
+            self.run_with_config(inputs, self.config.clone()).await;
         });
     }
 
@@ -40,17 +39,16 @@ impl WorkerAgent {
     }
 }
 
-#[async_trait::async_trait]
-impl AgentBase for WorkerAgent {
-    async fn run_(&self, inputs: Vec<u8>) {
+impl WorkerAgent {
+    pub async fn run_with_config(&self, inputs: Vec<u8>, worker_agent_config: WorkerAgentConfig) {
         info!("Agent {} running", self.config.name);
 
-        let config = self.config.clone();
+        let config = worker_agent_config.clone();
         let member_config = MemberPeerConfig::new(
             config.name.clone(),
             config.work_space_id.clone(),
             config.admin_peer.clone(),
-            config.admin_port.clone(),
+            config.admin_port,
         );
         let (mut peer_, mut peer_listener_) = MemberPeer::create(member_config.clone()).await;
 

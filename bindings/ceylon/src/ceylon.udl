@@ -1,6 +1,6 @@
 namespace ceylon {
   string version();
-  void enable_log();
+  void enable_log(string level);
 };
 
 dictionary WorkSpaceConfig{
@@ -24,7 +24,7 @@ dictionary AdminAgentConfig {
 interface AdminAgent{
     constructor(AdminAgentConfig config);
     [Async]
-    void run(bytes inputs);
+    void run(bytes inputs, sequence<WorkerAgent> workers);
 
     [Async]
     void stop();

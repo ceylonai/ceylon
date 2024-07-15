@@ -1,16 +1,42 @@
-use async_trait::async_trait;
+use std::sync::Arc;
 use tokio::{select, signal};
 use tracing::info;
+
 use sangedama::peer::message::data::NodeMessage;
 use sangedama::peer::node::{AdminPeer, AdminPeerConfig};
-use crate::workspace::agent::{Agent, AgentBase, AgentConfig};
 
-pub type AdminAgent = Agent;
-pub type AdminAgentConfig = AgentConfig;
+use crate::WorkerAgent;
 
-#[async_trait::async_trait]
-impl AgentBase for AdminAgent {
-    async fn run_(&self, inputs: Vec<u8>) {
+#[derive(Clone)]
+pub struct AdminAgentConfig {
+    pub name: String,
+    pub port: u16,
+}
+
+pub struct AdminAgent {
+    pub config: AdminAgentConfig,
+}
+
+impl AdminAgent {
+    pub fn new(config: AdminAgentConfig) -> Self {
+        Self { config }
+    }
+
+    pub async fn run(&self, inputs: Vec<u8>, agents: Vec<Arc<WorkerAgent>>) {
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        rt.block_on(async {
+            self.run_(inputs, agents).await;
+        });
+    }
+
+    pub async fn stop(&self) {
+        info!("Agent {} stop called", self.config.name);
+    }
+    async fn run_(&self, inputs: Vec<u8>, agents: Vec<Arc<WorkerAgent>>) {
         info!("Agent {} running", self.config.name);
 
         let config = self.config.clone();
@@ -48,6 +74,30 @@ impl AgentBase for AdminAgent {
                 }
             }
         });
+
+
+        let mut worker_tasks = vec![];
+
+        let _inputs = inputs.clone();
+        let admin_id_ = admin_id.clone();
+        for agent in agents {
+            let _inputs_ = _inputs.clone();
+            let agent_ = agent.clone();
+            let _admin_id_ = admin_id_.clone();
+            let task = tokio::spawn(async move {
+                let mut config = agent_.config.clone();
+                config.admin_peer = _admin_id_.clone();                
+                agent_.run_with_config(_inputs_.clone(), config).await;
+            });
+            worker_tasks.push(task);
+        }
+
+        let mut worker_handler = tokio::task::JoinSet::from_iter(worker_tasks);
+
+        tokio::spawn(async move {
+            while let Some(res) = worker_handler.join_next().await {}
+        });
+
 
         select! {
             _ = task_admin => {
