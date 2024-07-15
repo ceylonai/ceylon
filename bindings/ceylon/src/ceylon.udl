@@ -1,6 +1,8 @@
 namespace ceylon {
   string version();
   void enable_log(string level);
+
+  void cprint(string message);
 };
 
 dictionary WorkSpaceConfig{
@@ -29,6 +31,11 @@ interface AdminAgent{
     [Async]
     void stop();
 
+
+    [Async]
+    void broadcast(bytes message);
+
+
 };
 
 dictionary WorkerAgentConfig {
@@ -44,6 +51,11 @@ interface WorkerAgent{
 
     [Async]
     void stop();
+
+
+    [Async]
+    void broadcast(bytes message);
+
 };
 
 // Handle Agents behaviours

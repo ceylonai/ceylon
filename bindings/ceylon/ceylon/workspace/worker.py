@@ -2,7 +2,7 @@ import asyncio
 import pickle
 
 from ceylon.ceylon import AdminAgent, AdminAgentConfig, enable_log, WorkerAgent, WorkerAgentConfig, Processor, \
-    MessageHandler
+    MessageHandler, cprint
 
 
 class Worker(WorkerAgent, Processor, MessageHandler):
@@ -14,7 +14,11 @@ class Worker(WorkerAgent, Processor, MessageHandler):
                                                   work_space_id=workspace_id), processor=self, on_message=self)
 
     async def run(self, inputs: "bytes"):
+        cprint(f"Worker  received: {inputs}")
         while True:
+            await self.broadcast(pickle.dumps({
+                "hello": "world from worker"
+            }))
             await asyncio.sleep(1)
 
     async def on_message(self, agent_id: "str", data: "bytes", time: "int"):
