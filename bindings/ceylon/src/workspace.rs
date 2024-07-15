@@ -1,6 +1,6 @@
 mod workspace;
 mod admin_agent;
-mod worker_agent;
+mod agent;
 
 pub use workspace::{
     WorkSpace,
