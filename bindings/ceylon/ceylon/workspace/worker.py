@@ -22,4 +22,4 @@ class Worker(WorkerAgent, Processor, MessageHandler):
             await asyncio.sleep(1)
 
     async def on_message(self, agent_id: "str", data: "bytes", time: "int"):
-        print("Worker on_message", agent_id, data, time)
+        print(f"Worker on_message  {self.details().name}", agent_id, data, time)

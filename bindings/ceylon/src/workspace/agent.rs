@@ -1,5 +1,11 @@
 use std::fmt::Debug;
 
+pub struct AgentDetail {
+    pub name: String,
+    pub id: Option<String>,
+}
+
+
 #[async_trait::async_trait]
 pub trait AgentBase {
     async fn run_(&self, inputs: Vec<u8>);

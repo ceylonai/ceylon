@@ -22,6 +22,11 @@ dictionary AdminAgentConfig {
     u16 port;
 };
 
+dictionary AgentDetail{
+    string name;
+    string? id;
+};
+
 
 interface AdminAgent{
     constructor(AdminAgentConfig config,MessageHandler on_message, Processor processor);
@@ -35,7 +40,7 @@ interface AdminAgent{
     [Async]
     void broadcast(bytes message);
 
-
+    AgentDetail details();
 };
 
 dictionary WorkerAgentConfig {
@@ -52,9 +57,10 @@ interface WorkerAgent{
     [Async]
     void stop();
 
-
     [Async]
     void broadcast(bytes message);
+
+    AgentDetail details();
 
 };
 
