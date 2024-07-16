@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use serde::{Deserialize, Serialize};
 use tokio::{select, signal};
 use tokio::sync::Mutex;
@@ -7,6 +7,7 @@ use tracing::{error, info};
 use sangedama::peer::message::data::NodeMessage;
 use sangedama::peer::node::{MemberPeer, MemberPeerConfig};
 use crate::{MessageHandler, Processor};
+use crate::workspace::agent::AgentDetail;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkerAgentConfig {
@@ -25,6 +26,8 @@ pub struct WorkerAgent {
 
     pub broadcast_emitter: tokio::sync::mpsc::Sender<Vec<u8>>,
     pub broadcast_receiver: Arc<Mutex<tokio::sync::mpsc::Receiver<Vec<u8>>>>,
+
+    _peer_id: RwLock<Option<String>>,
 }
 
 impl WorkerAgent {
@@ -37,6 +40,8 @@ impl WorkerAgent {
 
             broadcast_emitter,
             broadcast_receiver: Arc::new(Mutex::new(broadcast_receiver)),
+
+            _peer_id: RwLock::new(None),
         }
     }
     pub async fn broadcast(&self, message: Vec<u8>) {
@@ -61,6 +66,13 @@ impl WorkerAgent {
     pub async fn stop(&self) {
         info!("Agent {} stop called", self.config.name);
     }
+
+    pub fn details(&self) -> AgentDetail {
+        AgentDetail {
+            name: self.config.name.clone(),
+            id: self._peer_id.read().unwrap().clone(),
+        }
+    }
 }
 
 impl WorkerAgent {
@@ -79,6 +91,10 @@ impl WorkerAgent {
         let peer_emitter = peer_.emitter();
 
         let peer_id = peer_.id.clone();
+
+        // Set peer id
+        *self._peer_id.write().unwrap() = Some(peer_id.clone());
+
         let peer_emitter = peer_.emitter();
 
         let mut is_request_to_shutdown = false;

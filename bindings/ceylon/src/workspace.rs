@@ -6,6 +6,7 @@ mod worker_agent;
 pub use agent::{
     MessageHandler,
     Processor,
+    AgentDetail,
 };
 
 pub use workspace::{

@@ -19,7 +19,7 @@ class Admin(AdminAgent, Processor, MessageHandler):
             await asyncio.sleep(1)
 
     async def on_message(self, agent_id: "str", data: "bytes", time: "int"):
-        print("Admin on_message", agent_id, data, time)
+        print(f"Admin on_message  {self.details().name}", agent_id, data, time)
 
     async def run_admin(self, inputs, workers):
         await self.start(inputs, workers)

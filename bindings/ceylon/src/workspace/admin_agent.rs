@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use tokio::runtime::Runtime;
 use tokio::sync::Mutex;
 use tokio::{select, signal};
@@ -8,6 +8,7 @@ use crate::agent::state::{Message, SystemMessage};
 use crate::{MessageHandler, Processor, WorkerAgent};
 use sangedama::peer::message::data::NodeMessage;
 use sangedama::peer::node::{AdminPeer, AdminPeerConfig};
+use crate::workspace::agent::AgentDetail;
 
 #[derive(Clone)]
 pub struct AdminAgentConfig {
@@ -25,6 +26,7 @@ pub struct AdminAgent {
     pub broadcast_receiver: Arc<Mutex<tokio::sync::mpsc::Receiver<Vec<u8>>>>,
 
     runtime: Runtime,
+    _peer_id: RwLock<Option<String>>,
 }
 
 impl AdminAgent {
@@ -46,6 +48,8 @@ impl AdminAgent {
             broadcast_receiver: Arc::new(Mutex::new(broadcast_receiver)),
 
             runtime: rt,
+
+            _peer_id: RwLock::new(None),
         }
     }
 
@@ -64,6 +68,14 @@ impl AdminAgent {
 
     pub async fn stop(&self) {
         info!("Agent {} stop called", self.config.name);
+    }
+
+
+    pub fn details(&self) -> AgentDetail {
+        AgentDetail {
+            name: self.config.name.clone(),
+            id: self._peer_id.read().unwrap().clone(),
+        }
     }
     async fn run_(&self, inputs: Vec<u8>, agents: Vec<Arc<WorkerAgent>>) {
         info!("Agent {} running", self.config.name);
