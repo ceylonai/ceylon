@@ -1,7 +1,7 @@
 import asyncio
 import pickle
 
-from ceylon.ceylon import AdminAgent, AdminAgentConfig, Processor, MessageHandler, uniffi_set_event_loop
+from ceylon.ceylon import AdminAgent, AdminAgentConfig, Processor, MessageHandler
 
 
 class Admin(AdminAgent, Processor, MessageHandler):
@@ -19,7 +19,7 @@ class Admin(AdminAgent, Processor, MessageHandler):
             await asyncio.sleep(1)
 
     async def on_message(self, agent_id: "str", data: "bytes", time: "int"):
-        print(agent_id, data, time)
+        print("Admin on_message", agent_id, data, time)
 
     async def run_admin(self, inputs, workers):
         await self.start(inputs, workers)
