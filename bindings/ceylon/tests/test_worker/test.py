@@ -1,12 +1,13 @@
 import asyncio
 import pickle
 
-from ceylon.ceylon import enable_log
+from ceylon.ceylon import enable_log, uniffi_set_event_loop
 from ceylon.workspace.admin import Admin
 from ceylon.workspace.worker import Worker
 
 
 async def main():
+    uniffi_set_event_loop(asyncio.get_event_loop())
     admin = Admin(
         name="admin",
         port=8000
@@ -32,5 +33,5 @@ async def main():
 
 
 if __name__ == '__main__':
-    enable_log("ERROR")
+    enable_log("INFO")
     asyncio.run(main())

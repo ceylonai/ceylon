@@ -1,12 +1,13 @@
 use std::sync::Arc;
-use tokio::{select, signal};
+use tokio::runtime::Runtime;
 use tokio::sync::Mutex;
+use tokio::{select, signal};
 use tracing::{error, info};
 
+use crate::agent::state::{Message, SystemMessage};
+use crate::{MessageHandler, Processor, WorkerAgent};
 use sangedama::peer::message::data::NodeMessage;
 use sangedama::peer::node::{AdminPeer, AdminPeerConfig};
-use crate::{MessageHandler, WorkerAgent, Processor};
-use crate::agent::state::{Message, SystemMessage};
 
 #[derive(Clone)]
 pub struct AdminAgentConfig {
@@ -22,11 +23,19 @@ pub struct AdminAgent {
 
     pub broadcast_emitter: tokio::sync::mpsc::Sender<Vec<u8>>,
     pub broadcast_receiver: Arc<Mutex<tokio::sync::mpsc::Receiver<Vec<u8>>>>,
+
+    runtime: Runtime,
 }
 
 impl AdminAgent {
-    pub fn new(config: AdminAgentConfig, on_message: Arc<dyn MessageHandler>, processor: Arc<dyn Processor>) -> Self {
+    pub fn new(
+        config: AdminAgentConfig,
+        on_message: Arc<dyn MessageHandler>,
+        processor: Arc<dyn Processor>,
+    ) -> Self {
         let (broadcast_emitter, broadcast_receiver) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
+
+        let rt = tokio::runtime::Runtime::new().unwrap();
 
         Self {
             config,
@@ -35,6 +44,8 @@ impl AdminAgent {
 
             broadcast_emitter,
             broadcast_receiver: Arc::new(Mutex::new(broadcast_receiver)),
+
+            runtime: rt,
         }
     }
 
@@ -48,14 +59,7 @@ impl AdminAgent {
     }
 
     pub async fn start(&self, inputs: Vec<u8>, agents: Vec<Arc<WorkerAgent>>) {
-        let rt = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .unwrap();
-
-        rt.block_on(async {
-            self.run_(inputs, agents).await;
-        });
+        self.run_(inputs, agents).await;
     }
 
     pub async fn stop(&self) {
@@ -68,23 +72,24 @@ impl AdminAgent {
         let admin_config = AdminPeerConfig::new(config.port, config.name.clone());
         let (mut peer_, mut peer_listener_) = AdminPeer::create(admin_config.clone()).await;
 
+        error!("Admin peer created {}", peer_.id.clone());
 
         let admin_emitter = peer_.emitter();
 
+        error!("Admin peer created {}", peer_.id.clone());
 
         let admin_id = peer_.id.clone();
         let admin_emitter = peer_.emitter();
 
         let mut is_request_to_shutdown = false;
 
-        let task_admin = tokio::task::spawn(async move {
+        let task_admin = self.runtime.spawn(async move {
             peer_.run(None).await;
         });
 
-
         let name = self.config.name.clone();
         let on_message = self._on_message.clone();
-        let task_admin_listener = tokio::spawn(async move {
+        let task_admin_listener = self.runtime.spawn(async move {
             loop {
                 if is_request_to_shutdown {
                     break;
@@ -113,15 +118,14 @@ impl AdminAgent {
         let processor = self._processor.clone();
         let processor_input_clone = inputs.clone();
         let name_processor = self.config.name.clone();
-        let run_process = tokio::spawn(async move {
+        let run_process = self.runtime.spawn(async move {
             info!("Agent {} run_process", name_processor);
             processor.lock().await.run(processor_input_clone).await;
             info!("Agent {} run_proces edd", name_processor);
         });
 
-
         let broadcast_receiver = self.broadcast_receiver.clone();
-        let run_broadcast = tokio::spawn(async move {
+        let run_broadcast = self.runtime.spawn(async move {
             loop {
                 if is_request_to_shutdown {
                     break;
@@ -133,7 +137,6 @@ impl AdminAgent {
             }
         });
 
-
         let mut worker_tasks = vec![];
 
         let _inputs = inputs.clone();
@@ -142,7 +145,7 @@ impl AdminAgent {
             let _inputs_ = _inputs.clone();
             let agent_ = agent.clone();
             let _admin_id_ = admin_id_.clone();
-            let task = tokio::spawn(async move {
+            let task = self.runtime.spawn(async move {
                 let mut config = agent_.config.clone();
                 config.admin_peer = _admin_id_.clone();
                 agent_.run_with_config(_inputs_.clone(), config).await;
@@ -150,30 +153,38 @@ impl AdminAgent {
             worker_tasks.push(task);
         }
 
-        let mut worker_handler = tokio::task::JoinSet::from_iter(worker_tasks);
+        error!("Worker tasks created");
 
-        tokio::spawn(async move {
+        self.runtime.spawn(async move {
+            let mut worker_handler = tokio::task::JoinSet::from_iter(worker_tasks);
             while let Some(res) = worker_handler.join_next().await {}
         });
 
+        self.runtime.spawn(async move {
+            select! {
+                _ = task_admin => {
+                    info!("Agent {} task_admin done", name);
+                }
+                _ = task_admin_listener => {
+                    info!("Agent {} task_admin_listener done", name);
+                }
+                _ = run_process => {
+                    info!("Agent {} run_process done", name);
+                }
+                _ = run_broadcast => {
+                    info!("Agent {} run_broadcast done", name);
+                }
+                _ = signal::ctrl_c() => {
+                    println!("Agent {:?} received exit signal", name);
+                    // Perform any necessary cleanup here
+                    is_request_to_shutdown = true;
+                }
+            }
+        }).await.unwrap();
 
-        select! {
-            _ = task_admin => {
-                info!("Agent {} task_admin done", name);
-            }
-            _ = task_admin_listener => {
-                info!("Agent {} task_admin_listener done", name);
-            }
-            _ = run_process => {
-                info!("Agent {} run_process done", name);
-            }
-            _ = run_broadcast => {
-                info!("Agent {} run_broadcast done", name);
-            }
-            _ = signal::ctrl_c() => {
-                println!("Agent {:?} received exit signal", name);
-                // Perform any necessary cleanup here
-                is_request_to_shutdown = true;
+        loop {
+            if is_request_to_shutdown {
+                break;
             }
         }
     }
