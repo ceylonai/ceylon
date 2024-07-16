@@ -7,7 +7,6 @@ from ceylon.workspace.worker import Worker
 
 
 async def main():
-    uniffi_set_event_loop(asyncio.get_event_loop())
     admin = Admin(
         name="admin",
         port=8000
@@ -24,6 +23,7 @@ async def main():
         admin_peer="admin",
         workspace_id="admin"
     )
+
     await admin.run_admin(pickle.dumps({
         "title": "How to use AI for Machine Learning",
     }), [
