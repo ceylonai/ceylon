@@ -16,9 +16,9 @@ impl WorkSpace {
 
     pub async fn run(&self, inputs: Vec<u8>) {
         info!("Workspace {} running", self.config.name);
-        
-        
-        
-        
+
+
+
+
     }
 }
