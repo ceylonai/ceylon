@@ -8,13 +8,7 @@ from .ceylon import AgentDefinition, WorkspaceConfig, AgentCore, Workspace
 from ceylon.ceylon.ceylon import uniffi_set_event_loop
 
 
-class RunnerInput(BaseModel):
-    request: Any
-    agents: List[AgentDefinition]
-    network: Dict[str, List[str]]
 
-    class Config:
-        arbitrary_types_allowed = True
 
 
 class AgentRunner:
