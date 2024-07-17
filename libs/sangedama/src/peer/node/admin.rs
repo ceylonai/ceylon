@@ -4,7 +4,7 @@ use crate::peer::behaviour::{PeerAdminBehaviour, PeerAdminEvent};
 use crate::peer::peer_swarm::create_swarm;
 use futures::StreamExt;
 use libp2p::swarm::SwarmEvent;
-use libp2p::{gossipsub, Multiaddr, PeerId, rendezvous, Swarm};
+use libp2p::{gossipsub, identity, Multiaddr, PeerId, rendezvous, Swarm};
 use libp2p::multiaddr::Protocol;
 use libp2p_gossipsub::TopicHash;
 use tokio::select;
@@ -44,8 +44,10 @@ pub struct AdminPeer {
 }
 
 impl AdminPeer {
-    pub async fn create(config: AdminPeerConfig) -> (Self, tokio::sync::mpsc::Receiver<NodeMessage>) {
-        let swarm = create_swarm::<PeerAdminBehaviour>().await;
+    pub async fn create(config: AdminPeerConfig, key: identity::Keypair) -> (Self, tokio::sync::mpsc::Receiver<NodeMessage>) {
+        let swarm = create_swarm::<PeerAdminBehaviour>(
+            key.clone(),
+        ).await;
         let (outside_tx, outside_rx) = tokio::sync::mpsc::channel::<NodeMessage>(100);
 
         let (inside_tx, inside_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(100);

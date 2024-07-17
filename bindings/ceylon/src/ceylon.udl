@@ -24,7 +24,7 @@ dictionary AdminAgentConfig {
 
 dictionary AgentDetail{
     string name;
-    string? id;
+    string id;
 };
 
 

@@ -7,7 +7,7 @@ use tracing::{error, info};
 use crate::agent::state::{Message, SystemMessage};
 use crate::{MessageHandler, Processor, WorkerAgent};
 use sangedama::peer::message::data::NodeMessage;
-use sangedama::peer::node::{AdminPeer, AdminPeerConfig};
+use sangedama::peer::node::{AdminPeer, AdminPeerConfig, create_key, create_key_from_bytes, get_peer_id};
 use crate::workspace::agent::AgentDetail;
 
 #[derive(Clone)]
@@ -26,7 +26,9 @@ pub struct AdminAgent {
     pub broadcast_receiver: Arc<Mutex<tokio::sync::mpsc::Receiver<Vec<u8>>>>,
 
     runtime: Runtime,
-    _peer_id: RwLock<Option<String>>,
+    _peer_id: String,
+
+    _key: Vec<u8>,
 }
 
 impl AdminAgent {
@@ -38,6 +40,8 @@ impl AdminAgent {
         let (broadcast_emitter, broadcast_receiver) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
 
         let rt = tokio::runtime::Runtime::new().unwrap();
+        let admin_peer_key = create_key();
+        let id = get_peer_id(&admin_peer_key).to_string();
 
         Self {
             config,
@@ -49,7 +53,9 @@ impl AdminAgent {
 
             runtime: rt,
 
-            _peer_id: RwLock::new(None),
+            _peer_id: id,
+
+            _key: admin_peer_key.to_protobuf_encoding().unwrap(),
         }
     }
 
@@ -74,7 +80,7 @@ impl AdminAgent {
     pub fn details(&self) -> AgentDetail {
         AgentDetail {
             name: self.config.name.clone(),
-            id: self._peer_id.read().unwrap().clone(),
+            id: self._peer_id.clone(),
         }
     }
     async fn run_(&self, inputs: Vec<u8>, agents: Vec<Arc<WorkerAgent>>) {
@@ -82,13 +88,18 @@ impl AdminAgent {
 
         let config = self.config.clone();
         let admin_config = AdminPeerConfig::new(config.port, config.name.clone());
-        let (mut peer_, mut peer_listener_) = AdminPeer::create(admin_config.clone()).await;
 
-        error!("Admin peer created {}", peer_.id.clone());
+        let peer_key = create_key_from_bytes(self._key.clone());
+
+        let (mut peer_, mut peer_listener_) = AdminPeer::create(admin_config.clone(), peer_key).await;
+
+        if peer_.id.to_string() == self._peer_id.to_string() {
+            info!("Admin peer created {}", peer_.id.clone());
+        } else {
+            panic!("Id mismatch");
+        }
 
         let admin_emitter = peer_.emitter();
-
-        error!("Admin peer created {}", peer_.id.clone());
 
         let admin_id = peer_.id.clone();
         let admin_emitter = peer_.emitter();

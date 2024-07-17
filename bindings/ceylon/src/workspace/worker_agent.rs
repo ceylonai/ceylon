@@ -5,7 +5,7 @@ use tokio::sync::Mutex;
 use tracing::{error, info};
 
 use sangedama::peer::message::data::NodeMessage;
-use sangedama::peer::node::{MemberPeer, MemberPeerConfig};
+use sangedama::peer::node::{create_key, create_key_from_bytes, get_peer_id, MemberPeer, MemberPeerConfig};
 use crate::{MessageHandler, Processor};
 use crate::workspace::agent::AgentDetail;
 
@@ -27,12 +27,15 @@ pub struct WorkerAgent {
     pub broadcast_emitter: tokio::sync::mpsc::Sender<Vec<u8>>,
     pub broadcast_receiver: Arc<Mutex<tokio::sync::mpsc::Receiver<Vec<u8>>>>,
 
-    _peer_id: RwLock<Option<String>>,
+    _peer_id: String,
+    _key: Vec<u8>,
 }
 
 impl WorkerAgent {
     pub fn new(config: WorkerAgentConfig, on_message: Arc<dyn MessageHandler>, processor: Arc<dyn Processor>) -> Self {
         let (broadcast_emitter, broadcast_receiver) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
+        let admin_peer_key = create_key();
+        let id = get_peer_id(&admin_peer_key).to_string();
         Self {
             config,
             _processor: Arc::new(Mutex::new(processor)),
@@ -41,7 +44,8 @@ impl WorkerAgent {
             broadcast_emitter,
             broadcast_receiver: Arc::new(Mutex::new(broadcast_receiver)),
 
-            _peer_id: RwLock::new(None),
+            _peer_id: id,
+            _key: admin_peer_key.to_protobuf_encoding().unwrap(),
         }
     }
     pub async fn broadcast(&self, message: Vec<u8>) {
@@ -70,7 +74,7 @@ impl WorkerAgent {
     pub fn details(&self) -> AgentDetail {
         AgentDetail {
             name: self.config.name.clone(),
-            id: self._peer_id.read().unwrap().clone(),
+            id: self._peer_id.clone(),
         }
     }
 }
@@ -86,14 +90,17 @@ impl WorkerAgent {
             config.admin_peer.clone(),
             config.admin_port,
         );
-        let (mut peer_, mut peer_listener_) = MemberPeer::create(member_config.clone()).await;
-
+        let peer_key = create_key_from_bytes(self._key.clone());
+        let (mut peer_, mut peer_listener_) = MemberPeer::create(member_config.clone(), peer_key).await;
+        if peer_.id.to_string() == self._peer_id.to_string() {
+            info!("Worker peer created {}", peer_.id.clone());
+        } else {
+            panic!("Id mismatch");
+        }
         let peer_emitter = peer_.emitter();
 
         let peer_id = peer_.id.clone();
 
-        // Set peer id
-        *self._peer_id.write().unwrap() = Some(peer_id.clone());
 
         let peer_emitter = peer_.emitter();
 

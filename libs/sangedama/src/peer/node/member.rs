@@ -1,7 +1,7 @@
 use std::net::Ipv4Addr;
 use std::str::FromStr;
 use futures::StreamExt;
-use libp2p::{gossipsub, Multiaddr, PeerId, rendezvous, Swarm};
+use libp2p::{gossipsub, identity, Multiaddr, PeerId, rendezvous, Swarm};
 use libp2p::multiaddr::Protocol;
 use libp2p::swarm::dial_opts::{DialOpts, PeerCondition};
 use libp2p::swarm::SwarmEvent;
@@ -50,8 +50,8 @@ pub struct MemberPeer {
 
 
 impl MemberPeer {
-    pub async fn create(config: MemberPeerConfig) -> (Self, tokio::sync::mpsc::Receiver<NodeMessage>) {
-        let swarm = create_swarm::<ClientPeerBehaviour>().await;
+    pub async fn create(config: MemberPeerConfig, key: identity::Keypair) -> (Self, tokio::sync::mpsc::Receiver<NodeMessage>) {
+        let swarm = create_swarm::<ClientPeerBehaviour>( key).await;
 
 
         let (outside_tx, outside_rx) = tokio::sync::mpsc::channel::<NodeMessage>(100);
