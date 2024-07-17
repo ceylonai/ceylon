@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 pub struct AgentDetail {
     pub name: String,
-    pub id: Option<String>,
+    pub id: String,
 }
 
 

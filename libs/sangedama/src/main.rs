@@ -6,8 +6,9 @@ use tokio::select;
 use tracing::{info};
 use tracing_subscriber::fmt::format;
 use uuid::Uuid;
+use sangedama::peer::node::create_key;
 use crate::peer::message::data::NodeMessage;
-use crate::peer::node::{AdminPeer, AdminPeerConfig, MemberPeer, MemberPeerConfig};
+use crate::peer::node::{AdminPeer, AdminPeerConfig, get_peer_id, MemberPeer, MemberPeerConfig};
 
 mod p2p;
 mod peer;
@@ -21,9 +22,17 @@ async fn main() {
 
     let admin_port = 7845;
     let admin_config = AdminPeerConfig::new(admin_port, workspace_id.clone());
-
-    let (mut admin_peer, mut admin_listener) = AdminPeer::create(admin_config.clone()).await;
+    let admin_key = create_key();
+    let admin_id_from_key = get_peer_id(&admin_key);
+    let (mut admin_peer, mut admin_listener) = AdminPeer::create(admin_config.clone(), admin_key).await;
     let admin_id = admin_peer.id.clone();
+
+
+    if admin_id.to_string() == admin_id_from_key.to_string() {
+        info!("Admin peer created with id: {}", admin_id);
+    }
+
+
     let admin_emitter = admin_peer.emitter();
     let task_admin = tokio::task::spawn(async move {
         admin_peer.run(None).await;
@@ -79,16 +88,22 @@ async fn main() {
 }
 
 async fn create_client(workspace_id: String, admin_id: String, admin_port: u16, peer_dial_address: Multiaddr, name: String) -> tokio::task::JoinHandle<()> {
+    let member_key = create_key();
+    let member_id_from_key = get_peer_id(&member_key);
     let (mut peer2, mut peer2_listener) = MemberPeer::create(MemberPeerConfig {
         name: name.clone(),
         workspace_id: workspace_id.clone(),
         admin_peer: PeerId::from_str(&admin_id).unwrap(),
         rendezvous_point_address: peer_dial_address.clone(),
-    }).await;
+    }, member_key).await;
 
 
     let peer2_emitter = peer2.emitter();
     let peer2_id = peer2.id.clone();
+
+    if member_id_from_key.to_string() == peer2_id.to_string() {
+        info!("{} {} created", name.clone(), peer2_id);
+    }
 
     let task_peer_2 = tokio::task::spawn(async move {
         peer2.run().await;

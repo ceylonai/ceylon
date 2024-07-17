@@ -5,11 +5,10 @@ use libp2p::core::muxing::StreamMuxerBox;
 use libp2p::core::transport::dummy::DummyTransport;
 use crate::peer::behaviour::PeerBehaviour;
 
-pub async fn create_swarm<B>() -> Swarm<B>
+pub async fn create_swarm<B>( key: identity::Keypair ) -> Swarm<B>
 where
     B: PeerBehaviour + 'static,
 {
-    let key = identity::Keypair::generate_ed25519();
     SwarmBuilder::with_existing_identity(key.clone())
         .with_tokio()
         .with_tcp(
