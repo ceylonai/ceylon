@@ -37,6 +37,8 @@ dependencies = [
     "langchain-community==0.2.6",
     "openai==1.35.7",
     "expert-ceylon==2.0.0a2",
+    "python-statemachine[diagrams]==2.3.4",
+    "pydot===3.0.1"
 ]
 
 [project.urls]
