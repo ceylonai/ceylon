@@ -16,7 +16,7 @@ class Admin(AdminAgent, Processor, MessageHandler, EventHandler):
 
     #
     async def on_message(self, agent_id: "str", data: "bytes", time: "int"):
-        print(f"Admin on_message  {self.details().name}", agent_id, data, time)
+        pass
 
     async def run_admin(self, inputs, workers):
         uniffi_set_event_loop(asyncio.get_event_loop())
