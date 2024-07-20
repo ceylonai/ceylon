@@ -23,11 +23,11 @@ multiple agents, each with specific roles and responsibilities.
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License. See the [LICENSE](../../LICENSE) file for details.
 
 ## Contributing
 
-We welcome contributions! Please read our [contributing guidelines](CONTRIBUTING.md) before submitting a pull request.
+We welcome contributions! Please read our [contributing guidelines](../../LCONTRIBUTING.md) before submitting a pull request.
 
 ## Contact
 
