@@ -6,7 +6,6 @@ use tokio::sync::{Mutex, RwLock};
 use tokio::{select, signal};
 use tracing::{error, info};
 
-use crate::agent::state::{Message, SystemMessage};
 use crate::workspace::agent::{AgentDetail, EventHandler};
 use crate::workspace::message::AgentMessage;
 use crate::{MessageHandler, Processor, WorkerAgent};
@@ -98,7 +97,7 @@ impl AdminAgent {
     async fn run_(&self, inputs: Vec<u8>, agents: Vec<Arc<WorkerAgent>>) {
         info!("Agent {} running", self.config.name);
 
-        let mut worker_details: RwLock<HashMap<String, AgentDetail>> = RwLock::new(HashMap::new());
+        let worker_details: RwLock<HashMap<String, AgentDetail>> = RwLock::new(HashMap::new());
 
         let config = self.config.clone();
         let admin_config = AdminPeerConfig::new(config.port, config.name.clone());
@@ -113,9 +112,6 @@ impl AdminAgent {
         } else {
             panic!("Id mismatch");
         }
-
-        let admin_emitter = peer_.emitter();
-
         let admin_id = peer_.id.clone();
         let admin_emitter = peer_.emitter();
 
@@ -204,9 +200,6 @@ impl AdminAgent {
                                         }
                                     }
                                 }
-                                _ => {
-                                    info!("Agent listener {:?}", event);
-                                }
                             }
                         }
                     }
@@ -216,7 +209,6 @@ impl AdminAgent {
 
         let processor = self._processor.clone();
         let processor_input_clone = inputs.clone();
-        let name_processor = self.config.name.clone();
         let run_process = self.runtime.spawn(async move {
             processor.lock().await.run(processor_input_clone).await;
             loop {
