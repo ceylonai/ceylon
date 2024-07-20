@@ -80,5 +80,5 @@ interface Processor {
 [Trait,WithForeign]
 interface EventHandler {
     [Async]
-    void on_agent_connected(string topic,string agent_id);
+    void on_agent_connected(string topic,AgentDetail agent);
 };
