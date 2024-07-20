@@ -9,7 +9,6 @@ from ceylon.ceylon.ceylon import uniffi_set_event_loop
 class Admin(AdminAgent, Processor, MessageHandler, EventHandler):
 
     def __init__(self, name="admin", port=8888):
-        print("Admin initialized")
         super().__init__(config=AdminAgentConfig(name=name, port=port), processor=self, on_message=self, on_event=self)
 
     async def run(self, inputs: "bytes"):
@@ -29,4 +28,4 @@ class Admin(AdminAgent, Processor, MessageHandler, EventHandler):
         pass
 
     async def on_agent_connected(self, topic: "str", agent_id: "str"):
-        print("Agent connected", agent_id, topic)
+        pass

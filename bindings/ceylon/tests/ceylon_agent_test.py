@@ -8,6 +8,7 @@ from ceylon.runner import AgentRunner
 
 class Agent(AgentCore, MessageHandler, Processor):
     def __init__(self, name, position, instructions, responsibilities):
+
         super().__init__(definition=AgentDefinition(
             id=None,
             name=name,
