@@ -148,19 +148,31 @@ impl AdminPeer {
             PeerAdminEvent::GossipSub(event) => {
                 match event {
                     gossipsub::Event::Unsubscribed { topic, peer_id } => {
-                        info!( "GossipSub: Unsubscribed from topic {:?}", topic);
+                        info!( "GossipSub: Unsubscribed to topic {:?} from peer: {:?}", topic , peer_id);
+                        self.outside_tx.send(NodeMessage::Event {
+                            time: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs_f64() as u64,
+                            created_by: peer_id.to_string(),
+                            event: EventType::Unsubscribe {
+                                topic: topic.to_string(),
+                                peer_id: peer_id.to_string(),
+                            },
+                        }).await.expect("Outside tx failed");
+
                         let peers = self.connected_peers.get_mut(&topic);
                         if let Some(peers) = peers {
                             peers.retain(|p| p != &peer_id);
                         }
                     }
                     gossipsub::Event::Subscribed { topic, peer_id } => {
-                        info!( "GossipSub: Subscribed to topic {:?}", topic);
+                        info!( "GossipSub: Subscribed to topic {:?} from peer: {:?}", topic , peer_id);
                         self.connected_peers.get_mut(&topic).unwrap_or(&mut vec![]).push(peer_id);
                         self.outside_tx.send(NodeMessage::Event {
                             time: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs_f64() as u64,
                             created_by: peer_id.to_string(),
-                            event: EventType::Subscribe,
+                            event: EventType::Subscribe {
+                                topic: topic.to_string(),
+                                peer_id: peer_id.to_string(),
+                            },
                         }).await.expect("Outside tx failed");
                     }
                     gossipsub::Event::Message { message, .. } => {

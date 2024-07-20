@@ -29,7 +29,7 @@ dictionary AgentDetail{
 
 
 interface AdminAgent{
-    constructor(AdminAgentConfig config,MessageHandler on_message, Processor processor);
+    constructor(AdminAgentConfig config,MessageHandler on_message, Processor processor, EventHandler on_event);
     [Async]
     void start(bytes inputs, sequence<WorkerAgent> workers);
 
@@ -75,4 +75,10 @@ interface MessageHandler {
 interface Processor {
     [Async]
     void run(bytes inputs);
+};
+
+[Trait,WithForeign]
+interface EventHandler {
+    [Async]
+    void on_agent_connected(string topic,string agent_id);
 };

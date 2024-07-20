@@ -171,27 +171,5 @@ impl WorkerAgent {
         });
 
         vec![task_admin, task_admin_listener, run_process, run_broadcast]
-
-        // runtime.spawn(async move {
-        //     select! {
-        //        _ = task_admin => {
-        //         info!("Agent {} task_admin done", name);
-        //         }
-        //         _ = task_admin_listener => {
-        //             info!("Agent {} task_admin_listener done", name);
-        //         }
-        //         _ = run_process => {
-        //             info!("Agent {} run_process done", name);
-        //         }
-        //         _ = run_broadcast => {
-        //             info!("Agent {} run_broadcast done", name);
-        //         }
-        //         _ = signal::ctrl_c() => {
-        //             println!("Agent {:?} received exit signal", name);
-        //             // Perform any necessary cleanup here
-        //             is_request_to_shutdown = true;
-        //         }
-        //     }
-        // })
     }
 }

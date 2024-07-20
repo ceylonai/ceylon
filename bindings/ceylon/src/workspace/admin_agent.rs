@@ -7,9 +7,9 @@ use tracing::{error, info};
 
 use crate::agent::state::{Message, SystemMessage};
 use crate::{MessageHandler, Processor, WorkerAgent};
-use sangedama::peer::message::data::NodeMessage;
+use sangedama::peer::message::data::{EventType, NodeMessage};
 use sangedama::peer::node::{AdminPeer, AdminPeerConfig, create_key, create_key_from_bytes, get_peer_id};
-use crate::workspace::agent::AgentDetail;
+use crate::workspace::agent::{AgentDetail, EventHandler};
 use crate::workspace::message::AgentMessage;
 
 #[derive(Clone)]
@@ -23,6 +23,7 @@ pub struct AdminAgent {
 
     _processor: Arc<Mutex<Arc<dyn Processor>>>,
     _on_message: Arc<Mutex<Arc<dyn MessageHandler>>>,
+    _on_event: Arc<Mutex<Arc<dyn EventHandler>>>,
 
     pub broadcast_emitter: tokio::sync::mpsc::Sender<Vec<u8>>,
     pub broadcast_receiver: Arc<Mutex<tokio::sync::mpsc::Receiver<Vec<u8>>>>,
@@ -38,6 +39,7 @@ impl AdminAgent {
         config: AdminAgentConfig,
         on_message: Arc<dyn MessageHandler>,
         processor: Arc<dyn Processor>,
+        on_event: Arc<dyn EventHandler>,
     ) -> Self {
         let (broadcast_emitter, broadcast_receiver) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
 
@@ -49,6 +51,7 @@ impl AdminAgent {
             config,
             _on_message: Arc::new(Mutex::new(on_message)),
             _processor: Arc::new(Mutex::new(processor)),
+            _on_event: Arc::new(Mutex::new(on_event)),
 
             broadcast_emitter,
             broadcast_receiver: Arc::new(Mutex::new(broadcast_receiver)),
@@ -115,6 +118,7 @@ impl AdminAgent {
 
         let name = self.config.name.clone();
         let on_message = self._on_message.clone();
+        let on_event = self._on_event.clone();
         let task_admin_listener = self.runtime.spawn(async move {
             loop {
                 if is_request_to_shutdown {
@@ -140,6 +144,25 @@ impl AdminAgent {
                                         }
                                     }
                                 }
+                                NodeMessage::Event {
+                                    event,
+                                    ..
+                                }=>{
+                                   match event{
+                                        EventType::Subscribe{
+                                            peer_id,
+                                            topic,
+                                        }=>{
+                                            on_event.lock().await.on_agent_connected(
+                                                topic,
+                                                peer_id
+                                            ).await;
+                                        }
+                                        _ => {
+                                            info!("Admin Received Event {:?}", event);
+                                        }
+                                    } 
+                                }
                                 _ => {
                                     info!("Agent listener {:?}", event);
                                 }
@@ -155,7 +178,6 @@ impl AdminAgent {
         let name_processor = self.config.name.clone();
         let run_process = self.runtime.spawn(async move {
             processor.lock().await.run(processor_input_clone).await;
-            info!("Processor {} stopped", name_processor);
             loop {
                 if is_request_to_shutdown {
                     break;

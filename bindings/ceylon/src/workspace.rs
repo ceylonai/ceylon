@@ -8,6 +8,7 @@ pub use agent::{
     MessageHandler,
     Processor,
     AgentDetail,
+    EventHandler,
 };
 
 pub use workspace::{

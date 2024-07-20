@@ -1,16 +1,16 @@
-use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum EventType {
-    Subscribe,
-    Unsubscribe,
-    Listen,
-    Expired,
-    Discovered,
-    ConnectionClosed,
-    ConnectionEstablished,
+    Subscribe {
+        topic: String,
+        peer_id: String,
+    },
+    Unsubscribe{
+        topic: String,
+        peer_id: String,
+    },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
