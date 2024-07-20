@@ -8,6 +8,17 @@ from ceylon.workspace.admin import Admin
 from ceylon.workspace.runner import RunnerInput
 
 
+class BoardAdmin(Admin):
+    def __init__(self, name="admin", port=8888):
+        super().__init__(name=name, port=port)
+
+    async def on_message(self, agent_id: "str", data: "bytes", time: "int"):
+        print(f"BoardAdmin on_message  {self.details().name}", agent_id, data, time)
+
+    async def run(self, inputs: "bytes"):
+        print(f"BoardAdmin run  {self.details().name}", inputs)
+
+
 @dataclass
 class GameBoard:
     grid: list
@@ -85,7 +96,7 @@ class SimpleAgent(WorkerAgent, MessageHandler, Processor):
 
 
 async def run():
-    admin = Admin(
+    admin = BoardAdmin(
         name="admin",
         port=8000
     )
@@ -112,7 +123,7 @@ async def run():
         ]
     )
 
-    await admin.run_admin(pickle.dumps(game_board), [
+    await admin.run_admin(game_board, [
         worker1,
         worker2
     ])

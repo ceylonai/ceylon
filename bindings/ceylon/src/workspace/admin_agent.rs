@@ -92,6 +92,7 @@ impl AdminAgent {
         AgentDetail {
             name: self.config.name.clone(),
             id: self._peer_id.clone(),
+            role: "admin".to_string(),
         }
     }
     async fn run_(&self, inputs: Vec<u8>, agents: Vec<Arc<WorkerAgent>>) {
@@ -153,7 +154,7 @@ impl AdminAgent {
         error!("Worker tasks created");
 
         let worker_tasks = join_all(worker_tasks);
-        
+
 
         let name = self.config.name.clone();
         let on_message = self._on_message.clone();
@@ -238,7 +239,7 @@ impl AdminAgent {
             }
         });
 
-        
+
         self.runtime
             .spawn(async move {
                 select! {

@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 pub struct AgentDetail {
     pub name: String,
     pub id: String,
+    pub role: String,
 }
 
 
