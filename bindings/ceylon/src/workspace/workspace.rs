@@ -1,4 +1,3 @@
-use sangedama::peer::node::{AdminPeerConfig};
 use tracing::info;
 
 pub struct WorkSpaceConfig {
@@ -14,11 +13,7 @@ impl WorkSpace {
         WorkSpace { config }
     }
 
-    pub async fn run(&self, inputs: Vec<u8>) {
+    pub async fn run(&self, _: Vec<u8>) {
         info!("Workspace {} running", self.config.name);
-
-
-
-
     }
 }

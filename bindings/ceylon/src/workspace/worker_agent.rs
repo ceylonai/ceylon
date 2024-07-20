@@ -1,9 +1,8 @@
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, RwLock};
-use futures::future::{join_all, JoinAll};
+use std::sync::{Arc};
 use tokio::sync::Mutex;
-use tokio::{select, signal};
-use tokio::runtime::{Handle, Runtime};
+use tokio::{select};
+use tokio::runtime::{Handle};
 use tokio::task::JoinHandle;
 use tracing::{error, info};
 
@@ -69,7 +68,8 @@ impl WorkerAgent {
             }
         }
     }
-    pub async fn start(&self, inputs: Vec<u8>) {
+    pub async fn start(&self, _: Vec<u8>) {
+        info!("Not yet implemented");
         // self.run_with_config(inputs, self.config.clone()).await;
     }
 
@@ -107,17 +107,11 @@ impl WorkerAgent {
         }
         let peer_emitter = peer_.emitter();
 
-        let peer_id = peer_.id.clone();
-
-        let peer_emitter = peer_.emitter();
-
-        let mut is_request_to_shutdown = false;
+        let is_request_to_shutdown = false;
 
         let task_admin = runtime.spawn(async move {
             peer_.run().await;
         });
-
-        let name = self.config.name.clone();
 
         let on_message = self._on_message.clone();
         let task_admin_listener = runtime.spawn(async move {
