@@ -1,5 +1,7 @@
 use std::fmt::Debug;
+use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentDetail {
     pub name: String,
     pub id: String,
@@ -23,5 +25,5 @@ pub trait Processor: Send + Sync + Debug {
 
 #[async_trait::async_trait]
 pub trait EventHandler: Send + Sync + Debug {
-    async fn on_agent_connected(&self, topic: String, agent_id: String) -> ();
+    async fn on_agent_connected(&self, topic: String, agent: AgentDetail) -> ();
 }

@@ -1,16 +1,19 @@
-use std::sync::{Arc, RwLock};
 use futures::future::join_all;
+use std::collections::HashMap;
+use std::sync::{Arc};
 use tokio::runtime::Runtime;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use tokio::{select, signal};
 use tracing::{error, info};
 
 use crate::agent::state::{Message, SystemMessage};
-use crate::{MessageHandler, Processor, WorkerAgent};
-use sangedama::peer::message::data::{EventType, NodeMessage};
-use sangedama::peer::node::{AdminPeer, AdminPeerConfig, create_key, create_key_from_bytes, get_peer_id};
 use crate::workspace::agent::{AgentDetail, EventHandler};
 use crate::workspace::message::AgentMessage;
+use crate::{MessageHandler, Processor, WorkerAgent};
+use sangedama::peer::message::data::{EventType, NodeMessage};
+use sangedama::peer::node::{
+    create_key, create_key_from_bytes, get_peer_id, AdminPeer, AdminPeerConfig,
+};
 
 #[derive(Clone)]
 pub struct AdminAgentConfig {
@@ -43,7 +46,10 @@ impl AdminAgent {
     ) -> Self {
         let (broadcast_emitter, broadcast_receiver) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
 
-        let rt = tokio::runtime::Runtime::new().unwrap();
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
         let admin_peer_key = create_key();
         let id = get_peer_id(&admin_peer_key).to_string();
 
@@ -82,7 +88,6 @@ impl AdminAgent {
         info!("Agent {} stop called", self.config.name);
     }
 
-
     pub fn details(&self) -> AgentDetail {
         AgentDetail {
             name: self.config.name.clone(),
@@ -92,14 +97,17 @@ impl AdminAgent {
     async fn run_(&self, inputs: Vec<u8>, agents: Vec<Arc<WorkerAgent>>) {
         info!("Agent {} running", self.config.name);
 
+        let mut worker_details: RwLock<HashMap<String, AgentDetail>> = RwLock::new(HashMap::new());
+
         let config = self.config.clone();
         let admin_config = AdminPeerConfig::new(config.port, config.name.clone());
 
         let peer_key = create_key_from_bytes(self._key.clone());
 
-        let (mut peer_, mut peer_listener_) = AdminPeer::create(admin_config.clone(), peer_key).await;
+        let (mut peer_, mut peer_listener_) =
+            AdminPeer::create(admin_config.clone(), peer_key).await;
 
-        if peer_.id.to_string() == self._peer_id.to_string() {
+        if peer_.id == self._peer_id {
             info!("Admin peer created {}", peer_.id.clone());
         } else {
             panic!("Id mismatch");
@@ -115,6 +123,37 @@ impl AdminAgent {
         let task_admin = self.runtime.spawn(async move {
             peer_.run(None).await;
         });
+
+
+        let mut worker_tasks = vec![];
+
+        let _inputs = inputs.clone();
+        let admin_id_ = admin_id.clone();
+        for agent in agents {
+            let _inputs_ = _inputs.clone();
+            let agent_ = agent.clone();
+            let _admin_id_ = admin_id_.clone();
+            let mut config = agent_.config.clone();
+            config.admin_peer = _admin_id_.clone();
+            let tasks = agent_
+                .run_with_config(_inputs_.clone(), config, self.runtime.handle())
+                .await;
+            let agent_detail = agent_.details();
+
+            worker_details
+                .write()
+                .await
+                .insert(agent_detail.id.clone(), agent_detail);
+
+            for task in tasks {
+                worker_tasks.push(task);
+            }
+        }
+
+        error!("Worker tasks created");
+
+        let worker_tasks = join_all(worker_tasks);
+        
 
         let name = self.config.name.clone();
         let on_message = self._on_message.clone();
@@ -153,15 +192,16 @@ impl AdminAgent {
                                             peer_id,
                                             topic,
                                         }=>{
-                                            on_event.lock().await.on_agent_connected(
-                                                topic,
-                                                peer_id
-                                            ).await;
+                                            if let Some(agent) = worker_details.read().await.get(&peer_id) {
+                                                let agent = agent.clone();
+                                                 on_event.lock().await.on_agent_connected(topic,agent)
+                                                .await;
+                                            }
                                         }
                                         _ => {
                                             info!("Admin Received Event {:?}", event);
                                         }
-                                    } 
+                                    }
                                 }
                                 _ => {
                                     info!("Agent listener {:?}", event);
@@ -198,50 +238,34 @@ impl AdminAgent {
             }
         });
 
-        let mut worker_tasks = vec![];
-
-        let _inputs = inputs.clone();
-        let admin_id_ = admin_id.clone();
-        for agent in agents {
-            let _inputs_ = _inputs.clone();
-            let agent_ = agent.clone();
-            let _admin_id_ = admin_id_.clone();
-            let mut config = agent_.config.clone();
-            config.admin_peer = _admin_id_.clone();
-            let tasks = agent_.run_with_config(_inputs_.clone(), config, self.runtime.handle()).await;
-            for task in tasks {
-                worker_tasks.push(task);
-            }
-        }
-
-        error!("Worker tasks created");
-
-        let worker_tasks = join_all(worker_tasks);
-
-        self.runtime.spawn(async move {
-            select! {
-               _ = worker_tasks => {
-                    info!("Agent {} task_admin_listener done", name);
+        
+        self.runtime
+            .spawn(async move {
+                select! {
+                   _ = worker_tasks => {
+                        info!("Agent {} task_admin_listener done", name);
+                    }
+                    _ = task_admin => {
+                        info!("Agent {} task_admin done", name);
+                    }
+                    _ = task_admin_listener => {
+                        info!("Agent {} task_admin_listener done", name);
+                    }
+                    _ = run_process => {
+                        info!("Agent {} run_process done", name);
+                    }
+                    _ = run_broadcast => {
+                        info!("Agent {} run_broadcast done", name);
+                    }
+                    _ = signal::ctrl_c() => {
+                        println!("Agent {:?} received exit signal", name);
+                        // Perform any necessary cleanup here
+                        is_request_to_shutdown = true;
+                    }
                 }
-                _ = task_admin => {
-                    info!("Agent {} task_admin done", name);
-                }
-                _ = task_admin_listener => {
-                    info!("Agent {} task_admin_listener done", name);
-                }
-                _ = run_process => {
-                    info!("Agent {} run_process done", name);
-                }
-                _ = run_broadcast => {
-                    info!("Agent {} run_broadcast done", name);
-                }
-                _ = signal::ctrl_c() => {
-                    println!("Agent {:?} received exit signal", name);
-                    // Perform any necessary cleanup here
-                    is_request_to_shutdown = true;
-                }
-            }
-        }).await.unwrap();
+            })
+            .await
+            .unwrap();
 
         loop {
             if is_request_to_shutdown {
