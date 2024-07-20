@@ -22,6 +22,9 @@ class Meeting:
     duration: int
     minimum_participants: int
 
+    def __str__(self):
+        return f"{self.name} {self.date} {self.duration} {self.minimum_participants}"
+
 
 @dataclass(repr=True)
 class TimeSlot:
@@ -99,6 +102,7 @@ class Coordinator(Admin):
     async def run(self, inputs: "bytes"):
         input: RunnerInput = pickle.loads(inputs)
         self.meeting = input.request
+        print("Meeting Schedule request: ", self.meeting)
 
     async def on_agent_connected(self, topic: "str", agent_id: "str"):
         if self.next_time_slot is None and self.meeting is not None:
@@ -114,7 +118,6 @@ class Coordinator(Admin):
                 print(f"{data.owner} accepts {data.time_slot}")
                 if time_slot_key in self.agreed_slots:
                     slots = self.agreed_slots[time_slot_key]
-                    print(f"Meeting {slots} participants agreed on {data.time_slot}")
                     if data.owner not in slots:
                         slots.append(data.owner)
                         self.agreed_slots[time_slot_key] = slots
@@ -130,7 +133,7 @@ class Coordinator(Admin):
 
             if calculated_next_time_slot.is_greater_than(self.next_time_slot):
                 self.next_time_slot = calculated_next_time_slot
-                print(f"Next time slot: {self.next_time_slot}")
+                # print(f"Next time slot: {self.next_time_slot}")
                 await self.broadcast(pickle.dumps(AvailabilityRequest(time_slot=self.next_time_slot)))
 
 
