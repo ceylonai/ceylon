@@ -112,7 +112,6 @@ class Coordinator(Admin):
             if data.accepted:
                 time_slot_key = f"{data.time_slot}"
                 print(f"{data.owner} accepts {data.time_slot}")
-
                 if time_slot_key in self.agreed_slots:
                     slots = self.agreed_slots[time_slot_key]
                     print(f"Meeting {slots} participants agreed on {data.time_slot}")
