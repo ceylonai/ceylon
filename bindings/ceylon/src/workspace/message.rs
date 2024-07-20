@@ -3,9 +3,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
 pub enum AgentMessage {
     SystemMessage {
+        id: u64,
         message: Vec<u8>
     },
     NodeMessage {
+        id: u64,
         message: Vec<u8>
     },
 }

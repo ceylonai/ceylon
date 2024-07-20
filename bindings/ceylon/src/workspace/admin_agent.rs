@@ -1,6 +1,8 @@
+use std::alloc::System;
 use futures::future::join_all;
 use std::collections::HashMap;
 use std::sync::{Arc};
+use std::time::SystemTime;
 use tokio::runtime::Runtime;
 use tokio::sync::{Mutex, RwLock};
 use tokio::{select, signal};
@@ -70,7 +72,8 @@ impl AdminAgent {
     }
 
     pub async fn broadcast(&self, message: Vec<u8>) {
-        let node_message = AgentMessage::NodeMessage { message };
+        let id = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_nanos() as u64;
+        let node_message = AgentMessage::NodeMessage { message, id };
         match self.broadcast_emitter.send(node_message.to_bytes()).await {
             Ok(_) => {}
             Err(_) => {
@@ -168,7 +171,7 @@ impl AdminAgent {
                                     let agent_message = AgentMessage::from_bytes(data);
 
                                     match agent_message {
-                                        AgentMessage::NodeMessage { message } => {
+                                        AgentMessage::NodeMessage { message,.. } => {
                                             on_message.lock().await.on_message(
                                                 created_by,
                                                 message,

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use tokio::{select};
 use tokio::runtime::{Handle};
 use tokio::task::JoinHandle;
@@ -34,6 +34,7 @@ pub struct WorkerAgent {
 
     _peer_id: String,
     _key: Vec<u8>,
+    _increment_id: RwLock<i32>,
 }
 
 impl WorkerAgent {
@@ -45,6 +46,7 @@ impl WorkerAgent {
         let (broadcast_emitter, broadcast_receiver) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
         let admin_peer_key = create_key();
         let id = get_peer_id(&admin_peer_key).to_string();
+        let increment_id = RwLock::new(0);
         Self {
             config,
             _processor: Arc::new(Mutex::new(processor)),
@@ -55,10 +57,13 @@ impl WorkerAgent {
 
             _peer_id: id,
             _key: admin_peer_key.to_protobuf_encoding().unwrap(),
+
+            _increment_id: increment_id,
         }
     }
     pub async fn broadcast(&self, message: Vec<u8>) {
-        let node_message = AgentMessage::NodeMessage { message };
+        let id = self._increment_id.read().await;
+        let node_message = AgentMessage::NodeMessage { message, id: *id as u64 };
         let message = node_message.to_bytes();
 
         match self.broadcast_emitter.send(message).await {
@@ -67,6 +72,7 @@ impl WorkerAgent {
                 error!("Failed to send broadcast message");
             }
         }
+        *self._increment_id.write().await += 1;
     }
     pub async fn start(&self, _: Vec<u8>) {
         info!("Not yet implemented");
@@ -127,7 +133,7 @@ impl WorkerAgent {
                                    let agent_message = AgentMessage::from_bytes(data);
 
                                     match agent_message {
-                                        AgentMessage::NodeMessage { message } => {
+                                        AgentMessage::NodeMessage { message,.. } => {
                                             on_message.lock().await.on_message(
                                                 created_by,
                                                 message,
