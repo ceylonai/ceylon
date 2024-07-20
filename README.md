@@ -19,6 +19,12 @@ multiple agents, each with specific roles and responsibilities.
 - **Interoperability and Performance**: Ensures seamless interoperability across different programming languages while
   providing memory safety and high performance.
 
+## Todo
+
+- [ ] LLM Agent Stack
+- [ ] Web Agent
+- [ ] Agent Registry
+
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
