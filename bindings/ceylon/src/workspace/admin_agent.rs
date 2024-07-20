@@ -1,4 +1,5 @@
 use std::sync::{Arc, RwLock};
+use futures::future::join_all;
 use tokio::runtime::Runtime;
 use tokio::sync::Mutex;
 use tokio::{select, signal};
@@ -153,9 +154,13 @@ impl AdminAgent {
         let processor_input_clone = inputs.clone();
         let name_processor = self.config.name.clone();
         let run_process = self.runtime.spawn(async move {
-            info!("Agent {} run_process", name_processor);
             processor.lock().await.run(processor_input_clone).await;
-            info!("Agent {} run_proces edd", name_processor);
+            info!("Processor {} stopped", name_processor);
+            loop {
+                if is_request_to_shutdown {
+                    break;
+                }
+            }
         });
 
         let broadcast_receiver = self.broadcast_receiver.clone();
@@ -179,23 +184,23 @@ impl AdminAgent {
             let _inputs_ = _inputs.clone();
             let agent_ = agent.clone();
             let _admin_id_ = admin_id_.clone();
-            let task = self.runtime.spawn(async move {
-                let mut config = agent_.config.clone();
-                config.admin_peer = _admin_id_.clone();
-                agent_.run_with_config(_inputs_.clone(), config).await;
-            });
-            worker_tasks.push(task);
+            let mut config = agent_.config.clone();
+            config.admin_peer = _admin_id_.clone();
+            let tasks = agent_.run_with_config(_inputs_.clone(), config, self.runtime.handle()).await;
+            for task in tasks {
+                worker_tasks.push(task);
+            }
         }
 
         error!("Worker tasks created");
 
-        self.runtime.spawn(async move {
-            let mut worker_handler = tokio::task::JoinSet::from_iter(worker_tasks);
-            while let Some(res) = worker_handler.join_next().await {}
-        });
+        let worker_tasks = join_all(worker_tasks);
 
         self.runtime.spawn(async move {
             select! {
+               _ = worker_tasks => {
+                    info!("Agent {} task_admin_listener done", name);
+                }
                 _ = task_admin => {
                     info!("Agent {} task_admin done", name);
                 }
