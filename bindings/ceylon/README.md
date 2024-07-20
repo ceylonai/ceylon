@@ -3,11 +3,12 @@
 [![PyPI - Version](https://img.shields.io/pypi/v/ceylon.svg)](https://pypi.org/project/ceylon)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/ceylon.svg)](https://pypi.org/project/ceylon)
 
-# Ceylon  : A Multi-Agent System (MAS)
+# Ceylon : A Multi-Agent System (MAS)
 
 ## Introduction
 
-Welcome to the Ceylon  Multi-Agent System (MAS) project! This system is designed to manage and automate task flows among multiple agents, each with specific roles and responsibilities.
+Welcome to the Ceylon: Multi-Agent System (MAS) project! This system is designed to manage and automate task flows among
+multiple agents, each with specific roles and responsibilities.
 
 ## Features
 
@@ -16,6 +17,9 @@ Welcome to the Ceylon  Multi-Agent System (MAS) project! This system is designed
 - **Scalability**: Scalable to handle multiple agents and complex workflows.
 - **Customization**: Highly customizable to fit different use cases.
 - **Networking**: Developed as a distributed system.
+- **Efficient Message Propagation**: Utilizes a robust framework for efficient and reliable message propagation.
+- **Interoperability and Performance**: Ensures seamless interoperability across different programming languages while
+  providing memory safety and high performance.
 
 ## License
 
