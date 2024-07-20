@@ -9,6 +9,7 @@ use crate::{MessageHandler, Processor, WorkerAgent};
 use sangedama::peer::message::data::NodeMessage;
 use sangedama::peer::node::{AdminPeer, AdminPeerConfig, create_key, create_key_from_bytes, get_peer_id};
 use crate::workspace::agent::AgentDetail;
+use crate::workspace::message::AgentMessage;
 
 #[derive(Clone)]
 pub struct AdminAgentConfig {
@@ -60,7 +61,8 @@ impl AdminAgent {
     }
 
     pub async fn broadcast(&self, message: Vec<u8>) {
-        match self.broadcast_emitter.send(message).await {
+        let node_message = AgentMessage::NodeMessage { message };
+        match self.broadcast_emitter.send(node_message.to_bytes()).await {
             Ok(_) => {}
             Err(_) => {
                 error!("Failed to send broadcast message");
@@ -122,11 +124,20 @@ impl AdminAgent {
                         if let Some(event) = event {
                             match event {
                                 NodeMessage::Message{ data, created_by, time} => {
-                                    on_message.lock().await.on_message(
-                                        created_by,
-                                        data,
-                                        time
-                                    ).await;
+                                    let agent_message = AgentMessage::from_bytes(data);
+
+                                    match agent_message {
+                                        AgentMessage::NodeMessage { message } => {
+                                            on_message.lock().await.on_message(
+                                                created_by,
+                                                message,
+                                                time
+                                            ).await;
+                                        }
+                                        _ => {
+                                            info!("Agent listener {:?}", agent_message);
+                                        }
+                                    }
                                 }
                                 _ => {
                                     info!("Agent listener {:?}", event);
