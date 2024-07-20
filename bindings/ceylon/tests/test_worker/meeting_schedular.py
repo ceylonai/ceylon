@@ -1,11 +1,9 @@
 import asyncio
 import pickle
-import sys
 from typing import List
 
 from pydantic.dataclasses import dataclass
 
-from ceylon.ceylon import enable_log
 from ceylon.workspace.admin import Admin
 from ceylon.workspace.runner import RunnerInput
 from ceylon.workspace.worker import Worker
