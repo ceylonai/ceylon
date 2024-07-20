@@ -1,14 +1,19 @@
-use std::sync::{Arc, RwLock};
 use serde::{Deserialize, Serialize};
-use tokio::{select, signal};
+use std::sync::{Arc, RwLock};
+use futures::future::{join_all, JoinAll};
 use tokio::sync::Mutex;
+use tokio::{select, signal};
+use tokio::runtime::{Handle, Runtime};
+use tokio::task::JoinHandle;
 use tracing::{error, info};
 
-use sangedama::peer::message::data::NodeMessage;
-use sangedama::peer::node::{create_key, create_key_from_bytes, get_peer_id, MemberPeer, MemberPeerConfig};
-use crate::{MessageHandler, Processor};
 use crate::workspace::agent::AgentDetail;
 use crate::workspace::message::AgentMessage;
+use crate::{MessageHandler, Processor};
+use sangedama::peer::message::data::NodeMessage;
+use sangedama::peer::node::{
+    create_key, create_key_from_bytes, get_peer_id, MemberPeer, MemberPeerConfig,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkerAgentConfig {
@@ -17,7 +22,6 @@ pub struct WorkerAgentConfig {
     pub admin_peer: String,
     pub admin_port: u16,
 }
-
 
 pub struct WorkerAgent {
     pub config: WorkerAgentConfig,
@@ -33,7 +37,11 @@ pub struct WorkerAgent {
 }
 
 impl WorkerAgent {
-    pub fn new(config: WorkerAgentConfig, on_message: Arc<dyn MessageHandler>, processor: Arc<dyn Processor>) -> Self {
+    pub fn new(
+        config: WorkerAgentConfig,
+        on_message: Arc<dyn MessageHandler>,
+        processor: Arc<dyn Processor>,
+    ) -> Self {
         let (broadcast_emitter, broadcast_receiver) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
         let admin_peer_key = create_key();
         let id = get_peer_id(&admin_peer_key).to_string();
@@ -61,14 +69,7 @@ impl WorkerAgent {
         }
     }
     pub async fn start(&self, inputs: Vec<u8>) {
-        let rt = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .unwrap();
-
-        rt.block_on(async {
-            self.run_with_config(inputs, self.config.clone()).await;
-        });
+        // self.run_with_config(inputs, self.config.clone()).await;
     }
 
     pub async fn stop(&self) {
@@ -84,7 +85,7 @@ impl WorkerAgent {
 }
 
 impl WorkerAgent {
-    pub async fn run_with_config(&self, inputs: Vec<u8>, worker_agent_config: WorkerAgentConfig) {
+    pub async fn run_with_config(&self, inputs: Vec<u8>, worker_agent_config: WorkerAgentConfig, runtime: &Handle) -> Vec<JoinHandle<()>> {
         info!("Agent {} running", self.config.name);
 
         let config = worker_agent_config.clone();
@@ -95,8 +96,9 @@ impl WorkerAgent {
             config.admin_port,
         );
         let peer_key = create_key_from_bytes(self._key.clone());
-        let (mut peer_, mut peer_listener_) = MemberPeer::create(member_config.clone(), peer_key).await;
-        if peer_.id.to_string() == self._peer_id.to_string() {
+        let (mut peer_, mut peer_listener_) =
+            MemberPeer::create(member_config.clone(), peer_key).await;
+        if peer_.id == self._peer_id {
             info!("Worker peer created {}", peer_.id.clone());
         } else {
             panic!("Id mismatch");
@@ -105,19 +107,18 @@ impl WorkerAgent {
 
         let peer_id = peer_.id.clone();
 
-
         let peer_emitter = peer_.emitter();
 
         let mut is_request_to_shutdown = false;
 
-        let task_admin = tokio::task::spawn(async move {
+        let task_admin = runtime.spawn(async move {
             peer_.run().await;
         });
 
         let name = self.config.name.clone();
 
         let on_message = self._on_message.clone();
-        let task_admin_listener = tokio::spawn(async move {
+        let task_admin_listener = runtime.spawn(async move {
             loop {
                 if is_request_to_shutdown {
                     break;
@@ -153,12 +154,12 @@ impl WorkerAgent {
         });
 
         let processor = self._processor.clone();
-        let run_process = tokio::spawn(async move {
+        let run_process =  runtime.spawn(async move {
             processor.lock().await.run(inputs).await;
         });
 
         let broadcast_receiver = self.broadcast_receiver.clone();
-        let run_broadcast = tokio::spawn(async move {
+        let run_broadcast =  runtime.spawn(async move {
             loop {
                 if is_request_to_shutdown {
                     break;
@@ -169,24 +170,28 @@ impl WorkerAgent {
             }
         });
 
-        select! {
-            _ = task_admin => {
-                info!("Agent {} task_admin done", name);
-            }
-            _ = task_admin_listener => {
-                info!("Agent {} task_admin_listener done", name);
-            }
-            _ = run_process => {
-                info!("Agent {} run_process done", name);
-            }
-            _ = run_broadcast => {
-                info!("Agent {} run_broadcast done", name);
-            }
-            _ = signal::ctrl_c() => {
-                println!("Agent {:?} received exit signal", name);
-                // Perform any necessary cleanup here
-                is_request_to_shutdown = true;
-            }
-        }
+        vec![task_admin, task_admin_listener, run_process, run_broadcast]
+
+        // runtime.spawn(async move {
+        //     select! {
+        //        _ = task_admin => {
+        //         info!("Agent {} task_admin done", name);
+        //         }
+        //         _ = task_admin_listener => {
+        //             info!("Agent {} task_admin_listener done", name);
+        //         }
+        //         _ = run_process => {
+        //             info!("Agent {} run_process done", name);
+        //         }
+        //         _ = run_broadcast => {
+        //             info!("Agent {} run_broadcast done", name);
+        //         }
+        //         _ = signal::ctrl_c() => {
+        //             println!("Agent {:?} received exit signal", name);
+        //             // Perform any necessary cleanup here
+        //             is_request_to_shutdown = true;
+        //         }
+        //     }
+        // })
     }
-} 
+}
