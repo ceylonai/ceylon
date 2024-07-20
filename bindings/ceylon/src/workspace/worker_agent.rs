@@ -18,6 +18,7 @@ use sangedama::peer::node::{
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkerAgentConfig {
     pub name: String,
+    pub role: String,
     pub work_space_id: String,
     pub admin_peer: String,
     pub admin_port: u16,
@@ -80,6 +81,7 @@ impl WorkerAgent {
         AgentDetail {
             name: self.config.name.clone(),
             id: self._peer_id.clone(),
+            role: self.config.role.clone(),
         }
     }
 }
@@ -154,12 +156,12 @@ impl WorkerAgent {
         });
 
         let processor = self._processor.clone();
-        let run_process =  runtime.spawn(async move {
+        let run_process = runtime.spawn(async move {
             processor.lock().await.run(inputs).await;
         });
 
         let broadcast_receiver = self.broadcast_receiver.clone();
-        let run_broadcast =  runtime.spawn(async move {
+        let run_broadcast = runtime.spawn(async move {
             loop {
                 if is_request_to_shutdown {
                     break;

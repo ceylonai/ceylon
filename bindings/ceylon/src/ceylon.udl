@@ -25,6 +25,7 @@ dictionary AdminAgentConfig {
 dictionary AgentDetail{
     string name;
     string id;
+    string role;
 };
 
 
@@ -47,6 +48,7 @@ dictionary WorkerAgentConfig {
     string name;
     string work_space_id;
     string admin_peer;
+    string role;
     u16 admin_port;
 };
 interface WorkerAgent{
