@@ -5,6 +5,7 @@ use tokio::sync::{Mutex, RwLock};
 use tokio::{select};
 use tokio::runtime::{Handle};
 use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
 
 use crate::workspace::agent::AgentDetail;
@@ -89,7 +90,7 @@ impl WorkerAgent {
 }
 
 impl WorkerAgent {
-    pub async fn run_with_config(&self, inputs: Vec<u8>, worker_agent_config: WorkerAgentConfig, runtime: &Handle) -> Vec<JoinHandle<()>> {
+    pub async fn run_with_config(&self, inputs: Vec<u8>, worker_agent_config: WorkerAgentConfig, runtime: Handle, cancellation_token: CancellationToken) -> Vec<JoinHandle<()>> {
         info!("Agent {} running", self.config.name);
 
         let config = worker_agent_config.clone();
@@ -110,18 +111,22 @@ impl WorkerAgent {
         let peer_emitter = peer_.emitter();
 
         let is_request_to_shutdown = false;
-
+        let cancellation_token_clone = cancellation_token.clone();
         let task_admin = runtime.spawn(async move {
-            peer_.run().await;
+            peer_.run(cancellation_token_clone).await;
         });
 
         let on_message = self._on_message.clone();
+        let cancellation_token_clone = cancellation_token.clone();
         let task_admin_listener = runtime.spawn(async move {
             loop {
                 if is_request_to_shutdown {
                     break;
                 }
                 select! {
+                    _ = cancellation_token_clone.cancelled() => {
+                        break;
+                    }
                    event = peer_listener_.recv() => {
                         if let Some(event) = event {
                             match event {
@@ -157,6 +162,7 @@ impl WorkerAgent {
         });
 
         let broadcast_receiver = self.broadcast_receiver.clone();
+        let cancellation_token_clone = cancellation_token.clone();
         let run_broadcast = runtime.spawn(async move {
             loop {
                 if is_request_to_shutdown {
@@ -164,6 +170,9 @@ impl WorkerAgent {
                 }
                 if let Some(raw_data) = broadcast_receiver.lock().await.recv().await {
                     peer_emitter.send(raw_data).await.unwrap();
+                }
+                if cancellation_token_clone.is_cancelled() {
+                    break;
                 }
             }
         });

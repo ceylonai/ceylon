@@ -123,7 +123,7 @@ class Coordinator(Admin):
                         self.agreed_slots[time_slot_key] = slots
                         if len(slots) >= self.meeting.minimum_participants:
                             print(f"Meeting {slots} participants agreed on {data.time_slot}")
-                            sys.exit(0)
+                            await self.stop()
                 else:
                     self.agreed_slots[time_slot_key] = [data.owner]
 

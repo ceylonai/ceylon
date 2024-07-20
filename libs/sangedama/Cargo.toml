@@ -13,6 +13,7 @@ async-trait = "0.1.80"
 reqwest = { version = "0.12.4", features = ["json"] }
 serde_json = "1.0.117"
 tokio = { version = "1.37.0", features = ["full"] }
+tokio-util = { version = "0.7.7", features = ["rt"] }
 serde = { version = "1.0.203", features = ["derive"] }
 dotenvy = "0.15.7"
 libp2p = { version = "0.53.2", features = [

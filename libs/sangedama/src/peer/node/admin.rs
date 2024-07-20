@@ -8,6 +8,7 @@ use libp2p::{gossipsub, identity, Multiaddr, PeerId, rendezvous, Swarm};
 use libp2p::multiaddr::Protocol;
 use libp2p_gossipsub::TopicHash;
 use tokio::select;
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
 use crate::peer::message::data::{EventType, NodeMessage};
 
@@ -69,7 +70,7 @@ impl AdminPeer {
         self.inside_tx.clone()
     }
 
-    pub async fn run(&mut self, address: Option<Multiaddr>) {
+    pub async fn run(&mut self, address: Option<Multiaddr>, cancellation_token: CancellationToken) {
         let address_ = if address.is_none() {
             Multiaddr::empty()
                 .with(Protocol::Ip4(Ipv4Addr::UNSPECIFIED))
@@ -83,7 +84,10 @@ impl AdminPeer {
         info!( "Listening on: {:?}", address_.to_string());
 
         loop {
-            select! {
+            select! {                
+                _ = cancellation_token.cancelled() => {
+                    break;
+                }
                 event = self.swarm.select_next_some() => {
                     match event {
                        SwarmEvent::ConnectionEstablished { peer_id, .. } => {

@@ -1,11 +1,12 @@
-use std::net::Ipv4Addr;
-use std::str::FromStr;
 use futures::StreamExt;
-use libp2p::{gossipsub, identity, Multiaddr, PeerId, rendezvous, Swarm};
 use libp2p::multiaddr::Protocol;
 use libp2p::swarm::dial_opts::{DialOpts, PeerCondition};
 use libp2p::swarm::SwarmEvent;
+use libp2p::{gossipsub, identity, rendezvous, Multiaddr, PeerId, Swarm};
+use std::net::Ipv4Addr;
+use std::str::FromStr;
 use tokio::select;
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
 
 use crate::peer::behaviour::{ClientPeerBehaviour, ClientPeerEvent};
@@ -21,8 +22,12 @@ pub struct MemberPeerConfig {
 }
 
 impl MemberPeerConfig {
-    pub fn new(name: String, workspace_id: String, admin_peer: String, rendezvous_point_admin_port: u16) -> Self {
-
+    pub fn new(
+        name: String,
+        workspace_id: String,
+        admin_peer: String,
+        rendezvous_point_admin_port: u16,
+    ) -> Self {
         let rendezvous_point_address = Multiaddr::empty()
             .with(Protocol::Ip4(Ipv4Addr::LOCALHOST))
             .with(Protocol::Udp(rendezvous_point_admin_port))
@@ -48,34 +53,36 @@ pub struct MemberPeer {
     inside_tx: tokio::sync::mpsc::Sender<Vec<u8>>,
 }
 
-
 impl MemberPeer {
-    pub async fn create(config: MemberPeerConfig, key: identity::Keypair) -> (Self, tokio::sync::mpsc::Receiver<NodeMessage>) {
-        let swarm = create_swarm::<ClientPeerBehaviour>( key).await;
-
+    pub async fn create(
+        config: MemberPeerConfig,
+        key: identity::Keypair,
+    ) -> (Self, tokio::sync::mpsc::Receiver<NodeMessage>) {
+        let swarm = create_swarm::<ClientPeerBehaviour>(key).await;
 
         let (outside_tx, outside_rx) = tokio::sync::mpsc::channel::<NodeMessage>(100);
 
         let (inside_tx, inside_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
 
-        (Self {
-            config,
-            id: swarm.local_peer_id().to_string(),
-            swarm,
+        (
+            Self {
+                config,
+                id: swarm.local_peer_id().to_string(),
+                swarm,
 
-            outside_tx,
+                outside_tx,
 
-            inside_tx,
-            inside_rx,
-        },
-         outside_rx)
+                inside_tx,
+                inside_rx,
+            },
+            outside_rx,
+        )
     }
-
 
     pub fn emitter(&self) -> tokio::sync::mpsc::Sender<Vec<u8>> {
         self.inside_tx.clone()
     }
-    pub async fn run(&mut self) {
+    pub async fn run(&mut self, cancellation_token: CancellationToken) {
         let name = self.config.name.clone();
         info!("Peer {:?}: {:?} Starting..", name.clone(), self.id.clone());
         let ext_address = Multiaddr::empty()
@@ -88,17 +95,17 @@ impl MemberPeer {
         let rendezvous_point_address = self.config.rendezvous_point_address.clone();
 
         let dial_opts = DialOpts::peer_id(admin_peer_id)
-            .addresses(
-                vec![rendezvous_point_address]
-            )
+            .addresses(vec![rendezvous_point_address])
             .condition(PeerCondition::Always)
             .build();
         self.swarm.dial(dial_opts).unwrap();
 
-
         let name_copy = name.clone();
         loop {
             select! {
+                _ = cancellation_token.cancelled() => {
+                    break;
+                }
                 event = self.swarm.select_next_some() => {
                     match event {
                        SwarmEvent::ConnectionEstablished { peer_id, .. } => {
@@ -148,52 +155,63 @@ impl MemberPeer {
         }
     }
 
-
     async fn process_event(&mut self, event: ClientPeerEvent) {
         let name_ = self.config.name.clone();
         match event {
-            ClientPeerEvent::Rendezvous(event) => {
-                match event {
-                    rendezvous::client::Event::Registered { namespace, ttl, rendezvous_node } => {
-                        info!(
+            ClientPeerEvent::Rendezvous(event) => match event {
+                rendezvous::client::Event::Registered {
+                    namespace,
+                    ttl,
+                    rendezvous_node,
+                } => {
+                    info!(
                             "Registered for namespace '{}' at rendezvous point {} for the next {} seconds",
                             namespace, rendezvous_node, ttl
                         );
-                        let topic = gossipsub::IdentTopic::new(self.config.workspace_id.clone());
-                        self.swarm.behaviour_mut().gossip_sub.subscribe(&topic).unwrap();
-                    }
-                    _ => {
-                        info!( "Rendezvous: {:?}", event);
+                    let topic = gossipsub::IdentTopic::new(self.config.workspace_id.clone());
+                    self.swarm
+                        .behaviour_mut()
+                        .gossip_sub
+                        .subscribe(&topic)
+                        .unwrap();
+                }
+                _ => {
+                    info!("Rendezvous: {:?}", event);
+                }
+            },
+
+            ClientPeerEvent::GossipSub(event) => match event {
+                gossipsub::Event::Subscribed { peer_id, topic } => {
+                    info!("Subscribed to topic: {:?} from peer: {:?}", topic, peer_id);
+                    if peer_id.to_string() == self.config.admin_peer.to_string() {
+                        info!("Member {} Subscribe with Admin", name_.clone());
                     }
                 }
-            }
 
-            ClientPeerEvent::GossipSub(event) => {
-                match event {
-                    gossipsub::Event::Subscribed { peer_id, topic } => {
-                        info!("Subscribed to topic: {:?} from peer: {:?}", topic, peer_id);
-                        if peer_id.to_string() == self.config.admin_peer.to_string() {
-                            info!( "Member {} Subscribe with Admin",name_.clone() );
-                        }
-                    }
-
-                    gossipsub::Event::Unsubscribed { peer_id, topic } => {
-                        info!("Unsubscribed from topic: {:?} from peer: {:?}", topic, peer_id);
-                        if peer_id.to_string() == self.config.admin_peer.to_string() {
-                            info!( "Member {} Unsubscribe with Admin",name_.clone() );
-                        }
-                    }
-
-                    gossipsub::Event::Message { message, .. } => {
-                        let msg = NodeMessage::from_bytes(message.data);
-                        self.outside_tx.send(msg).await.unwrap();
-                    }
-
-                    _ => {
-                        info!( "GossipSub: {:?}", event);
+                gossipsub::Event::Unsubscribed { peer_id, topic } => {
+                    info!(
+                        "Unsubscribed from topic: {:?} from peer: {:?}",
+                        topic, peer_id
+                    );
+                    if peer_id.to_string() == self.config.admin_peer.to_string() {
+                        info!("Member {} Unsubscribe with Admin", name_.clone());
                     }
                 }
-            }
+
+                gossipsub::Event::Message { message, .. } => {
+                    let msg = NodeMessage::from_bytes(message.data);
+                    match self.outside_tx.send(msg).await {
+                        Ok(_) => {}
+                        Err(e) => {
+                            error!("Failed to send message to outside: {:?}", e);
+                        }
+                    };
+                }
+
+                _ => {
+                    info!("GossipSub: {:?}", event);
+                }
+            },
 
             other => {
                 // tracing::info!("Unhandled {:?}", other);

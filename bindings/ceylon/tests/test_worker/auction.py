@@ -1,10 +1,12 @@
 import asyncio
 import pickle
 import random
+import sys
 from typing import List
 
 from pydantic.dataclasses import dataclass
 
+from ceylon.ceylon import enable_log
 from ceylon.workspace.admin import Admin
 from ceylon.workspace.worker import Worker
 
@@ -102,6 +104,7 @@ class Auctioneer(Admin):
             result = AuctionResult(winner=winning_bid.bidder, winning_bid=winning_bid.amount)
             await self.broadcast(pickle.dumps(result))
             print(f"Auction ended. Winner: {result.winner}, Winning Bid: ${result.winning_bid:.2f}")
+            await self.stop()
 
         await self.broadcast(pickle.dumps(AuctionEnd()))
 
@@ -120,4 +123,5 @@ async def main():
 
 
 if __name__ == '__main__':
+    enable_log("INFO")
     asyncio.run(main())

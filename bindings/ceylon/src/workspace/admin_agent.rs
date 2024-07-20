@@ -16,6 +16,9 @@ use sangedama::peer::node::{
     create_key, create_key_from_bytes, get_peer_id, AdminPeer, AdminPeerConfig,
 };
 
+use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
+
 #[derive(Clone)]
 pub struct AdminAgentConfig {
     pub name: String,
@@ -32,10 +35,12 @@ pub struct AdminAgent {
     pub broadcast_emitter: tokio::sync::mpsc::Sender<Vec<u8>>,
     pub broadcast_receiver: Arc<Mutex<tokio::sync::mpsc::Receiver<Vec<u8>>>>,
 
-    runtime: Runtime,
     _peer_id: String,
 
     _key: Vec<u8>,
+
+    pub shutdown_send: mpsc::UnboundedSender<String>,
+    pub shutdown_recv: Arc<Mutex<mpsc::UnboundedReceiver<String>>>,
 }
 
 impl AdminAgent {
@@ -47,12 +52,11 @@ impl AdminAgent {
     ) -> Self {
         let (broadcast_emitter, broadcast_receiver) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
 
-        let rt = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .unwrap();
+
         let admin_peer_key = create_key();
         let id = get_peer_id(&admin_peer_key).to_string();
+
+        let (shutdown_send, mut shutdown_recv) = mpsc::unbounded_channel::<String>();
 
         Self {
             config,
@@ -62,12 +66,12 @@ impl AdminAgent {
 
             broadcast_emitter,
             broadcast_receiver: Arc::new(Mutex::new(broadcast_receiver)),
-
-            runtime: rt,
-
             _peer_id: id,
 
             _key: admin_peer_key.to_protobuf_encoding().unwrap(),
+
+            shutdown_send,
+            shutdown_recv: Arc::new(Mutex::new(shutdown_recv)),
         }
     }
 
@@ -88,6 +92,10 @@ impl AdminAgent {
 
     pub async fn stop(&self) {
         info!("Agent {} stop called", self.config.name);
+
+        self.shutdown_send
+            .send(self._peer_id.clone())
+            .unwrap();
     }
 
     pub fn details(&self) -> AgentDetail {
@@ -99,6 +107,17 @@ impl AdminAgent {
     }
     async fn run_(&self, inputs: Vec<u8>, agents: Vec<Arc<WorkerAgent>>) {
         info!("Agent {} running", self.config.name);
+
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        let cancel_token = CancellationToken::new();
+
+
+        let handle = runtime.handle().clone();
+
 
         let worker_details: RwLock<HashMap<String, AgentDetail>> = RwLock::new(HashMap::new());
 
@@ -118,10 +137,9 @@ impl AdminAgent {
         let admin_id = peer_.id.clone();
         let admin_emitter = peer_.emitter();
 
-        let mut is_request_to_shutdown = false;
-
-        let task_admin = self.runtime.spawn(async move {
-            peer_.run(None).await;
+        let cancel_token_clone = cancel_token.clone();
+        let task_admin = handle.spawn(async move {
+            peer_.run(None, cancel_token_clone).await;
         });
 
 
@@ -129,6 +147,8 @@ impl AdminAgent {
 
         let _inputs = inputs.clone();
         let admin_id_ = admin_id.clone();
+
+        let cancel_token_clone = cancel_token.clone();
         for agent in agents {
             let _inputs_ = _inputs.clone();
             let agent_ = agent.clone();
@@ -136,7 +156,7 @@ impl AdminAgent {
             let mut config = agent_.config.clone();
             config.admin_peer = _admin_id_.clone();
             let tasks = agent_
-                .run_with_config(_inputs_.clone(), config, self.runtime.handle())
+                .run_with_config(_inputs_.clone(), config, handle.clone(), cancel_token_clone.clone())
                 .await;
             let agent_detail = agent_.details();
 
@@ -154,16 +174,20 @@ impl AdminAgent {
 
         let worker_tasks = join_all(worker_tasks);
 
-
         let name = self.config.name.clone();
         let on_message = self._on_message.clone();
         let on_event = self._on_event.clone();
-        let task_admin_listener = self.runtime.spawn(async move {
+
+
+        let cancel_token_clone = cancel_token.clone();
+
+        let task_admin_listener = handle.spawn(async move {
             loop {
-                if is_request_to_shutdown {
-                    break;
-                }
-                select! {
+                select! {                    
+                    _ = cancel_token_clone.cancelled() => {
+                        break;
+                    }                   
+                    
                    event = peer_listener_.recv() => {
                         if let Some(event) = event {
                             match event {
@@ -212,30 +236,44 @@ impl AdminAgent {
 
         let processor = self._processor.clone();
         let processor_input_clone = inputs.clone();
-        let run_process = self.runtime.spawn(async move {
+        let cancel_token_clone = cancel_token.clone();
+        let run_process = handle.spawn(async move {
             processor.lock().await.run(processor_input_clone).await;
             loop {
-                if is_request_to_shutdown {
+                if cancel_token_clone.is_cancelled() {
                     break;
                 }
             }
         });
 
         let broadcast_receiver = self.broadcast_receiver.clone();
-        let run_broadcast = self.runtime.spawn(async move {
+        let cancel_token_clone = cancel_token.clone();
+        let run_broadcast = handle.spawn(async move {
             loop {
-                if is_request_to_shutdown {
-                    break;
-                }
                 if let Some(raw_data) = broadcast_receiver.lock().await.recv().await {
                     // info!("Agent broadcast {:?}", raw_data);
                     admin_emitter.send(raw_data).await.unwrap();
                 }
+
+                if cancel_token_clone.is_cancelled() {
+                    break;
+                }
             }
         });
-
-
-        self.runtime
+        let shutdown_recv = self.shutdown_recv.clone();
+        let cancel_token_clone = cancel_token.clone();
+        let shutdown_task = handle.spawn(async move {
+            loop {
+                if let Some(raw_data) = shutdown_recv.lock().await.recv().await {
+                    if raw_data == admin_id {
+                        info!("Received shutdown signal, shutting down ...");
+                        cancel_token.cancel();
+                        break;
+                    }
+                }
+            }
+        });
+        handle
             .spawn(async move {
                 select! {
                    _ = worker_tasks => {
@@ -253,20 +291,17 @@ impl AdminAgent {
                     _ = run_broadcast => {
                         info!("Agent {} run_broadcast done", name);
                     }
+                    _ = shutdown_task => {
+                        info!("Agent {} run_broadcast done", name);
+                    }
                     _ = signal::ctrl_c() => {
                         println!("Agent {:?} received exit signal", name);
                         // Perform any necessary cleanup here
-                        is_request_to_shutdown = true;
                     }
                 }
             })
             .await
             .unwrap();
-
-        loop {
-            if is_request_to_shutdown {
-                break;
-            }
-        }
+        
     }
 }
