@@ -1,134 +1,80 @@
-import asyncio
-import pickle
-
-from pydantic.dataclasses import dataclass
-
-from ceylon.ceylon import WorkerAgent, MessageHandler, Processor, WorkerAgentConfig, enable_log
-from ceylon.workspace.admin import Admin
-from ceylon.workspace.runner import RunnerInput
+import random
 
 
-class BoardAdmin(Admin):
-    def __init__(self, name="admin", port=8888):
-        super().__init__(name=name, port=port)
-
-    async def on_message(self, agent_id: "str", data: "bytes", time: "int"):
-        print(f"BoardAdmin on_message  {self.details().name}", agent_id, data, time)
-
-    async def run(self, inputs: "bytes"):
-        print(f"BoardAdmin run  {self.details().name}", inputs)
+# Define the roles and their abilities
+class Role:
+    def __init__(self, name, ability):
+        self.name = name
+        self.ability = ability
 
 
-@dataclass
-class GameBoard:
-    grid: list
+class Player:
+    def __init__(self, name, role):
+        self.name = name
+        self.role = role
+        self.clues = []
+        self.position = 'Foyer'
 
-    def __str__(self):
-        return str(self.grid)
+    def move(self, new_position):
+        self.position = new_position
+        print(f"{self.name} moves to the {new_position}")
 
+    def find_clue(self, clue):
 
-def find_position(grid, item):
-    for row_idx, row in enumerate(grid):
-        for col_idx, cell in enumerate(row):
-            if cell == item:
-                return row_idx, col_idx
-    return None
-
-
-class SimpleAgent(WorkerAgent, MessageHandler, Processor):
-    def __init__(self, name="admin", workspace_id="admin", admin_peer=None, admin_port=8888):
-        super().__init__(config=WorkerAgentConfig(name=name,
-                                                  admin_peer=admin_peer,
-                                                  admin_port=admin_port,
-                                                  work_space_id=workspace_id), processor=self, on_message=self)
-        self.goal = None
-        self.agent_position = None
-
-    async def run(self, inputs: "bytes"):
-        agent_def = self.details()
-        input_request: RunnerInput = pickle.loads(inputs)
-        game_board: GameBoard = input_request.request
-
-        if not self.goal or not self.agent_position:
-            self.goal = find_position(game_board.grid, 'G')
-            self.agent_position = find_position(game_board.grid, 'A')
-
-        await self.move(game_board)
-        print(agent_def.name, game_board)
-
-        await self.broadcast(pickle.dumps(game_board))
-
-    async def on_message(self, agent_id: "str", data: "bytes", time: "int"):
-        game_board: GameBoard = pickle.loads(data)
-        print("Game board", game_board)
-
-        await self.move(game_board)
-        await self.broadcast(pickle.dumps(game_board))
-
-    async def move(self, game_board):
-        row, col = self.agent_position
-        goal_row, goal_col = self.goal
-
-        # Determine the direction to move
-        if row < goal_row and game_board.grid[row + 1][col] != 1:
-            new_position = (row + 1, col)
-        elif row > goal_row and game_board.grid[row - 1][col] != 1:
-            new_position = (row - 1, col)
-        elif col < goal_col and game_board.grid[row][col + 1] != 1:
-            new_position = (row, col + 1)
-        elif col > goal_col and game_board.grid[row][col - 1] != 1:
-            new_position = (row, col - 1)
-        else:
-            new_position = self.agent_position  # No move possible
-
-        # Update the agent's position
-        await self.update_position(game_board, new_position)
-
-    async def update_position(self, game_board, new_position):
-        old_row, old_col = self.agent_position
-        new_row, new_col = new_position
-
-        game_board.grid[old_row][old_col] = 0
-        game_board.grid[new_row][new_col] = 'A'
-        self.agent_position = new_position
-
-        print(f"Agent {(self.details()).name} moved from ({old_row}, {old_col}) to ({new_row}, {new_col})")
+        self.clues.append(clue)
+        print(f"{self.name} found a clue: {clue}")
 
 
-async def run():
-    admin = BoardAdmin(
-        name="admin",
-        port=8000
-    )
-    worker1 = SimpleAgent(
-        name="worker1",
-        admin_port=8000,
-        admin_peer="admin",
-        workspace_id="admin"
-    )
-    worker2 = SimpleAgent(
-        name="worker2",
-        admin_port=8000,
-        admin_peer="admin",
-        workspace_id="admin"
-    )
+# Define the mansion layout and clues
+rooms = ['Library', 'Lab', 'Attic', 'Kitchen', 'Garden']
+clues = {
+    'Library': 'Ancient Book',
+    'Lab': 'Strange Chemical',
+    'Attic': 'Old Journal',
+    'Kitchen': 'Hidden Key',
+    'Garden': 'Mysterious Map'
+}
 
-    game_board = GameBoard(
-        grid=[
-            [0, 0, 0, 0, 0],
-            [0, 1, 1, 1, 0],
-            [0, 0, 0, 1, 0],
-            [0, 1, 0, 0, 0],
-            ['A', 0, 0, 1, 'G']
-        ]
-    )
+# Define the players
+roles = [
+    Role('Detective', 'Can ask detailed questions about clues'),
+    Role('Scientist', 'Can analyze clues for additional insights'),
+    Role('Historian', 'Knows the mansion\'s background'),
+    Role('Locksmith', 'Can open hidden rooms and safes'),
+    Role('Psychic', 'Can sense hidden items and passages'),
+    Role('Thief', 'Can retrieve items from locked areas')
+]
 
-    await admin.run_admin(game_board, [
-        worker1,
-        worker2
-    ])
+players = [
+    Player('Alice', roles[0]),
+    Player('Bob', roles[1]),
+    Player('Charlie', roles[2]),
+    Player('Diana', roles[3]),
+    Player('Eve', roles[4]),
+    Player('Frank', roles[5])
+]
 
 
-if __name__ == '__main__':
-    enable_log("INFO")
-    asyncio.run(run())
+# Simulate a few turns
+def simulate_game_turns(turns):
+    for turn in range(turns):
+        print(f"\nTurn {turn + 1}")
+        for player in players:
+            # Randomly move the player to a new room
+            new_room = random.choice(rooms)
+            player.move(new_room)
+
+            # Check if there's a clue in the room
+            if new_room in clues:
+                player.find_clue(clues[new_room])
+                # Remove the clue from the room (assuming it's found only once)
+                del clues[new_room]
+
+
+# Run the simulation for 5 turns
+simulate_game_turns(5)
+
+# Print the final state
+print("\nFinal State:")
+for player in players:
+    print(f"{player.name} ({player.role.name}) has clues: {player.clues}")
