@@ -261,11 +261,12 @@ impl AdminAgent {
             }
         });
         let shutdown_recv = self.shutdown_recv.clone();
+        let admin_id_clone = admin_id.clone();
         let cancel_token_clone = cancel_token.clone();
         let shutdown_task = handle.spawn(async move {
             loop {
                 if let Some(raw_data) = shutdown_recv.lock().await.recv().await {
-                    if raw_data == admin_id {
+                    if raw_data == admin_id_clone {
                         info!("Received shutdown signal, shutting down ...");
                         cancel_token.cancel();
                         break;
@@ -273,6 +274,10 @@ impl AdminAgent {
                 }
             }
         });
+        
+        let shutdown_tx = Arc::new(self.shutdown_send.clone());
+        let shutdown_tx= shutdown_tx.clone();
+        let admin_id_clone = admin_id.clone();
         handle
             .spawn(async move {
                 select! {
@@ -296,6 +301,7 @@ impl AdminAgent {
                     }
                     _ = signal::ctrl_c() => {
                         println!("Agent {:?} received exit signal", name);
+                        shutdown_tx.send(admin_id_clone).unwrap();
                         // Perform any necessary cleanup here
                     }
                 }
