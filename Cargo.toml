@@ -1,5 +1,5 @@
 [workspace]
 members = [
     "libs/sangedama",
-    "libs/utils/utils-random-names",
-    "bindings/ceylon", "libs/sangathika", "libs/together", ]
+    "bindings/ceylon"
+]
