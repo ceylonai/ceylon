@@ -228,7 +228,7 @@ impl AdminAgent {
                     break;
                 }
                 if let Some(raw_data) = broadcast_receiver.lock().await.recv().await {
-                    info!("Agent broadcast {:?}", raw_data);
+                    // info!("Agent broadcast {:?}", raw_data);
                     admin_emitter.send(raw_data).await.unwrap();
                 }
             }
