@@ -151,16 +151,20 @@ class ChiefAgent(Admin):
             await self.stop()
 
     def execute(self, job: Job):
-        worker_summary = [worker.definition.intro for worker in self.workers]
-        prompt_txt = job_planing_prompt({
-            "job": job.input,
-            "workers": worker_summary
-        })
+        if job.build_workflow:
+            worker_summary = [worker.definition.intro for worker in self.workers]
+            prompt_txt = job_planing_prompt({
+                "job": job.input,
+                "workers": worker_summary
+            })
 
-        class JobSteps(BaseModel):
-            '''the steps of the job'''
-            steps: List[Step]
+            class JobSteps(BaseModel):
+                '''the steps of the job'''
+                steps: List[Step]
 
-        res = execute_llm_with_json_out(self.llm, prompt_txt, JobSteps)
-        job.work_order = res.steps
+            res = execute_llm_with_json_out(self.llm, prompt_txt, JobSteps)
+            if res is not None:
+                job.work_order = res.steps
+            else:
+                raise Exception("Failed to build workflow")
         return self.run_admin(pickle.dumps(job), self.workers)
