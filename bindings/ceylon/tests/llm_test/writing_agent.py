@@ -1,13 +1,13 @@
 import pickle
 
 from langchain_community.chat_models import ChatOllama
+from langchain_experimental.llms.ollama_functions import OllamaFunctions
 
 from ceylon.llm.types import Job, Step, AgentDefinition
 from ceylon.llm.unit import LLMAgent, ChiefAgent
 from ceylon.tools.search_tool import SearchTool
 
 llm_lib = ChatOllama(model="llama3:instruct")
-chief = ChiefAgent()
 writer = LLMAgent(
     AgentDefinition(
         name="writer",
@@ -126,11 +126,13 @@ job = Job(
         "title": "How to use AI for Machine Learning",
         "tone": "informal",
         "style": "creative"
-    }
+    },
+    build_workflow=True
 )
-res = chief.run_admin(pickle.dumps(job), [
-    writer,
-    researcher,
-    proof_writer
-])
+
+# llm_lib = ChatOllama(model="phi3:latest")
+llm_lib = OllamaFunctions(model="phi3:14b", output_format="json")
+chief = ChiefAgent(workers=[writer, researcher, proof_writer], llm=llm_lib)
+
+res = chief.execute(job)
 print("Response:", res)

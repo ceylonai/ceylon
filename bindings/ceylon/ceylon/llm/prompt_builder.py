@@ -92,6 +92,28 @@ def get_prompt(agent_config: dict):
     return cleaned_string
 
 
+def job_planing_prompt(job_config: dict):
+    template = Template("""                
+                You are an AI system coordinating a team of specialized agents:
+                #for $worker in $workers
+                    .....
+                    #for $key, $value in $worker.items()
+                                $key: $value
+                    #end for
+                    .....
+                #end for
+                User request
+                #for $key, $value in $job.items()
+                            $key: $value
+                #end for
+                Your goal is to determine the optimal workflow for execute this user request. dependencies and owner must be agents names.   
+            """, job_config)
+
+    cleaned_string = re.sub(r'\s+', ' ', f"{template}")
+    cleaned_string = cleaned_string.strip()
+    return cleaned_string
+
+
 if __name__ == '__main__':
     from ceylon.llm.types import AgentDefinition
 

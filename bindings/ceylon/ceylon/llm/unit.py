@@ -9,10 +9,13 @@ from langchain.agents.output_parsers import OpenAIFunctionsAgentOutputParser
 from langchain.prompts import Prompt
 from langchain_core.tools import BaseTool
 from langchain_core.utils.function_calling import format_tool_to_openai_function
+from langchain_experimental.llms.ollama_functions import convert_to_ollama_tool
+from pydantic.v1 import BaseModel
 
 from ceylon.ceylon import AgentDetail
-from ceylon.llm.prompt_builder import get_agent_definition, get_prompt
-from ceylon.llm.types import LLMAgentRequest, Job, LLMAgentResponse, AgentDefinition
+from ceylon.llm.llm_task_executor import execute_llm_with_function_calling, execute_llm, execute_llm_with_json_out
+from ceylon.llm.prompt_builder import get_agent_definition, get_prompt, job_planing_prompt
+from ceylon.llm.types import LLMAgentRequest, Job, LLMAgentResponse, AgentDefinition, Step
 from ceylon.workspace.admin import Admin
 from ceylon.workspace.worker import Worker
 
@@ -49,17 +52,10 @@ class LLMAgent(Worker):
                     "history": request.history
                 })
                 prompt = Prompt(template=prompt_value)
-                response_text = ""
                 if self.tools and len(self.tools) > 0:
-                    llm = self.llm.bind(functions=[format_tool_to_openai_function(t) for t in self.tools])
-                    agent = prompt | llm | OpenAIFunctionsAgentOutputParser()
-                    executor = AgentExecutor(agent=agent, tools=self.tools, verbose=False)
-                    llm_response = executor.invoke({})
-                    response_text = llm_response["output"]
+                    response_text = execute_llm_with_function_calling(self.llm, prompt, self.tools)
                 else:
-                    agent = prompt | self.llm
-                    response = agent.invoke({})
-                    response_text = response.content
+                    response_text = execute_llm(self.llm, prompt)
 
                 response = LLMAgentResponse(
                     time=datetime.datetime.now().timestamp(),
@@ -78,11 +74,13 @@ class ChiefAgent(Admin):
 
     agent_responses: List[LLMAgentResponse] = []
 
-    def __init__(self, name=workspace_id, port=admin_port):
+    def __init__(self, name=workspace_id, port=admin_port, workers=[], llm=None):
         self.queue = deque()
+        self.llm = llm
         # Create a directed graph to represent the workflow
         self.network_graph = nx.DiGraph()
         self.agent_responses = []
+        self.workers = workers
         super().__init__(name, port)
 
     async def run(self, inputs: "bytes"):
@@ -121,7 +119,7 @@ class ChiefAgent(Admin):
     async def on_agent_connected(self, topic: "str", agent: AgentDetail):
         next_agent = self.get_next_agent()
         if next_agent == agent.name:
-            await self.execute()
+            await self.execute_request()
 
     async def on_message(self, agent_id: "str", data: "bytes", time: "int"):
         data = pickle.loads(data)
@@ -131,9 +129,9 @@ class ChiefAgent(Admin):
             if next_agent == data.agent_name:
                 self.queue.popleft()
 
-            await self.execute()
+            await self.execute_request()
 
-    async def execute(self):
+    async def execute_request(self):
         next_agent = self.get_next_agent()
         print("Executing", next_agent)
         if next_agent:
@@ -151,3 +149,18 @@ class ChiefAgent(Admin):
             last_response = self.agent_responses[-1]
             self.return_response = last_response.response
             await self.stop()
+
+    def execute(self, job: Job):
+        worker_summary = [worker.definition.intro for worker in self.workers]
+        prompt_txt = job_planing_prompt({
+            "job": job.input,
+            "workers": worker_summary
+        })
+
+        class JobSteps(BaseModel):
+            '''the steps of the job'''
+            steps: List[Step]
+
+        res = execute_llm_with_json_out(self.llm, prompt_txt, JobSteps)
+        job.work_order = res.steps
+        return self.run_admin(pickle.dumps(job), self.workers)

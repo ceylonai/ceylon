@@ -34,7 +34,8 @@ dependencies = [
     "langchain==0.2.6",
     "ollama==0.2.1",
     "openai==1.35.7",
-    "ct3==3.3.3"
+    "ct3==3.3.3",
+    "langchain-experimental==0.0.62",
 ]
 
 [project.urls]
