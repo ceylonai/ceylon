@@ -181,7 +181,12 @@ impl AdminPeer {
                     }
                     gossipsub::Event::Message { message, .. } => {
                         let msg = NodeMessage::from_bytes(message.data);
-                        self.outside_tx.send(msg).await.unwrap();
+                        match self.outside_tx.send(msg).await {
+                            Ok(_) => {}
+                            Err(e) => {
+                                error!("Failed to send message to outside: {:?}", e);
+                            }
+                        };
                     }
                     _ => {
                         info!( "GossipSub: {:?}", event);
