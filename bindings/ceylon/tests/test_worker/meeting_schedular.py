@@ -98,8 +98,7 @@ class Coordinator(Admin):
         return earliest_end - latest_start >= duration
 
     async def run(self, inputs: "bytes"):
-        input: RunnerInput = pickle.loads(inputs)
-        self.meeting = input.request
+        self.meeting = pickle.loads(inputs)
         print("Meeting Schedule request: ", self.meeting)
 
     async def on_agent_connected(self, topic: "str", agent_id: "str"):
@@ -144,7 +143,7 @@ async def main():
 
     coordinator = Coordinator()
     await coordinator.run_admin(
-        inputs=Meeting(name="Meeting 1", duration=2, date="2024-07-21", minimum_participants=3),
+        inputs=pickle.dumps(Meeting(name="Meeting 1", duration=2, date="2024-07-21", minimum_participants=3)),
         workers=[agent1, agent2, agent3, agent4, agent5]
     )
 
