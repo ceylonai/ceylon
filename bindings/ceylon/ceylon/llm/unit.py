@@ -26,10 +26,10 @@ admin_peer = "admin"
 
 class LLMAgent(Worker):
 
-    def __init__(self, definition: AgentDefinition, tools: [BaseTool] = [], llm=None):
+    def __init__(self, definition: AgentDefinition, tools: [BaseTool] = [], tool_llm=None):
         self.definition = definition
         self.tools = tools
-        self.llm = llm
+        self.llm = tool_llm
         super().__init__(
             name=definition.name,
             workspace_id=workspace_id,
@@ -74,9 +74,9 @@ class ChiefAgent(Admin):
 
     agent_responses: List[LLMAgentResponse] = []
 
-    def __init__(self, name=workspace_id, port=admin_port, workers=[], llm=None):
+    def __init__(self, name=workspace_id, port=admin_port, workers=[], tool_llm=None):
         self.queue = deque()
-        self.llm = llm
+        self.llm = tool_llm
         # Create a directed graph to represent the workflow
         self.network_graph = nx.DiGraph()
         self.agent_responses = []

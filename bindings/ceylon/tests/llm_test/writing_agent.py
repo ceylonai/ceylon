@@ -1,5 +1,3 @@
-import pickle
-
 from langchain_community.chat_models import ChatOllama
 from langchain_experimental.llms.ollama_functions import OllamaFunctions
 
@@ -39,7 +37,7 @@ writer = LLMAgent(
         ],
         version="3.1.0"
     ),
-    llm=llm_lib
+    tool_llm=llm_lib
 )
 researcher = LLMAgent(
     AgentDefinition(
@@ -71,7 +69,7 @@ researcher = LLMAgent(
         version="2.0.0"
     ),
     tools=[SearchTool()],
-    llm=llm_lib
+    tool_llm=llm_lib
 )
 
 proof_writer = LLMAgent(
@@ -113,7 +111,7 @@ proof_writer = LLMAgent(
             "Maintain the engaging and accessible style of the original content",
         ],
         version="1.0.0"
-    ), llm=llm_lib)
+    ), tool_llm=llm_lib)
 
 job = Job(
     title="write_article",
@@ -132,7 +130,7 @@ job = Job(
 
 # llm_lib = ChatOllama(model="phi3:latest")
 llm_lib = OllamaFunctions(model="phi3:14b", output_format="json")
-chief = ChiefAgent(workers=[writer, researcher, proof_writer], llm=llm_lib)
+chief = ChiefAgent(workers=[writer, researcher, proof_writer], tool_llm=llm_lib)
 
 res = chief.execute(job)
 print("Response:", res)
