@@ -142,10 +142,10 @@ impl AdminPeer {
                     }
                 }
             }
-            PeerAdminEvent::Ping(event) => {
+            PeerAdminEvent::Ping(_) => {
                 // info!( "Ping: {:?}", event);
             }
-            PeerAdminEvent::Identify(event) => {
+            PeerAdminEvent::Identify(_) => {
                 // info!( "Identify: {:?}", event);
             }
 

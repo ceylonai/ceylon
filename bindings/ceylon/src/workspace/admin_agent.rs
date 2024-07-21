@@ -1,9 +1,7 @@
-use std::alloc::System;
 use futures::future::join_all;
 use std::collections::HashMap;
 use std::sync::{Arc};
 use std::time::SystemTime;
-use tokio::runtime::Runtime;
 use tokio::sync::{Mutex, RwLock};
 use tokio::{select, signal};
 use tracing::{error, info};
@@ -56,7 +54,7 @@ impl AdminAgent {
         let admin_peer_key = create_key();
         let id = get_peer_id(&admin_peer_key).to_string();
 
-        let (shutdown_send, mut shutdown_recv) = mpsc::unbounded_channel::<String>();
+        let (shutdown_send, shutdown_recv) = mpsc::unbounded_channel::<String>();
 
         Self {
             config,
@@ -262,7 +260,6 @@ impl AdminAgent {
         });
         let shutdown_recv = self.shutdown_recv.clone();
         let admin_id_clone = admin_id.clone();
-        let cancel_token_clone = cancel_token.clone();
         let shutdown_task = handle.spawn(async move {
             loop {
                 if let Some(raw_data) = shutdown_recv.lock().await.recv().await {
@@ -274,7 +271,7 @@ impl AdminAgent {
                 }
             }
         });
-        
+
         let shutdown_tx = Arc::new(self.shutdown_send.clone());
         let shutdown_tx= shutdown_tx.clone();
         let admin_id_clone = admin_id.clone();

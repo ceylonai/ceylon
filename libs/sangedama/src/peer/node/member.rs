@@ -213,7 +213,7 @@ impl MemberPeer {
                 }
             },
 
-            other => {
+            _ => {
                 // tracing::info!("Unhandled {:?}", other);
             }
         }

@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use libp2p::{gossipsub, identify, ping, rendezvous};
 use libp2p::swarm::NetworkBehaviour;
-use tracing::info;
+
 use crate::peer::behaviour::base::create_gossip_sub_config;
 use crate::peer::behaviour::PeerBehaviour;
 
