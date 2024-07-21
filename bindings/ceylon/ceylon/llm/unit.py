@@ -53,7 +53,7 @@ class LLMAgent(Worker):
                 if self.tools and len(self.tools) > 0:
                     llm = self.llm.bind(functions=[format_tool_to_openai_function(t) for t in self.tools])
                     agent = prompt | llm | OpenAIFunctionsAgentOutputParser()
-                    executor = AgentExecutor(agent=agent, tools=self.tools, verbose=True)
+                    executor = AgentExecutor(agent=agent, tools=self.tools, verbose=False)
                     llm_response = executor.invoke({})
                     response_text = llm_response["output"]
                 else:
@@ -97,26 +97,33 @@ class ChiefAgent(Admin):
                 self.network_graph.add_edge(dependency, step.owner)
 
         self.network_graph_original = self.network_graph.copy()
-        # Initialize the queue with nodes that have no dependencies (indegree 0)
-        self.queue.extend([node for node in self.network_graph if self.network_graph.in_degree(node) == 0])
+        topological_order = list(nx.topological_sort(self.network_graph))
+
+        # Convert the sorted list into a queue
+        self.queue = deque(topological_order)
+
+        # Print the queue
+        print("Order of tasks considering dependencies:")
+        print(self.queue)
+
+        # # Example usage of the queue
+        # while self.queue:
+        #     task = dependency_queue.popleft()
+        #     print(f"Processing task {task}")
 
     def get_next_agent(self):
         if not self.queue:
             return None
-        return self.queue[0]
+        next_agent = self.queue[0]
+        print("Next agent is", next_agent)
+        return next_agent
 
     async def on_agent_connected(self, topic: "str", agent: AgentDetail):
         next_agent = self.get_next_agent()
         if next_agent == agent.name:
-            await self.broadcast(pickle.dumps(
-                LLMAgentRequest(name=agent.name,
-                                user_inputs=self.job.input,
-                                history=self.agent_responses),
-            ))
-            # self.queue.popleft()
+            await self.execute()
 
     async def on_message(self, agent_id: "str", data: "bytes", time: "int"):
-        print("Admin on_message", agent_id)
         data = pickle.loads(data)
         if type(data) == LLMAgentResponse:
             self.agent_responses.append(data)
@@ -124,14 +131,23 @@ class ChiefAgent(Admin):
             if next_agent == data.agent_name:
                 self.queue.popleft()
 
-            next_agent = self.get_next_agent()
-            if next_agent:
+            await self.execute()
+
+    async def execute(self):
+        next_agent = self.get_next_agent()
+        print("Executing", next_agent)
+        if next_agent:
+            dependencies = list(self.network_graph_original.predecessors(next_agent))
+            only_dependencies = {dt.agent_name: dt.response for dt in self.agent_responses if
+                                 dt.agent_name in dependencies}
+
+            if len(only_dependencies) == len(dependencies):
                 await self.broadcast(pickle.dumps(
                     LLMAgentRequest(name=next_agent,
                                     user_inputs=self.job.input,
-                                    history=self.agent_responses),
+                                    history=only_dependencies),
                 ))
-            else:
-                last_response = self.agent_responses[-1]
-                self.return_response = last_response.response
-                await self.stop()
+        else:
+            last_response = self.agent_responses[-1]
+            self.return_response = last_response.response
+            await self.stop()

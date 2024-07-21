@@ -40,4 +40,4 @@ class LLMAgentResponse(BaseModel):
 class LLMAgentRequest(BaseModel):
     name: str
     user_inputs: dict
-    history: List[LLMAgentResponse]
+    history: dict

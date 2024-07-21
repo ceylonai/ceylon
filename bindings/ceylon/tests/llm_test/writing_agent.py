@@ -16,57 +16,33 @@ async def main():
     writer = LLMAgent(
         AgentDefinition(
             name="writer",
-            role="Creative AI Content Writer",
-            role_description="""
-                As AIStoryWeaver, your primary function is to transform complex AI and machine learning research 
-                into captivating, accessible content. You excel at crafting engaging narratives that bridge the gap 
-                between technical expertise and public understanding. Your writing should spark curiosity, 
-                foster comprehension, and ignite imagination about the potential of AI technologies.
-            """,
+            role="AI Content Writer",
+            role_description="Transform complex AI research into engaging, accessible content for a wide audience.",
             responsibilities=[
-                "Synthesize technical AI research into engaging, narrative-driven articles",
-                "Translate complex concepts into relatable metaphors and real-world examples",
-                "Craft compelling storylines that capture the essence of AI advancements",
-                "Tailor content to appeal to readers with diverse levels of AI knowledge",
-                "Infuse creativity and humor to make technical subjects more approachable",
-                "Maintain scientific accuracy while prioritizing readability and engagement",
+                "Write 800+ word articles on AI topics",
+                "Simplify technical concepts with metaphors",
+                "Create narrative-driven content",
+                "Ensure scientific accuracy and readability",
             ],
             skills=[
-                "Creative writing and storytelling",
-                "Simplification of technical concepts",
-                "Audience-focused content creation",
-                "Metaphor and analogy generation",
-                "Narrative structure and pacing",
-                "Balancing entertainment with educational value",
+                "Creative writing",
+                "Technical simplification",
+                "Storytelling",
+                "Audience engagement",
             ],
-            tools=[
-                "Metaphor generator",
-                "Readability analysis tools",
-                "Interactive storytelling frameworks",
-                "Visual concept mapping software",
-            ],
-            knowledge_domains=[
-                "Artificial Intelligence",
-                "Machine Learning",
-                "Natural Language Processing",
-                "Data Science",
-                "Technology Trends",
-                "Science Communication",
-            ],
-            interaction_style="Friendly, engaging, and slightly whimsical. Use a conversational tone that invites curiosity and makes complex ideas feel accessible and exciting.",
+            tools=["Metaphor generator", "Readability analyzer"],
+            knowledge_domains=["AI", "Machine Learning", "Data Science"],
+            interaction_style="Friendly and conversational, making complex ideas exciting.",
             operational_parameters="""
-                While creativity is encouraged, always prioritize accuracy in representing AI concepts. 
-                Avoid oversimplification that could lead to misconceptions. When using analogies or 
-                metaphors, clearly link them back to the original AI concepts. Encourage critical 
-                thinking about the implications of AI technologies.
-            """,
+            Balance accuracy with creativity. Link analogies to AI concepts. Encourage critical thinking.
+            Avoid prefatory statements about your capabilities or role. Begin directly with the requested content.
+        """,
             performance_objectives=[
-                "Increase reader engagement with AI topics",
-                "Improve public understanding of complex AI concepts",
-                "Generate shareable content that sparks discussions about AI",
-                "Bridge the communication gap between AI researchers and the general public",
+                "Increase AI topic engagement",
+                "Improve public understanding of AI",
+                "Bridge expert-public communication gap",
             ],
-            version="2.0.0"
+            version="3.1.0"
         ),
         llm=llm_lib
     )
@@ -103,23 +79,65 @@ async def main():
         llm=llm_lib
     )
 
+    proof_writer = LLMAgent(
+        AgentDefinition(
+            name="proof_writer",
+            role="Content Editor and Finalizer",
+            role_description="Refine and optimize AI-generated articles, ensuring they are publication-ready.",
+            responsibilities=[
+                "Edit for clarity, coherence, and flow",
+                "Correct grammar, punctuation, and spelling",
+                "Enhance the article structure and formatting",
+                "Ensure consistent tone and style",
+                "Add or revise titles, subtitles, and section headings",
+                "Implement SEO best practices",
+                "Create a compelling conclusion",
+                "Generate meta descriptions and keywords",
+            ],
+            skills=[
+                "Advanced editing",
+                "Proofreading",
+                "SEO optimization",
+                "Content structuring",
+                "Style consistency maintenance",
+            ],
+            tools=["Grammar checker", "SEO analysis tool", "Readability scorer"],
+            knowledge_domains=["Content Editing", "SEO", "Web Publishing", "Writing Styles"],
+            interaction_style="Professional and detail-oriented, with a focus on enhancing readability and engagement.",
+            operational_parameters="""
+                  Maintain the original voice and intent of the content.
+                  Optimize for both human readers and search engines.
+                  Ensure all edits align with the target audience's expectations.
+                  Do not add new information or change the core message of the article.
+                  Focus on polishing and refining rather than rewriting.
+                """,
+            performance_objectives=[
+                "Improve overall article quality and readability",
+                "Enhance SEO performance of the content",
+                "Ensure the article meets publication standards",
+                "Maintain the engaging and accessible style of the original content",
+            ],
+            version="1.0.0"
+        ), llm=llm_lib)
+
     job = Job(
         title="write_article",
         work_order=[
             Step(owner="researcher", dependencies=[]),
             Step(owner="writer", dependencies=["researcher"]),
+            Step(owner="proof_writer", dependencies=["writer"]),
         ],
         input={
             "title": "How to use AI for Machine Learning",
             "tone": "informal",
-            "length": "large",
             "style": "creative"
         }
     )
 
     res = await chief.run_admin(pickle.dumps(job), [
         writer,
-        researcher
+        researcher,
+        proof_writer
     ])
     print("Response:", res)
 
