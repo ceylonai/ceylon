@@ -18,10 +18,9 @@ class Admin(AdminAgent, Processor, MessageHandler, EventHandler):
     async def on_message(self, agent_id: "str", data: "bytes", time: "int"):
         pass
 
-    async def run_admin(self, inputs, workers):
+    async def run_admin(self, inputs: "bytes", workers):
         uniffi_set_event_loop(asyncio.get_event_loop())
-        runner_input = RunnerInput(request=inputs, agents=[], network={})
-        await self.start(pickle.dumps(runner_input), workers)
+        await self.start(inputs, workers)
 
     #
     async def execute_task(self, input):
