@@ -19,7 +19,11 @@ class Admin(AdminAgent, Processor, MessageHandler, EventHandler):
     async def on_message(self, agent_id: "str", data: "bytes", time: "int"):
         pass
 
-    async def run_admin(self, inputs: "bytes", workers):
+    def run_admin(self, inputs: "bytes", workers):
+        import asyncio
+        return asyncio.run(self.arun_admin(inputs, workers))
+
+    async def arun_admin(self, inputs: "bytes", workers):
         uniffi_set_event_loop(asyncio.get_event_loop())
         await self.start(inputs, workers)
         return self.return_response
