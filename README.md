@@ -8,6 +8,8 @@
 Welcome to the Ceylon: Multi-Agent System (MAS) project! This system is designed to manage and automate task flows among
 multiple agents, each with specific roles and responsibilities.
 
+![img.png](docs/images/img.png)
+
 ## Features
 
 - **Agent Management**: Easily define and manage agents with specific roles.
