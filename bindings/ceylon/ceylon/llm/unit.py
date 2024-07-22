@@ -4,18 +4,15 @@ from collections import deque
 from typing import List
 
 import networkx as nx
-from langchain.agents import AgentExecutor
-from langchain.agents.output_parsers import OpenAIFunctionsAgentOutputParser
 from langchain.prompts import Prompt
 from langchain_core.tools import BaseTool
-from langchain_core.utils.function_calling import format_tool_to_openai_function
-from langchain_experimental.llms.ollama_functions import convert_to_ollama_tool
 from pydantic.v1 import BaseModel
 
 from ceylon.ceylon import AgentDetail
 from ceylon.llm.llm_task_executor import execute_llm_with_function_calling, execute_llm, execute_llm_with_json_out
-from ceylon.llm.prompt_builder import get_agent_definition, get_prompt, job_planing_prompt
-from ceylon.llm.types import LLMAgentRequest, Job, LLMAgentResponse, AgentDefinition, Step
+from ceylon.llm.prompt_builder import get_prompt, job_planing_prompt
+from ceylon.llm.types import LLMAgentRequest, Job, LLMAgentResponse, Step
+from ceylon.llm.types.agent import AgentDefinition
 from ceylon.workspace.admin import Admin
 from ceylon.workspace.worker import Worker
 
@@ -45,7 +42,7 @@ class LLMAgent(Worker):
             if request.name == self.definition.name:
                 definition = self.definition
                 definition.tools = [tool.name for tool in self.tools if isinstance(tool, BaseTool)]
-                agent_definition_prompt = get_agent_definition(self.definition)
+                agent_definition_prompt = self.definition.prompt
                 prompt_value = get_prompt({
                     "user_inputs": request.user_inputs,
                     "agent_definition": agent_definition_prompt,

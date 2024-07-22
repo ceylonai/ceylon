@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List
 
 from pydantic.v1 import BaseModel, Field
 
@@ -15,28 +15,6 @@ class Job(BaseModel):
     work_order: List[Step]
     visualize: bool = False
     build_workflow: bool = False
-
-
-class AgentDefinition(BaseModel):
-    name: str
-    role: str
-    role_description: str
-    responsibilities: List[str]
-    skills: List[str]
-    tools: List[str] = []
-    knowledge_domains: Optional[List[str]] = []
-    interaction_style: Optional[str] = None
-    operational_parameters: Optional[str] = None
-    performance_objectives: Optional[List[str]] = []
-    version: Optional[str] = None
-
-    @property
-    def intro(self):
-        return {
-            "name": self.name,
-            "role": self.role,
-            "role_description": self.role_description,
-        }
 
 
 class LLMAgentResponse(BaseModel):
