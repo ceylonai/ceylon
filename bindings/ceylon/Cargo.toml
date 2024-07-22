@@ -11,15 +11,13 @@ crate-type = ["cdylib"]
 [dependencies]
 uniffi = { version = "0.28.0", features = ["tokio", "bindgen", "default"] }
 thiserror = "1.0.61"
-uuid = { version = "1.8.0", features = ["v4"] }
-serde_json = "1.0.117"
+uuid = { version = "1.10.0", features = ["v4"] }
+serde_json = "1.0.120"
 sangedama = { path = "../../libs/sangedama" }
-tokio = { version = "1.38.0", features = ["full"] }
-tokio-util = { version = "0.7.7", features = ["rt"] }
-async-trait = "0.1.80"
-serde = { version = "1.0.203", features = ["derive"] }
-log = "0.4.21"
-env_logger = "0.11.3"
+tokio = { version = "1.38.1", features = ["full"] }
+tokio-util = { version = "0.7.11", features = ["rt"] }
+async-trait = "0.1.81"
+serde = { version = "1.0.204", features = ["derive"] }
 tracing-subscriber = "0.3.18"
 tracing = "0.1.40"
 futures = { version = "0.3.30", default-features = true, features = ["default"] }
