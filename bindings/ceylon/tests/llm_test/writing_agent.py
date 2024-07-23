@@ -1,7 +1,7 @@
 from langchain_community.chat_models import ChatOllama
 from langchain_experimental.llms.ollama_functions import OllamaFunctions
 
-from ceylon.llm.types import Job, Step
+from ceylon.llm.types.job import Job, Step
 from ceylon.llm.types.agent import AgentDefinition
 from ceylon.llm.unit import LLMAgent, ChiefAgent
 from ceylon.tools.search_tool import SearchTool
@@ -39,21 +39,21 @@ proof_writer = LLMAgent(
 
 job = Job(
     title="write_article",
+    explanation="Write an article about machine learning",
     work_order=[
-        Step(owner="researcher", dependencies=[]),
-        Step(owner="writer", dependencies=["researcher"]),
-        Step(owner="proof_writer", dependencies=["writer"]),
+        Step(worker="researcher", dependencies=[]),
+        Step(worker="writer", dependencies=["researcher"]),
+        Step(worker="proof_writer", dependencies=["writer"]),
     ],
     input={
         "title": "How to use AI for Machine Learning",
         "tone": "informal",
         "style": "creative"
-    },
-    build_workflow=True
+    }
 )
 
-# llm_lib = ChatOllama(model="phi3:latest")
-llm_lib = OllamaFunctions(model="phi3:14b", output_format="json")
+llm_lib = ChatOllama(model="phi3:latest")
+# llm_lib = OllamaFunctions(model="phi3:14b", output_format="json")
 chief = ChiefAgent(workers=[writer, researcher, proof_writer], tool_llm=llm_lib)
 
 res = chief.execute(job)

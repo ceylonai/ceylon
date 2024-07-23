@@ -6,13 +6,14 @@ from typing import List
 import networkx as nx
 from langchain.prompts import Prompt
 from langchain_core.tools import BaseTool
-from pydantic.v1 import BaseModel
 
 from ceylon.ceylon import AgentDetail
-from ceylon.llm.llm_task_executor import execute_llm_with_function_calling, execute_llm, execute_llm_with_json_out
-from ceylon.llm.prompt_builder import get_prompt, job_planing_prompt
-from ceylon.llm.types import LLMAgentRequest, Job, LLMAgentResponse, Step
+from ceylon.llm.llm.llm_executor import LLMExecutor
+from ceylon.llm.llm_task_executor import execute_llm_with_function_calling, execute_llm
+from ceylon.llm.prompt_builder import get_prompt
+from ceylon.llm.types import LLMAgentRequest, LLMAgentResponse
 from ceylon.llm.types.agent import AgentDefinition
+from ceylon.llm.types.job import Job, JobWorker, JobSteps, JobStepsV1, Step
 from ceylon.workspace.admin import Admin
 from ceylon.workspace.worker import Worker
 
@@ -86,10 +87,11 @@ class ChiefAgent(Admin):
         self._initialize_graph()
 
     def _initialize_graph(self):
-        for step in self.job.work_order:
-            self.network_graph.add_node(step.owner)
+        print("Initializing graph", self.job.steps.steps)
+        for step in self.job.steps.steps:
+            self.network_graph.add_node(step.worker)
             for dependency in step.dependencies:
-                self.network_graph.add_edge(dependency, step.owner)
+                self.network_graph.add_edge(dependency, step.worker)
 
         self.network_graph_original = self.network_graph.copy()
         topological_order = list(nx.topological_sort(self.network_graph))
@@ -139,7 +141,7 @@ class ChiefAgent(Admin):
             if len(only_dependencies) == len(dependencies):
                 await self.broadcast(pickle.dumps(
                     LLMAgentRequest(name=next_agent,
-                                    user_inputs=self.job.input,
+                                    user_inputs=self.job.explanation,
                                     history=only_dependencies),
                 ))
         else:
@@ -148,20 +150,14 @@ class ChiefAgent(Admin):
             await self.stop()
 
     def execute(self, job: Job):
-        if job.build_workflow:
-            worker_summary = [worker.definition.intro for worker in self.workers]
-            prompt_txt = job_planing_prompt({
-                "job": job.input,
-                "workers": worker_summary
-            })
-
-            class JobSteps(BaseModel):
-                '''the steps of the job'''
-                steps: List[Step]
-
-            res = execute_llm_with_json_out(self.llm, prompt_txt, JobSteps)
-            if res is not None:
-                job.work_order = res.steps
-            else:
-                raise Exception("Failed to build workflow")
+        self.job = job
+        self.job.workers = [JobWorker.from_agent_definition(worker.definition) for worker in self.workers]
+        executor = LLMExecutor(llm=self.llm, type="llm_executor")
+        self.job.steps = executor.execute(job.prompt_planning)
+        if self.job.steps is None or len(self.job.steps.steps) == 0:
+            self.job.steps = JobSteps(steps=[Step(
+                worker=JobWorker.from_agent_definition(self.workers[0].definition),
+                dependencies=[],
+                prompt="Follow the role description",
+            )])
         return self.run_admin(pickle.dumps(job), self.workers)

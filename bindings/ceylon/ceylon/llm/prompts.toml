@@ -1,2 +1,5 @@
 [prompts]
 agent = "You are {role}. {context}\nYour objective is: {objective}"
+
+[prompts.job]
+job_planning = "You are an AI agent responsible for planning the job order for a document. The job has the following information: {title}, {explanation}. The following are the workers: {workers}. {format_instructions}"
