@@ -14,6 +14,7 @@ from ceylon.llm.prompt_builder import get_prompt
 from ceylon.llm.types import LLMAgentRequest, LLMAgentResponse
 from ceylon.llm.types.agent import AgentDefinition
 from ceylon.llm.types.job import Job, JobWorker, JobSteps, JobStepsV1, Step
+from ceylon.llm.types.step import StepExecution
 from ceylon.workspace.admin import Admin
 from ceylon.workspace.worker import Worker
 
@@ -43,25 +44,41 @@ class LLMAgent(Worker):
             if request.name == self.definition.name:
                 definition = self.definition
                 definition.tools = [tool.name for tool in self.tools if isinstance(tool, BaseTool)]
-                agent_definition_prompt = self.definition.prompt
-                prompt_value = get_prompt({
-                    "user_inputs": request.user_inputs,
-                    "agent_definition": agent_definition_prompt,
-                    "history": request.history
-                })
-                prompt = Prompt(template=prompt_value)
-                if self.tools and len(self.tools) > 0:
-                    response_text = execute_llm_with_function_calling(self.llm, prompt, self.tools)
-                else:
-                    response_text = execute_llm(self.llm, prompt)
 
-                response = LLMAgentResponse(
-                    time=datetime.datetime.now().timestamp(),
-                    agent_id=self.details().id,
-                    agent_name=self.details().name,
-                    response=response_text
+                print(" Executing", request.job_explanation)
+
+                agent_intro = definition.prompt
+
+                step_exc = StepExecution(
+                    worker=self.definition,
+                    explanation=request.job_explanation,
+                    dependencies=[]
                 )
-                await self.broadcast(pickle.dumps(response))
+                executor = LLMExecutor(llm=self.llm, type="llm_executor")
+                res = executor.execute(step_exc.prompt)
+                print(res)
+
+                print(agent_intro)
+
+                # agent_definition_prompt = self.definition.prompt
+                # prompt_value = get_prompt({
+                #     "user_inputs": request.user_inputs,
+                #     "agent_definition": agent_definition_prompt,
+                #     "history": request.history
+                # })
+                # prompt = Prompt(template=prompt_value)
+                # if self.tools and len(self.tools) > 0:
+                #     response_text = execute_llm_with_function_calling(self.llm, prompt, self.tools)
+                # else:
+                #     response_text = execute_llm(self.llm, prompt)
+                #
+                # response = LLMAgentResponse(
+                #     time=datetime.datetime.now().timestamp(),
+                #     agent_id=self.details().id,
+                #     agent_name=self.details().name,
+                #     response=response_text
+                # )
+                # await self.broadcast(pickle.dumps(response))
 
 
 class ChiefAgent(Admin):
@@ -141,7 +158,7 @@ class ChiefAgent(Admin):
             if len(only_dependencies) == len(dependencies):
                 await self.broadcast(pickle.dumps(
                     LLMAgentRequest(name=next_agent,
-                                    user_inputs=self.job.explanation,
+                                    job_explanation=self.job.explanation,
                                     history=only_dependencies),
                 ))
         else:
@@ -152,12 +169,16 @@ class ChiefAgent(Admin):
     def execute(self, job: Job):
         self.job = job
         self.job.workers = [JobWorker.from_agent_definition(worker.definition) for worker in self.workers]
-        executor = LLMExecutor(llm=self.llm, type="llm_executor")
-        self.job.steps = executor.execute(job.prompt_planning)
-        if self.job.steps is None or len(self.job.steps.steps) == 0:
-            self.job.steps = JobSteps(steps=[Step(
-                worker=JobWorker.from_agent_definition(self.workers[0].definition),
-                dependencies=[],
-                prompt="Follow the role description",
-            )])
+        if job.steps is None or job.steps.steps is None or len(job.steps.steps) == 0:
+            executor = LLMExecutor(llm=self.llm, type="llm_executor")
+            self.job.steps = executor.execute(job.prompt_planning)
+            if self.job.steps is None or len(self.job.steps.steps) == 0:
+                self.job.steps = JobSteps(steps=[
+                    Step(
+                        worker=worker.definition.name,
+                        dependencies=[],
+                        explanation=f"Follow the role description and expectation {job.explanation}",
+                    )
+                    for worker in self.workers
+                ])
         return self.run_admin(pickle.dumps(job), self.workers)

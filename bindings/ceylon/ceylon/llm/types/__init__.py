@@ -15,5 +15,5 @@ class LLMAgentResponse(BaseModel):
 
 class LLMAgentRequest(BaseModel):
     name: str
-    user_inputs: str
+    job_explanation: str
     history: dict
