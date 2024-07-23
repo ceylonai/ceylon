@@ -12,6 +12,9 @@ class PromptWrapper(BaseModel):
     arguments: Any = Field(default={}, description="the kwargs of the prompt")
     parser: Any = Field(default=None, description="the parser of the prompt")
 
+    def invoke(self):
+        return self.template.format(**{**self.arguments})
+
 
 class PromptMessage(BaseModel):
     path: Optional[str] = Field(

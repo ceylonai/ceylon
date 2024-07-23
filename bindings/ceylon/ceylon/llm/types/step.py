@@ -11,6 +11,17 @@ class StepHistory(BaseModel):
     worker: str = Field(description="the worker name of the step")
     result: str = Field(description="the result of the step")
 
+    _prompt: PromptMessage = PrivateAttr(
+        default=PromptMessage(path="prompts.job.step_history"),
+    )
+
+    class Config:
+        arbitrary_types_allowed = True
+
+    @property
+    def prompt(self):
+        return self._prompt.build(worker=self.worker, result=self.result)
+
 
 class StepExecution(BaseModel):
     '''the step execution'''
@@ -30,8 +41,9 @@ class StepExecution(BaseModel):
 
     @property
     def prompt(self):
+        worker_prompt = self.worker.prompt
         return self._prompt.build(
-            worker=self.worker.prompt,
+            worker=worker_prompt.invoke(),
             dependencies=[d.prompt for d in self.dependencies],
             explanation=self.explanation
         )

@@ -1,6 +1,7 @@
 from typing import Any, Type, Optional
 
 from duckduckgo_search import DDGS
+from langchain_community.utilities import SearxSearchWrapper
 from langchain_core.callbacks import CallbackManagerForToolRun
 from langchain_core.tools import BaseTool
 from pydantic.v1 import BaseModel, Field
@@ -37,8 +38,14 @@ class SearchTool(BaseTool):
                 - body (str): A brief description of the search result.
         """
         print(f"Searching for {query}")
-        results = DDGS().text(query, safesearch='off', timelimit='y', max_results=10)
-        return results
+        try:
+            # try:
+            search = SearxSearchWrapper(searx_host="http://127.0.0.1:6664")
+            results = search.run(query)
+            print(results)
+            return results
+        except Exception as e:
+            return f"An error occurred: {e}"
 
     async def _arun(self, *args: Any, **kwargs: Any, ) -> Any:
         return self._run(*args, **kwargs)

@@ -1,12 +1,16 @@
-from langchain_community.chat_models import ChatOllama
-from langchain_experimental.llms.ollama_functions import OllamaFunctions
+from langchain_community.chat_models import ChatOllama, ChatOpenAI
+from langchain_community.tools import WikipediaQueryRun
+from langchain_community.utilities import WikipediaAPIWrapper
 
-from ceylon.llm.types.job import Job, Step, JobSteps
 from ceylon.llm.types.agent import AgentDefinition
+from ceylon.llm.types.job import Job, Step, JobSteps
 from ceylon.llm.unit import LLMAgent, ChiefAgent
 from ceylon.tools.search_tool import SearchTool
 
 llm_lib = ChatOllama(model="llama3:instruct")
+# llm_lib = ChatOpenAI(model="gpt-4o")
+# llm_lib = OllamaFunctions(model="phi3:instruct", keep_alive=-1,
+#                           format="json")
 writer = LLMAgent(
     AgentDefinition(
         name="writer",
@@ -20,11 +24,13 @@ researcher = LLMAgent(
     AgentDefinition(
         name="researcher",
         role="AI and Machine Learning Research Specialist",
-        objective="Provide comprehensive and current coverage of AI applications in machine learning",
-        context="Conducts thorough research on AI applications in machine learning, gathering detailed information "
-                "from reputable academic and industry sources. Uses tools like academic databases and industry report aggregators."
+        objective="Search from web for relevant information with source references",
+        context="Searches for relevant information on web to gather data for content creation"
     ),
-    tools=[SearchTool()],
+    tools=[
+        SearchTool(),
+        # WikipediaQueryRun(api_wrapper=WikipediaAPIWrapper(top_k_results=1, doc_content_chars_max=100))
+    ],
     tool_llm=llm_lib
 )
 

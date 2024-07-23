@@ -4,17 +4,14 @@ from collections import deque
 from typing import List
 
 import networkx as nx
-from langchain.prompts import Prompt
 from langchain_core.tools import BaseTool
 
 from ceylon.ceylon import AgentDetail
 from ceylon.llm.llm.llm_executor import LLMExecutor
-from ceylon.llm.llm_task_executor import execute_llm_with_function_calling, execute_llm
-from ceylon.llm.prompt_builder import get_prompt
 from ceylon.llm.types import LLMAgentRequest, LLMAgentResponse
 from ceylon.llm.types.agent import AgentDefinition
-from ceylon.llm.types.job import Job, JobWorker, JobSteps, JobStepsV1, Step
-from ceylon.llm.types.step import StepExecution
+from ceylon.llm.types.job import Job, JobWorker, JobSteps, Step
+from ceylon.llm.types.step import StepExecution, StepHistory
 from ceylon.workspace.admin import Admin
 from ceylon.workspace.worker import Worker
 
@@ -44,41 +41,27 @@ class LLMAgent(Worker):
             if request.name == self.definition.name:
                 definition = self.definition
                 definition.tools = [tool.name for tool in self.tools if isinstance(tool, BaseTool)]
-
-                print(" Executing", request.job_explanation)
-
-                agent_intro = definition.prompt
+                history = []
+                for r, v in request.history.items():
+                    history.append(StepHistory(
+                        worker=r,
+                        result=v
+                    ))
 
                 step_exc = StepExecution(
                     worker=self.definition,
                     explanation=request.job_explanation,
-                    dependencies=[]
+                    dependencies=history
                 )
                 executor = LLMExecutor(llm=self.llm, type="llm_executor")
-                res = executor.execute(step_exc.prompt)
-                print(res)
-
-                print(agent_intro)
-
-                # agent_definition_prompt = self.definition.prompt
-                # prompt_value = get_prompt({
-                #     "user_inputs": request.user_inputs,
-                #     "agent_definition": agent_definition_prompt,
-                #     "history": request.history
-                # })
-                # prompt = Prompt(template=prompt_value)
-                # if self.tools and len(self.tools) > 0:
-                #     response_text = execute_llm_with_function_calling(self.llm, prompt, self.tools)
-                # else:
-                #     response_text = execute_llm(self.llm, prompt)
-                #
-                # response = LLMAgentResponse(
-                #     time=datetime.datetime.now().timestamp(),
-                #     agent_id=self.details().id,
-                #     agent_name=self.details().name,
-                #     response=response_text
-                # )
-                # await self.broadcast(pickle.dumps(response))
+                response_text = executor.execute(step_exc.prompt, self.tools)
+                response = LLMAgentResponse(
+                    time=datetime.datetime.now().timestamp(),
+                    agent_id=self.details().id,
+                    agent_name=self.details().name,
+                    response=response_text
+                )
+                await self.broadcast(pickle.dumps(response))
 
 
 class ChiefAgent(Admin):
@@ -120,11 +103,6 @@ class ChiefAgent(Admin):
         print("Order of tasks considering dependencies:")
         print(self.queue)
 
-        # # Example usage of the queue
-        # while self.queue:
-        #     task = dependency_queue.popleft()
-        #     print(f"Processing task {task}")
-
     def get_next_agent(self):
         if not self.queue:
             return None
@@ -135,7 +113,7 @@ class ChiefAgent(Admin):
     async def on_agent_connected(self, topic: "str", agent: AgentDetail):
         next_agent = self.get_next_agent()
         if next_agent == agent.name:
-            await self.execute_request()
+            await self._execute_request()
 
     async def on_message(self, agent_id: "str", data: "bytes", time: "int"):
         data = pickle.loads(data)
@@ -145,20 +123,19 @@ class ChiefAgent(Admin):
             if next_agent == data.agent_name:
                 self.queue.popleft()
 
-            await self.execute_request()
+            await self._execute_request()
 
-    async def execute_request(self):
+    async def _execute_request(self):
         next_agent = self.get_next_agent()
-        print("Executing", next_agent)
         if next_agent:
+            next_step = self.job.steps.step(next_agent)
             dependencies = list(self.network_graph_original.predecessors(next_agent))
             only_dependencies = {dt.agent_name: dt.response for dt in self.agent_responses if
                                  dt.agent_name in dependencies}
-
             if len(only_dependencies) == len(dependencies):
                 await self.broadcast(pickle.dumps(
                     LLMAgentRequest(name=next_agent,
-                                    job_explanation=self.job.explanation,
+                                    job_explanation=next_step.explanation,
                                     history=only_dependencies),
                 ))
         else:

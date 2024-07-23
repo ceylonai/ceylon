@@ -33,8 +33,6 @@ class OutputData(BaseModel):
         arbitrary_types_allowed = True
 
 
-
-
 class JobWorker(BaseModel):
     '''the job worker'''
     name: str = Field(description="the name of the job worker")
@@ -50,6 +48,8 @@ class JobWorker(BaseModel):
 
     def __str__(self):
         return self.model_dump_json()
+
+
 class Step(BaseModel):
     '''the step'''
     worker: str = Field(description="the worker name of the step")
@@ -68,6 +68,14 @@ class Step(BaseModel):
 class JobSteps(BaseModel):
     '''the steps of the job'''
     steps: List[Step] = Field(description="the steps of the job", default=[])
+
+    def step(self, worker: str) -> Step:
+        '''get the next step of the job'''
+        for step in self.steps:
+            if step.worker == worker:
+                return step
+
+        return None
 
 
 class Stepv1(pydantic.v1.BaseModel):

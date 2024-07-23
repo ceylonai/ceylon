@@ -36,7 +36,8 @@ dependencies = [
     "openai==1.35.7",
     "ct3==3.3.3",
     "langchain-experimental==0.0.62",
-    "toml==0.10.2"
+    "toml==0.10.2",
+    "langchain-openai==0.1.17"
 ]
 
 [project.urls]
