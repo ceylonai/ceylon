@@ -10,7 +10,7 @@ readme = { file = "README.md", content-type = "text/markdown" }
 license = { file = "LICENSE" }
 keywords = ["Aritifical Intelligence", "Multi Agent Systems", "CEYLON", "Ceylon Aritficial Intelligence."]
 dynamic = []
-version = "0.14.12"
+version = "0.14.13"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
@@ -27,17 +27,12 @@ classifiers = [
 ]
 
 dependencies = [
-    "langchain==0.2.6",
-    "langchain-community==0.2.6",
-    "networkx==3.3",
-    "pydantic==2.7.4",
-    "langchain==0.2.6",
-    "ollama==0.2.1",
-    "openai==1.35.7",
-    "ct3==3.3.3",
+    "langchain==0.2.10",
+    "langchain-community==0.2.9",
     "langchain-experimental==0.0.62",
+    "networkx==3.3",
+    "pydantic==2.8.2",
     "toml==0.10.2",
-    "langchain-openai==0.1.17"
 ]
 
 [project.urls]
