@@ -45,26 +45,27 @@ news_sentiment_worker = NewAnalysisAgent(name="news_sentiment", role="Technical 
 decision_maker_worker = DecisionMakerAgent(name="decision_maker", role="Make Decision")
 
 chief = RunnerAgent(workers=[ta_worker, news_sentiment_worker, decision_maker_worker], tool_llm=llm_lib)
-job = JobRequest(
-    title="write_article",
-    explanation="Write an article about machine learning, Tone: Informal, Style: Creative, Length: Large",
-    steps=JobSteps(steps=[
-        Step(
-            worker="ta",
-            explanation="",
-            dependencies=[]
-        ),
-        Step(
-            worker="news_sentiment",
-            explanation="",
-            dependencies=[]
-        ),
-        Step(
-            worker="decision_maker",
-            explanation="",
-            dependencies=["ta", "news_sentiment"]
-        )
-    ]),
-)
-res = chief.execute(job)
-print(res)
+for i in range(10):
+    job = JobRequest(
+        title="write_article",
+        explanation="Write an article about machine learning, Tone: Informal, Style: Creative, Length: Large",
+        steps=JobSteps(steps=[
+            Step(
+                worker="ta",
+                explanation="",
+                dependencies=[]
+            ),
+            Step(
+                worker="news_sentiment",
+                explanation="",
+                dependencies=[]
+            ),
+            Step(
+                worker="decision_maker",
+                explanation="",
+                dependencies=["ta", "news_sentiment"]
+            )
+        ]),
+    )
+    res = chief.execute(job)
+    print(res)

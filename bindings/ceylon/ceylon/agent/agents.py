@@ -1,10 +1,8 @@
-import datetime
 import pickle
 from collections import deque
 from typing import List
 
 import networkx as nx
-from langchain_core.tools import BaseTool
 
 from ceylon.agent.types.agent_request import AgentJobStepRequest, AgentJobResponse
 from ceylon.agent.types.job import JobRequest
@@ -34,6 +32,7 @@ class Agent(Worker):
             request: AgentJobStepRequest = data
             if request.worker == self.details().name:
                 response = await self.execute_request(request)
+                response.job_id = request.job_id
                 await self.broadcast(pickle.dumps(response))
 
     async def execute_request(self, request: AgentJobStepRequest) -> AgentJobResponse:
@@ -111,7 +110,7 @@ class RunnerAgent(Admin):
                                  dt.worker in dependencies}
             if len(only_dependencies) == len(dependencies):
                 await self.broadcast(pickle.dumps(
-                    AgentJobStepRequest(worker=next_agent, job_data={})
+                    AgentJobStepRequest(worker=next_agent, job_data={}, job_id=self.job.id)
                 ))
         else:
             last_response = self.agent_responses[-1]

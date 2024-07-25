@@ -1,3 +1,4 @@
+import uuid
 from typing import List
 
 from pydantic import BaseModel, Field
@@ -5,6 +6,7 @@ from pydantic import BaseModel, Field
 
 class Step(BaseModel):
     '''the step'''
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), alias='_id')
     worker: str = Field(description="the worker name of the step")
     dependencies: List[str] = Field(description="the dependencies of the step, these steps must be another step worker",
                                     default=[])
@@ -16,6 +18,7 @@ class Step(BaseModel):
 
 class JobSteps(BaseModel):
     '''the steps of the job'''
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), alias='_id')
     steps: List[Step] = Field(description="the steps of the job", default=[])
 
     def step(self, worker: str):
@@ -27,7 +30,8 @@ class JobSteps(BaseModel):
 
 
 class JobRequest(BaseModel):
-    steps: JobSteps
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), alias='_id')
+    steps: JobSteps = Field(description="the steps of the job", default=JobSteps(steps=[]))
 
     class Config:
         arbitrary_types_allowed = True
