@@ -114,8 +114,9 @@ class JobRequest(BaseModel):
         else:
             last_response = self._agent_responses[-1]
             print(self.id, self.title, "Last response", last_response)
-            await self.on_success_callback(
-                JobRequestResponse(job_id=self.id, status=JobStatus.COMPLETED, data=last_response.job_data))
+            if self.on_success_callback:
+                await self.on_success_callback(
+                    JobRequestResponse(job_id=self.id, status=JobStatus.COMPLETED, data=last_response.job_data))
             return JobRequestResponse(job_id=self.id, status=JobStatus.COMPLETED, data=last_response.job_data)
 
     async def on_agent_connected(self, topic: "str", agent: AgentDetail, broadcaster=None):
