@@ -4,3 +4,6 @@ target
 .env
 !.env.sample
 /bindings/ceylon/ceylon/ceylon/
+/bindings/ceylon/tests/data/*
+!/bindings/ceylon/tests/data/.no
+

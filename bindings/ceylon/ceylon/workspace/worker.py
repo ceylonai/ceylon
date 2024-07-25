@@ -14,8 +14,6 @@ class Worker(WorkerAgent, Processor, MessageHandler):
     async def run(self, inputs: "bytes"):
         pass
 
-    def on_message(self, agent_id: "str", data: "bytes", time: "int"):
-        pass
-
     async def on_message(self, agent_id: "str", data: "bytes", time: "int"):
         pass
+   
