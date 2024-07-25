@@ -48,27 +48,38 @@ news_sentiment_worker = NewAnalysisAgent(name="news_sentiment", role="Technical 
 decision_maker_worker = DecisionMakerAgent(name="decision_maker", role="Make Decision")
 
 chief = RunnerAgent(workers=[ta_worker, news_sentiment_worker, decision_maker_worker], tool_llm=llm_lib,
-                    server_mode=False)
-for i in range(10):
-    job = JobRequest(
-        title=f"{i} write_article",
-        explanation="Write an article about machine learning, Tone: Informal, Style: Creative, Length: Large",
-        steps=JobSteps(steps=[
-            Step(
-                worker="ta",
-                explanation="",
-                dependencies=[]
-            ),
-            Step(
-                worker="news_sentiment",
-                explanation="",
-                dependencies=[]
-            ),
-            Step(
-                worker="decision_maker",
-                explanation="",
-                dependencies=["ta", "news_sentiment"]
-            )
-        ])
-    )
-    res = chief.execute(job)
+                    server_mode=True)
+threading.Thread(target=chief.execute, args=({})).start()
+
+
+async def main():
+    for i in range(10):
+        async def on_success_callback(res: AgentJobResponse):
+            print("Finished job: ", res)
+
+        job = JobRequest(
+            title=f"{i} write_article",
+            explanation="Write an article about machine learning, Tone: Informal, Style: Creative, Length: Large",
+            steps=JobSteps(steps=[
+                Step(
+                    worker="ta",
+                    explanation="",
+                    dependencies=[]
+                ),
+                Step(
+                    worker="news_sentiment",
+                    explanation="",
+                    dependencies=[]
+                ),
+                Step(
+                    worker="decision_maker",
+                    explanation="",
+                    dependencies=["ta", "news_sentiment"]
+                )
+            ]),
+            on_success_callback=on_success_callback
+        )
+        await chief.add_job(job)
+
+
+asyncio.run(main())
