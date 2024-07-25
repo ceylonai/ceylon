@@ -41,8 +41,11 @@ class Agent(Worker):
 
 class RunnerAgent(Admin):
     jobs: List[JobRequest] = []
+    connected_agents: List[AgentDetail] = []
+    server_mode = False
 
-    def __init__(self, name=workspace_id, port=admin_port, workers=[], tool_llm=None):
+    def __init__(self, name=workspace_id, port=admin_port, workers=[], tool_llm=None, server_mode=False):
+        self.server_mode = server_mode
         self.queue = deque()
         self.llm = tool_llm
         # Create a directed graph to represent the workflow
@@ -52,11 +55,18 @@ class RunnerAgent(Admin):
         super().__init__(name, port)
 
     async def run(self, inputs: "bytes"):
-        job: JobRequest = pickle.loads(inputs)
+        job = pickle.loads(inputs)
+        if type(job) == JobRequest:
+            await self.add_job(job)
+
+    async def add_job(self, job: JobRequest):
         job.initialize_graph()
         self.jobs.append(job)
+        for agent in self.connected_agents:
+            await job.on_agent_connected("", agent, self.broadcast)
 
     async def on_agent_connected(self, topic: "str", agent: AgentDetail):
+        self.connected_agents.append(agent)
         for job in self.jobs:
             await job.on_agent_connected(topic, agent, self.broadcast)
 
@@ -69,13 +79,14 @@ class RunnerAgent(Admin):
                 res = await job.execute_request(data, self.broadcast)
                 if res is not None and res.status == JobStatus.COMPLETED:
                     self.jobs.remove(job)
-        if len(self.jobs) == 0:
-            await self.stop()
+        if not self.server_mode:
+            if len(self.jobs) == 0:
+                await self.stop()
 
     def get_job_by_id(self, job_id: str):
         for job in self.jobs:
             if job.id == job_id:
                 return job
 
-    def execute(self, job: JobRequest):
-        return self.run_admin(pickle.dumps(job), self.workers)
+    def execute(self, job: JobRequest = None):
+        return self.run_admin(pickle.dumps(job or {}), self.workers)

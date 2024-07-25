@@ -2,7 +2,7 @@ import enum
 import pickle
 import uuid
 from collections import deque
-from typing import List, Any
+from typing import List, Any, Optional, Callable, Awaitable
 
 import networkx as nx
 from pydantic import BaseModel, Field, PrivateAttr
@@ -50,8 +50,12 @@ class JobRequestResponse(BaseModel):
 
 
 class JobRequest(BaseModel):
+    title: str = Field(description="the name of the job")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), alias='_id')
     steps: JobSteps = Field(description="the steps of the job", default=JobSteps(steps=[]))
+
+    on_success_callback: Optional[Callable[[JobRequestResponse], Awaitable[None]]] = Field(default=None)
+    on_failure_callback: Optional[Callable[[JobRequestResponse], Awaitable[None]]] = Field(default=None)
 
     _network_graph: nx.DiGraph = PrivateAttr(default=nx.DiGraph())
     _network_graph_original: nx.DiGraph = PrivateAttr(default=nx.DiGraph())
@@ -63,7 +67,7 @@ class JobRequest(BaseModel):
         arbitrary_types_allowed = True
 
     def initialize_graph(self):
-        print("Initializing graph", self.steps.steps)
+        print(self.id, self.title, "Initializing graph", self.steps.steps)
         for step in self.steps.steps:
             self._network_graph.add_node(step.worker)
             for dependency in step.dependencies:
@@ -76,14 +80,16 @@ class JobRequest(BaseModel):
         self._queue = deque(topological_order)
 
         # Print the queue
-        print(f"Order of tasks considering dependencies: {self.id}")
+        print(self.id, self.title
+              , f"Order of tasks considering dependencies: {self.id}")
         print(self._queue)
 
     def get_next_agent(self):
         if not self._queue:
             return None
         next_agent = self._queue[0]
-        print("Next agent is", next_agent)
+        print(self.id, self.title
+              , "Next agent is", next_agent)
         return next_agent
 
     async def execute_request(self, data: AgentJobResponse = None, broadcaster=None):
@@ -104,7 +110,12 @@ class JobRequest(BaseModel):
                 ))
         else:
             last_response = self._agent_responses[-1]
-            return JobRequestResponse(job_id=self.id, status=JobStatus.COMPLETED, data=last_response.job_data)
+            print(self.id, self.title, "Last response", last_response)
+            if self.on_success_callback is not None:
+                await self.on_success_callback(
+                    JobRequestResponse(job_id=self.id, status=JobStatus.COMPLETED, data=last_response.job_data))
+            else:
+                return JobRequestResponse(job_id=self.id, status=JobStatus.COMPLETED, data=last_response.job_data)
 
     async def on_agent_connected(self, topic: "str", agent: AgentDetail, broadcaster=None):
         next_agent = self.get_next_agent()
