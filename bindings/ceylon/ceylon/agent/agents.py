@@ -68,7 +68,6 @@ class RunnerAgent(Admin):
         self.jobs.append(job)
 
     async def start_job(self):
-        print(len(self.running_jobs), self.parallel_jobs)
         if len(self.running_jobs) < self.parallel_jobs:
             for agent in self.connected_agents:
                 for job in self.jobs:
