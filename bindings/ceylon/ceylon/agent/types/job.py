@@ -1,7 +1,14 @@
+import enum
+import pickle
 import uuid
-from typing import List
+from collections import deque
+from typing import List, Any
 
-from pydantic import BaseModel, Field
+import networkx as nx
+from pydantic import BaseModel, Field, PrivateAttr
+
+from ceylon.agent.types.agent_request import AgentJobResponse, AgentJobStepRequest
+from ceylon.ceylon import AgentDetail
 
 
 class Step(BaseModel):
@@ -29,9 +36,77 @@ class JobSteps(BaseModel):
         return None
 
 
+class JobStatus(enum.Enum):
+    RUNNING = "RUNNING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+
+
+class JobRequestResponse(BaseModel):
+    job_id: str = Field(None, description="the job id")
+    status: JobStatus = Field(JobStatus.RUNNING, description="the status of the job")
+    data: Any = Field(None, description="the data of the job")
+
+
 class JobRequest(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), alias='_id')
     steps: JobSteps = Field(description="the steps of the job", default=JobSteps(steps=[]))
 
+    _network_graph: nx.DiGraph = PrivateAttr(default=nx.DiGraph())
+    _network_graph_original: nx.DiGraph = PrivateAttr(default=nx.DiGraph())
+    _queue: deque = PrivateAttr(default=deque([]))
+
+    _agent_responses: List[AgentJobResponse] = PrivateAttr(default=[])
+
     class Config:
         arbitrary_types_allowed = True
+
+    def initialize_graph(self):
+        print("Initializing graph", self.steps.steps)
+        for step in self.steps.steps:
+            self._network_graph.add_node(step.worker)
+            for dependency in step.dependencies:
+                self._network_graph.add_edge(dependency, step.worker)
+
+        self._network_graph_original = self._network_graph.copy()
+        topological_order = list(nx.topological_sort(self._network_graph))
+
+        # Convert the sorted list into a queue
+        self._queue = deque(topological_order)
+
+        # Print the queue
+        print(f"Order of tasks considering dependencies: {self.id}")
+        print(self._queue)
+
+    def get_next_agent(self):
+        if not self._queue:
+            return None
+        next_agent = self._queue[0]
+        print("Next agent is", next_agent)
+        return next_agent
+
+    async def execute_request(self, data: AgentJobResponse = None, broadcaster=None):
+        if data:
+            self._agent_responses.append(data)
+            next_agent = self.get_next_agent()
+            if next_agent == data.worker:
+                self._queue.popleft()
+
+        next_agent = self.get_next_agent()
+        if next_agent:
+            dependencies = list(self._network_graph_original.predecessors(next_agent))
+            only_dependencies = {dt.worker: dt.job_data for dt in self._agent_responses if
+                                 dt.worker in dependencies}
+            if len(only_dependencies) == len(dependencies):
+                await broadcaster(pickle.dumps(
+                    AgentJobStepRequest(worker=next_agent, job_data={}, job_id=self.id)
+                ))
+        else:
+            last_response = self._agent_responses[-1]
+            return JobRequestResponse(job_id=self.id, status=JobStatus.COMPLETED, data=last_response.job_data)
+
+    async def on_agent_connected(self, topic: "str", agent: AgentDetail, broadcaster=None):
+        next_agent = self.get_next_agent()
+        if next_agent == agent.name:
+            await self.execute_request(None, broadcaster)
