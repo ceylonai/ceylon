@@ -1,10 +1,6 @@
-import asyncio
-import threading
-
-from ceylon.agent.types.agent_request import AgentJobStepRequest, AgentJobResponse
-from ceylon.agent.types.job import JobRequest, JobSteps, Step
-from ceylon.agent.agents import RunnerAgent, Agent
 from langchain_community.chat_models import ChatOllama
+
+from ceylon import Agent, AgentJobStepRequest, AgentJobResponse, JobRequest, JobSteps, Step, RunnerAgent
 
 llm_lib = ChatOllama(model="llama3:instruct")
 

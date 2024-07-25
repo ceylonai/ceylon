@@ -7,7 +7,7 @@ from ceylon.llm.types.job import Job, Step, JobSteps
 from ceylon.llm.unit import LLMAgent, ChiefAgent
 from ceylon.tools.search_tool import SearchTool
 
-llm_lib = ChatOllama(model="llama3:instruct")
+llm_lib = ChatOllama(model="llama3.1:latest")
 # llm_lib = ChatOpenAI(model="gpt-4o")
 # llm_lib = OllamaFunctions(model="phi3:instruct", keep_alive=-1,
 #                           format="json")
