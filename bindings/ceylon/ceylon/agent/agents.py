@@ -43,9 +43,13 @@ class RunnerAgent(Admin):
     jobs: List[JobRequest] = []
     connected_agents: List[AgentDetail] = []
     server_mode = False
+    parallel_jobs = 1
+    running_jobs = []
 
-    def __init__(self, name=workspace_id, port=admin_port, workers=[], tool_llm=None, server_mode=False):
+    def __init__(self, name=workspace_id, port=admin_port, workers=[], tool_llm=None, server_mode=False,
+                 parallel_jobs=1):
         self.server_mode = server_mode
+        self.parallel_jobs = parallel_jobs
         self.queue = deque()
         self.llm = tool_llm
         # Create a directed graph to represent the workflow
@@ -62,13 +66,20 @@ class RunnerAgent(Admin):
     async def add_job(self, job: JobRequest):
         job.initialize_graph()
         self.jobs.append(job)
-        for agent in self.connected_agents:
-            await job.on_agent_connected("", agent, self.broadcast)
+
+    async def start_job(self):
+        print(len(self.running_jobs), self.parallel_jobs)
+        if len(self.running_jobs) < self.parallel_jobs:
+            for agent in self.connected_agents:
+                for job in self.jobs:
+                    await job.on_agent_connected("", agent, self.broadcast)
+                    self.running_jobs.append(job)
+                    if len(self.running_jobs) == self.parallel_jobs:
+                        return
 
     async def on_agent_connected(self, topic: "str", agent: AgentDetail):
         self.connected_agents.append(agent)
-        for job in self.jobs:
-            await job.on_agent_connected(topic, agent, self.broadcast)
+        await self.start_job()
 
     async def on_message(self, agent_id: "str", data: "bytes", time: "int"):
         data = pickle.loads(data)
@@ -79,6 +90,10 @@ class RunnerAgent(Admin):
                 res = await job.execute_request(data, self.broadcast)
                 if res is not None and res.status == JobStatus.COMPLETED:
                     self.jobs.remove(job)
+                    self.running_jobs.remove(job)
+                    print(f"Job {job.id} completed", len(self.running_jobs))
+
+        await self.start_job()
         if not self.server_mode:
             if len(self.jobs) == 0:
                 await self.stop()

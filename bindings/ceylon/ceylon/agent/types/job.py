@@ -37,6 +37,7 @@ class JobSteps(BaseModel):
 
 
 class JobStatus(enum.Enum):
+    IDLE = "IDLE"
     RUNNING = "RUNNING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
@@ -56,6 +57,8 @@ class JobRequest(BaseModel):
 
     on_success_callback: Optional[Callable[[JobRequestResponse], Awaitable[None]]] = Field(default=None)
     on_failure_callback: Optional[Callable[[JobRequestResponse], Awaitable[None]]] = Field(default=None)
+
+    current_status: JobStatus = Field(JobStatus.IDLE, description="the current status of the job")
 
     _network_graph: nx.DiGraph = PrivateAttr(default=nx.DiGraph())
     _network_graph_original: nx.DiGraph = PrivateAttr(default=nx.DiGraph())
@@ -111,13 +114,12 @@ class JobRequest(BaseModel):
         else:
             last_response = self._agent_responses[-1]
             print(self.id, self.title, "Last response", last_response)
-            if self.on_success_callback is not None:
-                await self.on_success_callback(
-                    JobRequestResponse(job_id=self.id, status=JobStatus.COMPLETED, data=last_response.job_data))
-            else:
-                return JobRequestResponse(job_id=self.id, status=JobStatus.COMPLETED, data=last_response.job_data)
+            await self.on_success_callback(
+                JobRequestResponse(job_id=self.id, status=JobStatus.COMPLETED, data=last_response.job_data))
+            return JobRequestResponse(job_id=self.id, status=JobStatus.COMPLETED, data=last_response.job_data)
 
     async def on_agent_connected(self, topic: "str", agent: AgentDetail, broadcaster=None):
         next_agent = self.get_next_agent()
-        if next_agent == agent.name:
+        if next_agent == agent.name and self.current_status == JobStatus.IDLE:
+            self.current_status = JobStatus.RUNNING
             await self.execute_request(None, broadcaster)
