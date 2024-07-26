@@ -5,7 +5,6 @@ from typing import List
 from pydantic.dataclasses import dataclass
 
 from ceylon.workspace.admin import Admin
-from ceylon.workspace.runner import RunnerInput
 from ceylon.workspace.worker import Worker
 
 admin_port = 8000
@@ -142,7 +141,7 @@ async def main():
     agent5 = Participant("Kevin", [TimeSlot("2024-07-21", 10, 13), TimeSlot("2024-07-21", 15, 17)])
 
     coordinator = Coordinator()
-    await coordinator.run_admin(
+    await coordinator.arun_admin(
         inputs=pickle.dumps(Meeting(name="Meeting 1", duration=2, date="2024-07-21", minimum_participants=3)),
         workers=[agent1, agent2, agent3, agent4, agent5]
     )
