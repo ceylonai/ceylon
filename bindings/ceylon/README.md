@@ -100,6 +100,11 @@ This example demonstrates how to:
 3. Define a job with multiple steps and dependencies
 4. Execute the job and get the result
 
+## Examples
+
+ - Example [Example](./examples)
+ - Colab Scripts
+   1. [News Writing panel](https://colab.research.google.com/drive/1ZMy0Iggni6fCQynBlyI1wL4WW4U_Fman?usp=sharing)  
 
 ## 🚧 Todo
 

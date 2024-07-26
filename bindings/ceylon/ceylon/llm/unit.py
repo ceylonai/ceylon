@@ -143,7 +143,7 @@ class ChiefAgent(Admin):
             self.return_response = last_response.response
             await self.stop()
 
-    def execute(self, job: Job):
+    def update_job(self, job):
         self.job = job
         self.job.workers = [JobWorker.from_agent_definition(worker.definition) for worker in self.workers]
         if job.steps is None or job.steps.steps is None or len(job.steps.steps) == 0:
@@ -158,4 +158,11 @@ class ChiefAgent(Admin):
                     )
                     for worker in self.workers
                 ])
+
+    def execute(self, job: Job):
+        self.update_job(job)
         return self.run_admin(pickle.dumps(job), self.workers)
+
+    async def aexecute(self, job: Job):
+        self.update_job(job)
+        return await self.arun_admin(pickle.dumps(job), self.workers)
