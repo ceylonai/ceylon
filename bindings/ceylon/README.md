@@ -106,7 +106,7 @@ This example demonstrates how to:
  - Colab Scripts
    1. [News Writing panel](https://colab.research.google.com/drive/1ZMy0Iggni6fCQynBlyI1wL4WW4U_Fman?usp=sharing)  
    2. [Meeting Schedular](https://colab.research.google.com/drive/1C-E9BN992k5sZYeJWnVrsWA5_ryaaT8m?usp=sharing)
-   3. 
+   3. [Single Item Auction](https://colab.research.google.com/drive/1C-E9BN992k5sZYeJWnVrsWA5_ryaaT8m?usp=sharing)
 
 ## 🚧 Todo
 
