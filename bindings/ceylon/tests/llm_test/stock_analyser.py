@@ -68,3 +68,4 @@ for i in range(10):
         ])
     )
     res = chief.execute(job)
+    print(res)

@@ -1,7 +1,6 @@
-from langchain_community.chat_models import ChatOllama, ChatOpenAI
-from langchain_community.tools import WikipediaQueryRun
-from langchain_community.utilities import WikipediaAPIWrapper
+from langchain_community.chat_models import ChatOllama
 
+from ceylon.ceylon import enable_log
 from ceylon.llm.types.agent import AgentDefinition
 from ceylon.llm.types.job import Job, Step, JobSteps
 from ceylon.llm.unit import LLMAgent, ChiefAgent
@@ -67,7 +66,7 @@ job = Job(
 
 llm_lib = ChatOllama(model="phi3:latest")
 # llm_lib = OllamaFunctions(model="phi3:14b", output_format="json")
-chief = ChiefAgent(workers=[writer, researcher, proof_writer], tool_llm=llm_lib)
-
+chief = ChiefAgent(workers=[writer,  proof_writer], tool_llm=llm_lib)
+# enable_log("TRACE")
 res = chief.execute(job)
 print("Response:", res)

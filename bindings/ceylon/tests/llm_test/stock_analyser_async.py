@@ -48,7 +48,7 @@ news_sentiment_worker = NewAnalysisAgent(name="news_sentiment", role="Technical 
 decision_maker_worker = DecisionMakerAgent(name="decision_maker", role="Make Decision")
 
 chief = RunnerAgent(workers=[ta_worker, news_sentiment_worker, decision_maker_worker], tool_llm=llm_lib,
-                    server_mode=True, parallel_jobs=8)
+                    server_mode=True, parallel_jobs=5)
 threading.Thread(target=chief.execute, args=({})).start()
 
 
