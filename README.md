@@ -100,13 +100,10 @@ This example demonstrates how to:
 3. Define a job with multiple steps and dependencies
 4. Execute the job and get the result
 
-## 📘 Documentation
-
-For full documentation, visit [docs.ceylon.ai](https://docs.ceylon.ai)
-
 ## 🚧 Todo
 
-- [ ] LLM Agent Stack
+- [X] LLM Agent Stack
+- [x] Job Handling (parallel & sequential)
 - [ ] Web Agent
 - [ ] Agent Registry
 

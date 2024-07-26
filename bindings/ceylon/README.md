@@ -100,9 +100,6 @@ This example demonstrates how to:
 3. Define a job with multiple steps and dependencies
 4. Execute the job and get the result
 
-## 📘 Documentation
-
-For full documentation, visit [docs.ceylon.ai](https://docs.ceylon.ai)
 
 ## 🚧 Todo
 
