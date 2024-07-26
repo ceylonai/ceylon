@@ -1,3 +1,5 @@
+import asyncio
+
 from langchain_community.chat_models import ChatOllama
 
 from ceylon.ceylon import enable_log
@@ -66,7 +68,19 @@ job = Job(
 
 llm_lib = ChatOllama(model="phi3:latest")
 # llm_lib = OllamaFunctions(model="phi3:14b", output_format="json")
-chief = ChiefAgent(workers=[writer,  proof_writer], tool_llm=llm_lib)
+chief = ChiefAgent(workers=[writer, researcher, proof_writer], tool_llm=llm_lib)
 # enable_log("TRACE")
 res = chief.execute(job)
-print("Response:", res)
+
+
+# print("Response:", res)
+
+# asyncio.run(chief.aexecute(job))
+
+async def main():
+    res = await chief.aexecute(job)
+    print(res)
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

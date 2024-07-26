@@ -19,6 +19,10 @@ class Admin(AdminAgent, Processor, MessageHandler, EventHandler):
 
     def run_admin(self, inputs: "bytes", workers):
         import asyncio
+
+        event_loop = asyncio.get_event_loop()
+        if event_loop.is_running():
+            event_loop.run_until_complete(self.arun_admin(inputs, workers))
         return asyncio.run(self.arun_admin(inputs, workers))
 
     async def arun_admin(self, inputs: "bytes", workers):
