@@ -9,7 +9,7 @@
 
 Welcome to Ceylon: A Multi-Agent System (MAS) designed to orchestrate complex task flows among multiple AI agents. Ceylon manages and automates interactions between agents, each with specific roles and responsibilities, enabling powerful collaborative AI solutions. By empowering collaboration and simplifying complexity, Ceylon opens up new possibilities in AI-driven task automation and problem-solving.
 
-![Ceylon Architecture](docs/images/img.png)
+![Ceylon Architecture](../../docs/images/img.png)
 
 ## 🚀 Key Features
 
@@ -99,6 +99,14 @@ This example demonstrates how to:
 2. Create a runner agent to orchestrate the process
 3. Define a job with multiple steps and dependencies
 4. Execute the job and get the result
+
+## Examples
+
+- Example [Example](./bindings/ceylon/examples)
+- Colab Scripts
+    1. [News Writing panel](https://colab.research.google.com/drive/1ZMy0Iggni6fCQynBlyI1wL4WW4U_Fman?usp=sharing)
+    2. [Meeting Schedular](https://colab.research.google.com/drive/1C-E9BN992k5sZYeJWnVrsWA5_ryaaT8m?usp=sharing)
+    3. [Single Item Auction](https://colab.research.google.com/drive/1C-E9BN992k5sZYeJWnVrsWA5_ryaaT8m?usp=sharing)
 
 ## 🚧 Todo
 
