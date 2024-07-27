@@ -70,5 +70,16 @@ job = JobRequest(
 )
 
 coordinator = LLMExecutorAgent(workers=[researcher, writer, seo_optimizer, proof_writer])
-res: JobRequest = coordinator.execute(job)
-print("Response:", res)
+
+
+# res: JobRequest = coordinator.execute(job)
+# print("Response:", res)
+async def main():
+    res: JobRequest = await coordinator.aexecute(job)
+    print("Response:", res)
+
+
+if __name__ == '__main__':
+    import asyncio
+
+    asyncio.run(main())

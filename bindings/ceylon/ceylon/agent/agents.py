@@ -111,3 +111,6 @@ class RunnerAgent(Admin):
 
     def execute(self, job: JobRequest = None):
         return self.run_admin(pickle.dumps(job or {}), self.workers)
+
+    async def aexecute(self, job: JobRequest = None):
+        return await self.arun_admin(pickle.dumps(job or {}), self.workers)

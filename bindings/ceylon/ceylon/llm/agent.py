@@ -65,3 +65,7 @@ class LLMExecutorAgent(RunnerAgent):
     def execute(self, job: JobRequest = None):
         res: JobRequest = super().execute(job)
         return res.result.data["response"]
+
+    async def aexecute(self, job: JobRequest = None):
+        res: JobRequest = await super().aexecute(job)
+        return res.result.data["response"]
