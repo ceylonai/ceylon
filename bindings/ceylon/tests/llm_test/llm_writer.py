@@ -48,6 +48,7 @@ job = JobRequest(
         Step(
             worker="seo_optimizer",
             dependencies=["writer"],
+            explanation="Just give the article output. We need to publish it"
         )
     ]),
     job_data="Write Article Title: What is the importance of Machine Learning, Tone: Informal, Style: Creative, Length: Large. Focus on keyword AI,Future",
