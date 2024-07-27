@@ -248,13 +248,18 @@ impl AdminAgent {
         let cancel_token_clone = cancel_token.clone();
         let run_broadcast = handle.spawn(async move {
             loop {
-                if let Some(raw_data) = broadcast_receiver.lock().await.recv().await {
-                    // info!("Agent broadcast {:?}", raw_data);
-                    admin_emitter.send(raw_data).await.unwrap();
-                }
-
                 if cancel_token_clone.is_cancelled() {
                     break;
+                } else if let Some(raw_data) = broadcast_receiver.lock().await.recv().await {
+                    // info!("Agent broadcast {:?}", raw_data);
+                    match admin_emitter.send(raw_data).await {
+                        Ok(_) => {
+                            continue;
+                        }
+                        Err(_) => {
+                            continue
+                        }
+                    };
                 }
             }
         });
@@ -273,7 +278,7 @@ impl AdminAgent {
         });
 
         let shutdown_tx = Arc::new(self.shutdown_send.clone());
-        let shutdown_tx= shutdown_tx.clone();
+        let shutdown_tx = shutdown_tx.clone();
         let admin_id_clone = admin_id.clone();
         handle
             .spawn(async move {
@@ -305,6 +310,5 @@ impl AdminAgent {
             })
             .await
             .unwrap();
-        
     }
 }

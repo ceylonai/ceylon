@@ -1,3 +1,5 @@
+from time import sleep
+
 from langchain_community.chat_models import ChatOllama
 
 from ceylon import Agent, AgentJobStepRequest, AgentJobResponse, JobRequest, JobSteps, Step, RunnerAgent
@@ -34,38 +36,48 @@ class DecisionMakerAgent(Agent):
         return AgentJobResponse(
             worker=self.details().name,
             job_data={
+                "job": request.job_id,
                 "trade": True,
             }
         )
 
 
 ta_worker = TAAgent(name="ta", role="Technical Analyst")
+ta_worker2 = TAAgent(name="ta2", role="Technical Analyst2")
+ta_worker3 = TAAgent(name="ta2", role="Technical Analyst3")
 news_sentiment_worker = NewAnalysisAgent(name="news_sentiment", role="Technical Analyst")
 decision_maker_worker = DecisionMakerAgent(name="decision_maker", role="Make Decision")
 
-chief = RunnerAgent(workers=[ta_worker, news_sentiment_worker, decision_maker_worker], tool_llm=llm_lib,
+chief = RunnerAgent(workers=[ta_worker, ta_worker2, ta_worker3, news_sentiment_worker, decision_maker_worker],
+                    tool_llm=llm_lib,
+                    parallel_jobs=1,
                     server_mode=False)
-for i in range(10):
-    job = JobRequest(
-        title=f"{i} write_article",
-        explanation="Write an article about machine learning, Tone: Informal, Style: Creative, Length: Large",
-        steps=JobSteps(steps=[
-            Step(
-                worker="ta",
-                explanation="",
-                dependencies=[]
-            ),
-            Step(
-                worker="news_sentiment",
-                explanation="",
-                dependencies=[]
-            ),
-            Step(
-                worker="decision_maker",
-                explanation="",
-                dependencies=["ta", "news_sentiment"]
-            )
-        ])
-    )
-    res = chief.execute(job)
-    print(res)
+job = JobRequest(
+    title=f"{10} write_article",
+    explanation="Write an article about machine learning, Tone: Informal, Style: Creative, Length: Large",
+    steps=JobSteps(steps=[
+        Step(
+            worker="ta",
+            explanation="",
+            dependencies=[]
+        ),
+        Step(
+            worker="ta2",
+            explanation="",
+            dependencies=[]
+        ),
+        Step(
+            worker="news_sentiment",
+            explanation="",
+            dependencies=["ta2"]
+        ),
+        Step(
+            worker="decision_maker",
+            explanation="",
+            dependencies=["ta", "news_sentiment"]
+        )
+    ])
+)
+
+res = chief.execute(job)
+print(res.result, job.id)

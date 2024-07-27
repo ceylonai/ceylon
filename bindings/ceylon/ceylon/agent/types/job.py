@@ -66,61 +66,70 @@ class JobRequest(BaseModel):
 
     _agent_responses: List[AgentJobResponse] = PrivateAttr(default=[])
 
+    result: Any = Field(None, description="the result of the job")
+
     class Config:
         arbitrary_types_allowed = True
 
     def initialize_graph(self):
-        print(self.id, self.title, "Initializing graph", self.steps.steps)
         for step in self.steps.steps:
             self._network_graph.add_node(step.worker)
-            for dependency in step.dependencies:
-                self._network_graph.add_edge(dependency, step.worker)
-
+            for dep in step.dependencies:
+                self._network_graph.add_edge(dep, step.worker)
         self._network_graph_original = self._network_graph.copy()
-        topological_order = list(nx.topological_sort(self._network_graph))
+        if not nx.is_directed_acyclic_graph(self._network_graph):
+            raise ValueError("Job steps contain cycles")
 
-        # Convert the sorted list into a queue
-        self._queue = deque(topological_order)
+        for layer in nx.topological_generations(self._network_graph):
+            self._queue.append(layer)
 
-        # Print the queue
-        print(self.id, self.title
-              , f"Order of tasks considering dependencies: {self.id}")
-        print(self._queue)
-
-    def get_next_agent(self):
+    def get_next_agents(self):
         if not self._queue:
             return None
-        next_agent = self._queue[0]
-        print(self.id, self.title
-              , "Next agent is", next_agent)
-        return next_agent
+        next_agents = self._queue[0]
+        # print(self.id, self.title
+        #       , "Next agent is", next_agents)
+        return next_agents
 
     async def execute_request(self, data: AgentJobResponse = None, broadcaster=None):
         if data:
             self._agent_responses.append(data)
-            next_agent = self.get_next_agent()
-            if next_agent == data.worker:
+            next_agents = self.get_next_agents()
+            for next_agent in next_agents:
+                if next_agent == data.worker:
+                    next_agents.remove(next_agent)
+            if len(next_agents) == 0:
                 self._queue.popleft()
 
-        next_agent = self.get_next_agent()
-        if next_agent:
-            dependencies = list(self._network_graph_original.predecessors(next_agent))
-            only_dependencies = {dt.worker: dt.job_data for dt in self._agent_responses if
-                                 dt.worker in dependencies}
-            if len(only_dependencies) == len(dependencies):
-                await broadcaster(pickle.dumps(
-                    AgentJobStepRequest(worker=next_agent, job_data={}, job_id=self.id)
-                ))
+        next_agents = self.get_next_agents()
+        if next_agents:
+            for next_agent in next_agents:
+                # print(self.id, self.title, "Next agent", next_agent)
+                dependencies = list(self._network_graph_original.predecessors(next_agent))
+                only_dependencies = {dt.worker: dt.job_data for dt in self._agent_responses if
+                                     dt.worker in dependencies}
+                if len(only_dependencies) == len(dependencies):
+                    await broadcaster(pickle.dumps(
+                        AgentJobStepRequest(worker=next_agent, job_data={}, job_id=self.id)
+                    ))
         else:
             last_response = self._agent_responses[-1]
-            print(self.id, self.title, "Last response", last_response)
             if self.on_success_callback:
                 await self.on_success_callback(
                     JobRequestResponse(job_id=self.id, status=JobStatus.COMPLETED, data=last_response.job_data))
             return JobRequestResponse(job_id=self.id, status=JobStatus.COMPLETED, data=last_response.job_data)
 
     async def on_agent_connected(self, topic: "str", agent: AgentDetail, broadcaster=None):
-        next_agent = self.get_next_agent()
-        if next_agent == agent.name and self.current_status == JobStatus.IDLE:
-            self.current_status = JobStatus.RUNNING
+        next_agents = self.get_next_agents()
+        for next_agent in next_agents:
+            if next_agent == agent.name and self.current_status == JobStatus.IDLE:
+                self.current_status = JobStatus.RUNNING
             await self.execute_request(None, broadcaster)
+
+    def show_graph(self):
+        import matplotlib.pyplot as plt
+        nx.draw(self._network_graph, with_labels=True)
+        plt.show()
+
+    def __str__(self):
+        return f"Job {self.id}: {self.title} with {len(self.steps.steps)} steps"

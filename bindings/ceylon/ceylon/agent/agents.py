@@ -1,3 +1,4 @@
+import copy
 import pickle
 from collections import deque
 from typing import List
@@ -88,9 +89,11 @@ class RunnerAgent(Admin):
             if job:
                 res = await job.execute_request(data, self.broadcast)
                 if res is not None and res.status == JobStatus.COMPLETED:
+                    job_last = copy.deepcopy(job)
+                    job_last.result = res
                     self.jobs.remove(job)
                     self.running_jobs.remove(job)
-                    print(f"Job {job.id} completed", len(self.running_jobs))
+                    self.return_response = job_last
 
         await self.start_job()
         if not self.server_mode:
@@ -104,3 +107,10 @@ class RunnerAgent(Admin):
 
     def execute(self, job: JobRequest = None):
         return self.run_admin(pickle.dumps(job or {}), self.workers)
+
+    def reset_agents(self):
+        self.connected_agents = []
+        self.jobs = []
+        self.running_jobs = []
+        self.agent_responses = []
+        self.queue = deque()
