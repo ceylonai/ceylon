@@ -53,8 +53,6 @@ class RunnerAgent(Admin):
         self.parallel_jobs = parallel_jobs
         self.queue = deque()
         self.llm = tool_llm
-        # Create a directed graph to represent the workflow
-        self.network_graph = nx.DiGraph()
         self.agent_responses = []
         self.workers = workers
         super().__init__(name, port)
@@ -107,10 +105,3 @@ class RunnerAgent(Admin):
 
     def execute(self, job: JobRequest = None):
         return self.run_admin(pickle.dumps(job or {}), self.workers)
-
-    def reset_agents(self):
-        self.connected_agents = []
-        self.jobs = []
-        self.running_jobs = []
-        self.agent_responses = []
-        self.queue = deque()
