@@ -1,11 +1,12 @@
 from langchain_community.chat_models import ChatOllama
 
-from ceylon import RunnerAgent, JobSteps, Step, JobRequest
+from ceylon import JobSteps, Step, JobRequest
 from ceylon.llm import LLMAgent
 from ceylon.llm.agent import LLMExecutorAgent
 from ceylon.tools.search_tool import SearchTool
 
 llm_lib = ChatOllama(model="llama3.1:latest")
+# llm_lib = ChatOpenAI(model="gpt-4o")
 researcher = LLMAgent(
     name="researcher",
     role="AI and Machine Learning Research Specialist",
@@ -30,7 +31,8 @@ seo_optimizer = LLMAgent(
     name="seo_optimizer",
     role="SEO Optimizer",
     objective="Optimize content for search engines",
-    context="Optimize content for search engines, with SEO optimization. You will optimize the content for search engines.",
+    context="Optimize content for search engines, with SEO optimization. You will optimize "
+            "the content for search engines.",
     tools=[],
     llm=llm_lib
 )
@@ -38,8 +40,9 @@ proof_writer = LLMAgent(
     name="proof_writer",
     role="Proof Writer",
     objective="Increase engagement and improve public understanding of the topic.",
-    context="Simplifies technical concepts with paraphrasing, and creates narrative-driven content while ensuring scientific accuracy."
-            " Proof writer will proofread and proofread the content. The content will be published on the website directly.",
+    context="Simplifies technical concepts with paraphrasing, and creates narrative-driven content "
+            "while ensuring scientific accuracy."
+            " Proof writer will proofread and proofread the content. Do not use any explanation just use final article",
     llm=llm_lib
 )
 job = JobRequest(
@@ -62,7 +65,8 @@ job = JobRequest(
             dependencies=["seo_optimizer"],
         )
     ]),
-    job_data="Write Article Title: What is the importance of Machine Learning, Tone: Informal, Style: Creative, Length: Large. Focus on keyword AI,Future",
+    job_data="Write Article Title: What is the importance of Machine Learning, Tone: Informal, "
+             "Style: Creative, Length: Large. Focus on keyword AI,Future",
 )
 
 coordinator = LLMExecutorAgent(workers=[researcher, writer, seo_optimizer, proof_writer])
