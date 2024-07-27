@@ -1,5 +1,5 @@
 import os
-from typing import Optional, Any
+from typing import Optional, Any, List
 
 import toml
 from langchain_core.output_parsers import PydanticOutputParser
@@ -17,8 +17,8 @@ class PromptWrapper(BaseModel):
 
 
 class PromptMessage(BaseModel):
-    path: Optional[str] = Field(
-        default=None,
+    paths: Optional[List[str]] = Field(
+        default=[],
         description="the path to the prompt section",
     )
 
@@ -26,16 +26,19 @@ class PromptMessage(BaseModel):
         prompt_toml = toml.load(os.path.join(os.path.dirname(__file__), "prompts.toml"))
         # path comes like this a.b.c
         # so we need to split it
-        path = self.path.split(".")
-        _prompt = prompt_toml
-        for p in path:
-            _prompt = _prompt[p]
+        prompt = ""
+        for path in self.paths:
+            path = path.split(".")
+            _prompt = prompt_toml
+            for p in path:
+                _prompt = _prompt[p]
+            prompt = prompt + _prompt
 
         if pydantic_object is not None:
             parser = PydanticOutputParser(pydantic_object=pydantic_object)
             partial_variables = {"format_instructions": parser.get_format_instructions()}
-            _prompt = PromptTemplate(template=_prompt, partial_variables=partial_variables)
+            _prompt = PromptTemplate(template=prompt, partial_variables=partial_variables)
         else:
             parser = None
-            _prompt = PromptTemplate(template=_prompt)
+            _prompt = PromptTemplate(template=prompt)
         return PromptWrapper(template=_prompt, arguments=kwargs, parser=parser)

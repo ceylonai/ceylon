@@ -3,6 +3,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from .job_step import Step
+
 
 class AgentJobStepRequest(BaseModel):
     """ the agent job step request"""
@@ -10,6 +12,7 @@ class AgentJobStepRequest(BaseModel):
     job_id: str = Field(None, description="the job id")
     worker: str = Field(description="the worker name")
     job_data: Any = Field(None, description="the job data")
+    step: Step = Field(None, description="the step")
 
 
 class AgentJobResponse(BaseModel):

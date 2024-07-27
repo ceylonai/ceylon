@@ -9,18 +9,9 @@ from pydantic import BaseModel, Field, PrivateAttr
 
 from ceylon.agent.types.agent_request import AgentJobResponse, AgentJobStepRequest
 from ceylon.ceylon import AgentDetail
+from .job_step import Step
 
 
-class Step(BaseModel):
-    '''the step'''
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()), alias='_id')
-    worker: str = Field(description="the worker name of the step")
-    dependencies: List[str] = Field(description="the dependencies of the step, these steps must be another step worker",
-                                    default=[])
-    explanation: str = Field(description="the explanation of the step", default="")
-
-    class Config:
-        arbitrary_types_allowed = True
 
 
 class JobSteps(BaseModel):
@@ -67,6 +58,7 @@ class JobRequest(BaseModel):
     _agent_responses: List[AgentJobResponse] = PrivateAttr(default=[])
 
     result: Any = Field(None, description="the result of the job")
+    job_data: Any = Field(None, description="the job data")
 
     class Config:
         arbitrary_types_allowed = True
@@ -110,7 +102,8 @@ class JobRequest(BaseModel):
                                      dt.worker in dependencies}
                 if len(only_dependencies) == len(dependencies):
                     await broadcaster(pickle.dumps(
-                        AgentJobStepRequest(worker=next_agent, job_data={}, job_id=self.id)
+                        AgentJobStepRequest(worker=next_agent, job_data=self.job_data, job_id=self.id,
+                                            step=self.steps.step(next_agent)),
                     ))
         else:
             last_response = self._agent_responses[-1]

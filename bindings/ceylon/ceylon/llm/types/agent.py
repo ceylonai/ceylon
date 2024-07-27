@@ -1,3 +1,5 @@
+from typing import List
+
 from pydantic import BaseModel, PrivateAttr, Field
 
 from ceylon.llm.prompt import PromptMessage
@@ -11,7 +13,7 @@ class AgentDefinition(BaseModel):
     role: str = Field(description="the role of the agent")
     objective: str = Field(description="the objective of the agent")
     context: str = Field(description="the context of the agent")
-    tools: [str] = Field(description="the tools of the agent", default=[])
+    tools: List[str] = Field(description="the tools of the agent", default=[])
 
     _prompt: PromptMessage = PrivateAttr(
         default=PromptMessage(path="prompts.agent"),
