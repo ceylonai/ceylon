@@ -168,11 +168,11 @@ impl WorkerAgent {
                 if is_request_to_shutdown {
                     break;
                 }
-                if let Some(raw_data) = broadcast_receiver.lock().await.recv().await {
-                    peer_emitter.send(raw_data).await.unwrap();
-                }
+
                 if cancellation_token_clone.is_cancelled() {
                     break;
+                } else if let Some(raw_data) = broadcast_receiver.lock().await.recv().await {
+                    peer_emitter.send(raw_data).await.unwrap();
                 }
             }
         });

@@ -52,6 +52,7 @@ chief = RunnerAgent(workers=[ta_worker, ta_worker2, ta_worker3, news_sentiment_w
                     tool_llm=llm_lib,
                     parallel_jobs=1,
                     server_mode=False)
+
 job = JobRequest(
     title=f"{10} write_article",
     explanation="Write an article about machine learning, Tone: Informal, Style: Creative, Length: Large",
@@ -78,6 +79,5 @@ job = JobRequest(
         )
     ])
 )
-
 res = chief.execute(job)
-print(res.result, job.id)
+print("Finished job: ", job.id, job.current_status, res.id)

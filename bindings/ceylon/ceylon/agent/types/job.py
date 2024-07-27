@@ -55,8 +55,8 @@ class JobRequest(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), alias='_id')
     steps: JobSteps = Field(description="the steps of the job", default=JobSteps(steps=[]))
 
-    on_success_callback: Optional[Callable[[JobRequestResponse], Awaitable[None]]] = Field(default=None)
-    on_failure_callback: Optional[Callable[[JobRequestResponse], Awaitable[None]]] = Field(default=None)
+    on_success_callback: Optional[Callable[[JobRequestResponse, 'JobRequest'], Awaitable[None]]] = Field(default=None)
+    on_failure_callback: Optional[Callable[[JobRequestResponse, 'JobRequest'], Awaitable[None]]] = Field(default=None)
 
     current_status: JobStatus = Field(JobStatus.IDLE, description="the current status of the job")
 
@@ -116,7 +116,8 @@ class JobRequest(BaseModel):
             last_response = self._agent_responses[-1]
             if self.on_success_callback:
                 await self.on_success_callback(
-                    JobRequestResponse(job_id=self.id, status=JobStatus.COMPLETED, data=last_response.job_data))
+                    JobRequestResponse(job_id=self.id, status=JobStatus.COMPLETED, data=last_response.job_data), self)
+            self.result = last_response
             return JobRequestResponse(job_id=self.id, status=JobStatus.COMPLETED, data=last_response.job_data)
 
     async def on_agent_connected(self, topic: "str", agent: AgentDetail, broadcaster=None):

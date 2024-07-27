@@ -54,8 +54,8 @@ threading.Thread(target=chief.execute, args=({})).start()
 
 async def main():
     for i in range(10):
-        async def on_success_callback(res: AgentJobResponse):
-            print("Finished job: ", res)
+        async def on_success_callback(res: AgentJobResponse, job: JobRequest):
+            print("Finished job: ", res, res.job_id, job.id)
 
         job = JobRequest(
             title=f"{i} write_article",
