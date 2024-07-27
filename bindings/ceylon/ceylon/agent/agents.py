@@ -17,6 +17,7 @@ admin_peer = "admin"
 
 
 class Agent(Worker):
+    history_responses = []
 
     def __init__(self, name: str, role: str):
         super().__init__(
@@ -32,9 +33,14 @@ class Agent(Worker):
         if type(data) == AgentJobStepRequest:
             request: AgentJobStepRequest = data
             if request.worker == self.details().name:
+                print("Agent process starting", self.details().name)
                 response = await self.execute_request(request)
                 response.job_id = request.job_id
                 await self.broadcast(pickle.dumps(response))
+                self.history_responses.append(response)
+                print("Agent process done", self.details().name)
+        elif type(data) == AgentJobResponse:
+            self.history_responses.append(data)
 
     async def execute_request(self, request: AgentJobStepRequest) -> AgentJobResponse:
         raise NotImplemented

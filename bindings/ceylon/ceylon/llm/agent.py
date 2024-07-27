@@ -1,9 +1,18 @@
-from typing import Any
+from typing import Any, List
+
+from langchain_core.tools import render_text_description
 
 from ceylon import Agent, AgentJobStepRequest, AgentJobResponse
 from ceylon.llm.llm.llm_executor import LLMExecutor
 from ceylon.llm.prompt import PromptMessage
 from ceylon.llm.types.agent import AgentDefinition
+
+
+def render_history(history: List[AgentJobResponse]):
+    text = ""
+    for h in history:
+        text = f"{text}\n{h.worker}-{h.job_data['response']}\n"
+    return text
 
 
 class LLMAgent(Agent):
@@ -19,7 +28,7 @@ class LLMAgent(Agent):
                  llm: Any = None
                  ):
         self.tools = tools
-        tool_names = [t.name for t in tools]
+        tool_names = render_text_description(self.tools)
         self.definition = AgentDefinition(
             name=name,
             role=role,
@@ -31,17 +40,18 @@ class LLMAgent(Agent):
         super().__init__(name=name, role=role)
 
     async def execute_request(self, request: AgentJobStepRequest) -> AgentJobResponse:
-        # print("LLM Agent executing request", request)
-
         pm = PromptMessage(paths=[
+            "prompts.job.step_history",
             "prompts.agent",
-            "prompts.job.step_execution"
+            "prompts.job.step_execution_with_tools" if self.tools else "prompts.job.step_execution"
         ])
 
         prompt_wrapper = pm.build(name=self.details().name,
                                   role=self.details().role,
                                   objective=self.definition.objective,
                                   context=self.definition.context,
+                                  tools=self.definition.tools,
+                                  history=render_history(self.history_responses),
                                   explanation=request.step.explanation + " " + request.job_data)
         executor = LLMExecutor(llm=self.llm, type="llm_executor")
         llm_response = executor.execute(prompt_wrapper, tools=self.tools)

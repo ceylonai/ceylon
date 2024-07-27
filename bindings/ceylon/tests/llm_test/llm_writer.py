@@ -25,6 +25,15 @@ writer = LLMAgent(
     llm=llm_lib
 )
 
+seo_optimizer = LLMAgent(
+    name="seo_optimizer",
+    role="SEO Optimizer",
+    objective="Optimize content for search engines",
+    context="Optimizes content for search engines",
+    tools=[],
+    llm=llm_lib
+)
+
 job = JobRequest(
     title="write_article",
     steps=JobSteps(steps=[
@@ -35,11 +44,15 @@ job = JobRequest(
         Step(
             worker="writer",
             dependencies=["researcher"],
+        ),
+        Step(
+            worker="seo_optimizer",
+            dependencies=["writer"],
         )
     ]),
-    job_data="What happened to trump?",
+    job_data="Write Article Title: What is the importance of Machine Learning, Tone: Informal, Style: Creative, Length: Large. Focus on keyword AI,Future",
 )
 
-coordinator = RunnerAgent(workers=[writer, researcher])
+coordinator = RunnerAgent(workers=[researcher, writer, seo_optimizer])
 res: JobRequest = coordinator.execute(job)
 print("Response:", res, res.id, res.result)

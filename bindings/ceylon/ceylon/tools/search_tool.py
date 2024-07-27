@@ -1,6 +1,5 @@
 from typing import Any, Type, Optional
 
-from duckduckgo_search import DDGS
 from langchain_community.utilities import SearxSearchWrapper
 from langchain_core.callbacks import CallbackManagerForToolRun
 from langchain_core.tools import BaseTool
@@ -37,7 +36,6 @@ class SearchTool(BaseTool):
                 - href (str): The URL of the search result.
                 - body (str): A brief description of the search result.
         """
-        print(f"Searching for {query}")
         try:
             # try:
             search = SearxSearchWrapper(searx_host="http://127.0.0.1:6664")
