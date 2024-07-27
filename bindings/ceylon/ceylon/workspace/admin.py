@@ -20,9 +20,14 @@ class Admin(AdminAgent, Processor, MessageHandler, EventHandler):
     def run_admin(self, inputs: "bytes", workers):
         import asyncio
 
-        event_loop = asyncio.get_event_loop()
+        try:
+            event_loop = asyncio.get_running_loop()
+        except RuntimeError:  # No running event loop
+            event_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(event_loop)
         if event_loop.is_running():
-            return event_loop.create_task(self.arun_admin(inputs, workers))
+            task = event_loop.create_task(self.arun_admin(inputs, workers))
+            return task.result()
 
         return asyncio.run(self.arun_admin(inputs, workers))
 
