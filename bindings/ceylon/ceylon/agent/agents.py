@@ -3,13 +3,13 @@ import pickle
 from collections import deque
 from typing import List
 
-import networkx as nx
-
 from ceylon.agent.types.agent_request import AgentJobStepRequest, AgentJobResponse
 from ceylon.agent.types.job import JobRequest, JobStatus
 from ceylon.ceylon import AgentDetail
 from ceylon.workspace.admin import Admin
 from ceylon.workspace.worker import Worker
+
+from loguru import logger
 
 workspace_id = "llm_unit"
 admin_port = 8888
@@ -33,12 +33,12 @@ class Agent(Worker):
         if type(data) == AgentJobStepRequest:
             request: AgentJobStepRequest = data
             if request.worker == self.details().name:
-                print("Agent process starting", self.details().name)
+                logger.info("Agent process starting", self.details().name)
                 response = await self.execute_request(request)
                 response.job_id = request.job_id
                 await self.broadcast(pickle.dumps(response))
                 self.history_responses.append(response)
-                print("Agent process done", self.details().name)
+                logger.info("Agent process finished", self.details().name)
         elif type(data) == AgentJobResponse:
             self.history_responses.append(data)
 
