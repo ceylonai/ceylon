@@ -107,7 +107,9 @@ This example demonstrates how to:
    1. [News Writing panel](https://colab.research.google.com/drive/1ZMy0Iggni6fCQynBlyI1wL4WW4U_Fman?usp=sharing)  
    2. [Meeting Schedular](https://colab.research.google.com/drive/1C-E9BN992k5sZYeJWnVrsWA5_ryaaT8m?usp=sharing)
    3. [Single Item Auction](https://colab.research.google.com/drive/1C-E9BN992k5sZYeJWnVrsWA5_ryaaT8m?usp=sharing)
-
+## Tutorials 
+- [Collaborative AI Workflow: Using Ceylon Framework for Streamlined Article Creation](https://medium.com/ceylonai/collaborative-ai-workflow-using-ceylon-framework-for-streamlined-article-creation-81bbd7ee7c01)
+- [A Meeting Scheduler with Ceylon - Multi Agent System](https://medium.com/ceylonai/a-meeting-scheduler-with-ceylon-multi-agent-system-a7aa5a906f36)
 ## 🚧 Todo
 
 - [X] LLM Agent Stack
