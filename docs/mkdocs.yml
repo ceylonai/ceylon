@@ -1,0 +1,5 @@
+site_name: "Ceylon: A Multi-Agent System (MAS)"
+site_url: "https://ceylon.ai"
+theme:
+  name: "material"
+

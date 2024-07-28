@@ -33,7 +33,8 @@ dependencies = [
     "networkx==3.3",
     "pydantic==2.8.2",
     "toml==0.10.2",
-    "loguru==0.7.2"
+    "loguru==0.7.2",
+    "mkdocs-material==9.5.30"
 ]
 
 [project.urls]
