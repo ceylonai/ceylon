@@ -3,3 +3,4 @@ site_url: "https://ceylon.ai"
 theme:
   name: "mkdocs"
 
+use_directory_urls: false
