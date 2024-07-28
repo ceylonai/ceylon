@@ -33,12 +33,12 @@ class Agent(Worker):
         if type(data) == AgentJobStepRequest:
             request: AgentJobStepRequest = data
             if request.worker == self.details().name:
-                logger.info("Agent process starting", self.details().name)
+                logger.debug(f"Agent process starting {self.details().name}")
                 response = await self.execute_request(request)
                 response.job_id = request.job_id
                 await self.broadcast(pickle.dumps(response))
                 self.history_responses.append(response)
-                logger.info("Agent process finished", self.details().name)
+                logger.debug(f"Agent process finished {self.details().name}")
         elif type(data) == AgentJobResponse:
             self.history_responses.append(data)
 
