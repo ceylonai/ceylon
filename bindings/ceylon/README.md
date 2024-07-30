@@ -1,4 +1,4 @@
-# Ceylon: A Multi-Agent System (MAS)
+# Ceylon: Multi Agent Framework
 
 > Empowering Collaboration, Simplifying Complexity
 
