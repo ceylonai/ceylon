@@ -123,7 +123,7 @@ We welcome contributions! Please read our [contributing guidelines](../../CONTRI
 
 ## 📄 License
 
-Ceylon is released under the MIT License. See the [LICENSE](LICENSE) file for details.
+Ceylon is released under the Apache-2.0 license. See the [LICENSE](LICENSE) file for details.
 
 ## 📞 Contact
 
