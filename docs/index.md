@@ -12,4 +12,4 @@ Ceylon manages and automates interactions between agents, each with specific rol
 powerful collaborative AI solutions. By empowering collaboration and simplifying complexity, Ceylon opens up new
 possibilities in AI-driven task automation and problem-solving.
 
-![Ceylon Architecture](../images/img.png)
+![Ceylon Architecture](../contents/images/img.png)

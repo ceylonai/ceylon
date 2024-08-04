@@ -1,27 +1,13 @@
-mod workspace;
 mod admin_agent;
 mod agent;
-mod worker_agent;
 mod message;
+mod worker_agent;
+mod workspace;
 
-pub use agent::{
-    MessageHandler,
-    Processor,
-    AgentDetail,
-    EventHandler,
-};
+pub use agent::{AgentDetail, EventHandler, MessageHandler, Processor};
 
-pub use workspace::{
-    WorkSpace,
-    WorkSpaceConfig,
-};
+pub use workspace::{WorkSpace, WorkSpaceConfig};
 
-pub use admin_agent::{
-    AdminAgent,
-    AdminAgentConfig,
-};
+pub use admin_agent::{AdminAgent, AdminAgentConfig};
 
-pub use worker_agent::{
-    WorkerAgentConfig,
-    WorkerAgent,
-};
+pub use worker_agent::{WorkerAgent, WorkerAgentConfig};

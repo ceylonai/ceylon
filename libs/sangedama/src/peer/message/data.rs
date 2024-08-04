@@ -3,14 +3,8 @@ use serde_json::json;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum EventType {
-    Subscribe {
-        topic: String,
-        peer_id: String,
-    },
-    Unsubscribe{
-        topic: String,
-        peer_id: String,
-    },
+    Subscribe { topic: String, peer_id: String },
+    Unsubscribe { topic: String, peer_id: String },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -38,4 +32,4 @@ impl NodeMessage {
     pub fn to_bytes(&self) -> Vec<u8> {
         serde_json::to_vec(self).unwrap()
     }
-} 
+}

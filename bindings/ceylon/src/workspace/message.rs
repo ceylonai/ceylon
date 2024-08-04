@@ -2,14 +2,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum AgentMessage {
-    SystemMessage {
-        id: u64,
-        message: Vec<u8>
-    },
-    NodeMessage {
-        id: u64,
-        message: Vec<u8>
-    },
+    SystemMessage { id: u64, message: Vec<u8> },
+    NodeMessage { id: u64, message: Vec<u8> },
 }
 
 impl AgentMessage {
@@ -20,4 +14,4 @@ impl AgentMessage {
     pub fn from_bytes(bytes: Vec<u8>) -> Self {
         serde_json::from_slice(&bytes).unwrap()
     }
-} 
+}

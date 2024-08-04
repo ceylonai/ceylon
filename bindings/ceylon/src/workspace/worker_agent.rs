@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc};
+use std::sync::Arc;
 use std::time::SystemTime;
-use tokio::sync::{Mutex};
-use tokio::{select};
-use tokio::runtime::{Handle};
+use tokio::runtime::Handle;
+use tokio::select;
+use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
@@ -60,8 +60,14 @@ impl WorkerAgent {
         }
     }
     pub async fn broadcast(&self, message: Vec<u8>) {
-        let id = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_nanos();
-        let node_message = AgentMessage::NodeMessage { message, id: id as u64 };
+        let id = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let node_message = AgentMessage::NodeMessage {
+            message,
+            id: id as u64,
+        };
         let message = node_message.to_bytes();
 
         match self.broadcast_emitter.send(message).await {
@@ -90,7 +96,13 @@ impl WorkerAgent {
 }
 
 impl WorkerAgent {
-    pub async fn run_with_config(&self, inputs: Vec<u8>, worker_agent_config: WorkerAgentConfig, runtime: Handle, cancellation_token: CancellationToken) -> Vec<JoinHandle<()>> {
+    pub async fn run_with_config(
+        &self,
+        inputs: Vec<u8>,
+        worker_agent_config: WorkerAgentConfig,
+        runtime: Handle,
+        cancellation_token: CancellationToken,
+    ) -> Vec<JoinHandle<()>> {
         info!("Agent {} running", self.config.name);
 
         let config = worker_agent_config.clone();

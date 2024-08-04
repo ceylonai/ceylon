@@ -1,9 +1,11 @@
-use futures::future::join_all;
 use std::collections::HashMap;
-use std::sync::{Arc};
+use std::sync::Arc;
 use std::time::SystemTime;
-use tokio::sync::{Mutex, RwLock};
+
+use futures::future::join_all;
+use tokio::sync::{mpsc, Mutex, RwLock};
 use tokio::{select, signal};
+use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
 
 use crate::workspace::agent::{AgentDetail, EventHandler};
@@ -13,9 +15,6 @@ use sangedama::peer::message::data::{EventType, NodeMessage};
 use sangedama::peer::node::{
     create_key, create_key_from_bytes, get_peer_id, AdminPeer, AdminPeerConfig,
 };
-
-use tokio::sync::mpsc;
-use tokio_util::sync::CancellationToken;
 
 #[derive(Clone)]
 pub struct AdminAgentConfig {
@@ -50,7 +49,6 @@ impl AdminAgent {
     ) -> Self {
         let (broadcast_emitter, broadcast_receiver) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
 
-
         let admin_peer_key = create_key();
         let id = get_peer_id(&admin_peer_key).to_string();
 
@@ -74,7 +72,10 @@ impl AdminAgent {
     }
 
     pub async fn broadcast(&self, message: Vec<u8>) {
-        let id = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_nanos() as u64;
+        let id = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
         let node_message = AgentMessage::NodeMessage { message, id };
         match self.broadcast_emitter.send(node_message.to_bytes()).await {
             Ok(_) => {}
@@ -91,9 +92,7 @@ impl AdminAgent {
     pub async fn stop(&self) {
         info!("Agent {} stop called", self.config.name);
 
-        self.shutdown_send
-            .send(self._peer_id.clone())
-            .unwrap();
+        self.shutdown_send.send(self._peer_id.clone()).unwrap();
     }
 
     pub fn details(&self) -> AgentDetail {
@@ -113,9 +112,7 @@ impl AdminAgent {
 
         let cancel_token = CancellationToken::new();
 
-
         let handle = runtime.handle().clone();
-
 
         let worker_details: RwLock<HashMap<String, AgentDetail>> = RwLock::new(HashMap::new());
 
@@ -140,7 +137,6 @@ impl AdminAgent {
             peer_.run(None, cancel_token_clone).await;
         });
 
-
         let mut worker_tasks = vec![];
 
         let _inputs = inputs.clone();
@@ -154,7 +150,12 @@ impl AdminAgent {
             let mut config = agent_.config.clone();
             config.admin_peer = _admin_id_.clone();
             let tasks = agent_
-                .run_with_config(_inputs_.clone(), config, handle.clone(), cancel_token_clone.clone())
+                .run_with_config(
+                    _inputs_.clone(),
+                    config,
+                    handle.clone(),
+                    cancel_token_clone.clone(),
+                )
                 .await;
             let agent_detail = agent_.details();
 
@@ -175,7 +176,6 @@ impl AdminAgent {
         let name = self.config.name.clone();
         let on_message = self._on_message.clone();
         let on_event = self._on_event.clone();
-
 
         let cancel_token_clone = cancel_token.clone();
 
@@ -256,9 +256,7 @@ impl AdminAgent {
                         Ok(_) => {
                             continue;
                         }
-                        Err(_) => {
-                            continue
-                        }
+                        Err(_) => continue,
                     };
                 }
             }
