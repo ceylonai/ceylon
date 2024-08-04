@@ -1,10 +1,9 @@
 use std::time::Duration;
 
-use libp2p::{gossipsub, identify, ping, rendezvous};
 use libp2p::swarm::NetworkBehaviour;
+use libp2p::{gossipsub, identify, ping, rendezvous};
 
-use crate::peer::behaviour::base::create_gossip_sub_config;
-use crate::peer::behaviour::PeerBehaviour;
+use crate::peer::behaviour::{base::create_gossip_sub_config, PeerBehaviour};
 
 // We create a custom network behaviour that combines Gossipsub and Mdns.
 #[derive(NetworkBehaviour)]
@@ -23,7 +22,6 @@ pub enum PeerAdminEvent {
     Identify(identify::Event),
     GossipSub(gossipsub::Event),
 }
-
 
 impl From<gossipsub::Event> for PeerAdminEvent {
     fn from(event: gossipsub::Event) -> Self {
@@ -50,12 +48,14 @@ impl From<identify::Event> for PeerAdminEvent {
 
 impl PeerBehaviour for PeerAdminBehaviour {
     fn new(local_public_key: libp2p::identity::Keypair) -> Self {
-        let rendezvous_server = rendezvous::server::Behaviour::new(rendezvous::server::Config::default());
+        let rendezvous_server =
+            rendezvous::server::Behaviour::new(rendezvous::server::Config::default());
         let gossip_sub_config = create_gossip_sub_config();
         let gossip_sub = gossipsub::Behaviour::new(
             gossipsub::MessageAuthenticity::Signed(local_public_key.clone()),
             gossip_sub_config,
-        ).unwrap();
+        )
+        .unwrap();
 
         Self {
             gossip_sub,

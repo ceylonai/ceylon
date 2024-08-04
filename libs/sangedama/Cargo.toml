@@ -2,34 +2,37 @@
 name = "sangedama"
 version = "0.1.1"
 edition = "2021"
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-[lib]
-name = "sangedama"
 crate-type = ["rlib"]
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+futures = "0.3.30"
 async-trait = "0.1.80"
-reqwest = { version = "0.12.5", features = ["json"] }
-serde_json = "1.0.120"
 tokio = { version = "1.38.1", features = ["full"] }
 tokio-util = { version = "0.7.11", features = ["rt"] }
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 serde = { version = "1.0.203", features = ["derive"] }
+serde_json = "1.0.120"
+reqwest = { version = "0.12.5", features = ["json"] }
 libp2p = { version = "0.53.2", features = [
     "tokio",
-    "gossipsub", "mdns", "noise", "macros", "tcp", "yamux", "quic", "tls", "relay", "websocket", "dns",
+    "gossipsub",
+    "mdns",
+    "noise",
+    "macros",
+    "tcp",
+    "yamux",
+    "quic",
+    "tls",
+    "relay",
+    "websocket",
+    "dns",
     "autonat",
     "identify",
     "rendezvous",
     "ping",
-    "request-response"
+    "request-response",
 ] }
-libp2p-gossipsub = "0.46.1"
-libp2p-noise = "0.44.0"
-libp2p-tls = "0.4.1"
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-tracing = "0.1.40"
-futures = "0.3.30"
 
 sha2 = "0.10.8"
 chrono = "0.4.38"

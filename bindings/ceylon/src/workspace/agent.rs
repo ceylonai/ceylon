@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -7,7 +8,6 @@ pub struct AgentDetail {
     pub id: String,
     pub role: String,
 }
-
 
 #[async_trait::async_trait]
 pub trait AgentBase {

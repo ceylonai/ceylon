@@ -1,7 +1,7 @@
 use std::time::Duration;
 
-use libp2p::{gossipsub, identify, identity, mdns, ping, rendezvous};
 use libp2p::swarm::NetworkBehaviour;
+use libp2p::{gossipsub, identify, identity, mdns, ping, rendezvous};
 
 use crate::peer::behaviour::base::create_gossip_sub_config;
 use crate::peer::behaviour::PeerBehaviour;
@@ -54,7 +54,6 @@ impl From<identify::Event> for ClientPeerEvent {
     }
 }
 
-
 impl PeerBehaviour for ClientPeerBehaviour {
     fn new(local_public_key: identity::Keypair) -> Self {
         // Set a custom gossip_sub_config configuration
@@ -62,7 +61,8 @@ impl PeerBehaviour for ClientPeerBehaviour {
         let gossip_sub = gossipsub::Behaviour::new(
             gossipsub::MessageAuthenticity::Signed(local_public_key.clone()),
             gossip_sub_config,
-        ).unwrap();
+        )
+        .unwrap();
 
         Self {
             gossip_sub,

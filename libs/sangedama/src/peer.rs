@@ -1,4 +1,4 @@
 mod behaviour;
-mod peer_swarm;
-pub mod node;
 pub mod message;
+pub mod node;
+mod peer_swarm;

@@ -1,8 +1,8 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::time::Duration;
-use libp2p::gossipsub;
+
+use libp2p::gossipsub::{self, Config};
 use libp2p::swarm::NetworkBehaviour;
-use libp2p_gossipsub::Config;
 use tokio::io;
 
 pub trait PeerBehaviour

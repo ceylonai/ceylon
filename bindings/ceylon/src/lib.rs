@@ -5,7 +5,7 @@ fn version() -> String {
 }
 
 fn cprint(val: String) {
-    info!( "{}", val);
+    info!("{}", val);
 }
 
 fn enable_log(level: String) {
