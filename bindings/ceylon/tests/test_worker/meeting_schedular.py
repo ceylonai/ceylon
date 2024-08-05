@@ -4,8 +4,7 @@ from typing import List
 
 from pydantic.dataclasses import dataclass
 
-from ceylon.workspace.admin import Admin
-from ceylon.workspace.worker import Worker
+from ceylon import Agent, CoreAdmin
 
 admin_port = 8000
 admin_peer = "Coordinator"
@@ -52,7 +51,7 @@ class AvailabilityResponse:
     accepted: bool
 
 
-class Participant(Worker):
+class Participant(Agent):
     name: str
     available_times: List[TimeSlot]
 
@@ -82,7 +81,7 @@ class Participant(Worker):
         return earliest_end - latest_start >= duration
 
 
-class Coordinator(Admin):
+class Coordinator(CoreAdmin):
     meeting: Meeting = None
     agreed_slots = {}
     next_time_slot = None

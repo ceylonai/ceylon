@@ -17,19 +17,26 @@ class Admin(AdminAgent, Processor, MessageHandler, EventHandler):
     async def on_message(self, agent_id: "str", data: "bytes", time: "int"):
         pass
 
-    def run_admin(self, inputs: "bytes", workers):
+    def run_admin(self, inputs: bytes, workers):
         import asyncio
 
         try:
+            # Try to get the running event loop
             event_loop = asyncio.get_running_loop()
-        except RuntimeError:  # No running event loop
+        except RuntimeError:
+            # No running event loop, create a new one
             event_loop = asyncio.new_event_loop()
             asyncio.set_event_loop(event_loop)
-        if event_loop.is_running():
-            task = event_loop.create_task(self.arun_admin(inputs, workers))
-            return task.result()
+            return event_loop.run_until_complete(self.arun_admin(inputs, workers))
 
-        return asyncio.run(self.arun_admin(inputs, workers))
+        # If the loop is already running, schedule the coroutine in the running loop
+        if event_loop.is_running():
+            # Create a future to run the coroutine
+            future = asyncio.ensure_future(self.arun_admin(inputs, workers), loop=event_loop)
+            return event_loop.run_until_complete(future)
+        else:
+            # If no loop is running, run the coroutine with asyncio.run()
+            return asyncio.run(self.arun_admin(inputs, workers))
 
     async def arun_admin(self, inputs: "bytes", workers):
         uniffi_set_event_loop(asyncio.get_event_loop())

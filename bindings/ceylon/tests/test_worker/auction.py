@@ -1,14 +1,13 @@
 import asyncio
 import pickle
 import random
-import sys
 from typing import List
 
 from pydantic.dataclasses import dataclass
 
 from ceylon.ceylon import enable_log
-from ceylon.workspace.admin import Admin
-from ceylon.workspace.worker import Worker
+from ceylon import CoreAdmin
+from ceylon import Agent
 
 admin_port = 8000
 admin_peer = "Auctioneer"
@@ -43,14 +42,15 @@ class AuctionEnd:
     pass
 
 
-class Bidder(Worker):
+class Bidder(Agent):
     name: str
     budget: float
 
     def __init__(self, name: str, budget: float):
         self.name = name
         self.budget = budget
-        super().__init__(name=name, workspace_id=workspace_id, admin_peer=admin_peer, admin_port=admin_port)
+        super().__init__(name=name, workspace_id=workspace_id, admin_peer=admin_peer, admin_port=admin_port,
+                         role="bidder")
 
     async def on_message(self, agent_id: str, data: bytes, time: int):
         message = pickle.loads(data)
@@ -67,7 +67,7 @@ class Bidder(Worker):
                 print(f"{self.name} lost the auction")
 
 
-class Auctioneer(Admin):
+class Auctioneer(CoreAdmin):
     item: Item
     bids: List[Bid] = []
     expected_bidders: int
@@ -109,7 +109,7 @@ class Auctioneer(Admin):
         await self.broadcast(pickle.dumps(AuctionEnd()))
 
 
-async def main():
+if __name__ == '__main__':
     item = Item("Rare Painting", 1000)
 
     bidders = [
@@ -119,9 +119,4 @@ async def main():
     ]
 
     auctioneer = Auctioneer(item, expected_bidders=len(bidders))
-    await auctioneer.run_admin(inputs=b"", workers=bidders)
-
-
-if __name__ == '__main__':
-    enable_log("INFO")
-    asyncio.run(main())
+    auctioneer.run_admin(inputs=b"", workers=bidders)

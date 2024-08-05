@@ -1,0 +1,19 @@
+from ceylon.ceylon import AgentDetail
+from ceylon.workspace.admin import Admin
+
+
+class CoreAdmin(Admin):
+    def __init__(self, name, port, workers=[], server_mode=False):
+        self.__server_mode = server_mode
+        self.__workers = workers
+        self.__connected_agents = []
+        super().__init__(name, port)
+
+    async def run(self, inputs: "bytes"):
+        pass
+
+    async def on_agent_connected(self, topic: "str", agent: AgentDetail):
+        self.__connected_agents.append(agent)
+
+    async def on_message(self, agent_id: "str", data: "bytes", time: "int"):
+        pass
