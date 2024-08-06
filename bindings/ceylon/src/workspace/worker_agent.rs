@@ -11,7 +11,7 @@ use tracing::{error, info};
 
 use crate::workspace::agent::AgentDetail;
 use crate::workspace::message::AgentMessage;
-use crate::{MessageHandler, Processor};
+use crate::{EventHandler, MessageHandler, Processor};
 use sangedama::peer::message::data::{EventType, NodeMessage};
 use sangedama::peer::node::{
     create_key, create_key_from_bytes, get_peer_id, MemberPeer, MemberPeerConfig,
@@ -32,6 +32,7 @@ pub struct WorkerAgent {
 
     _processor: Arc<Mutex<Arc<dyn Processor>>>,
     _on_message: Arc<Mutex<Arc<dyn MessageHandler>>>,
+    _on_event: Arc<Mutex<Arc<dyn EventHandler>>>,
 
     pub broadcast_emitter: tokio::sync::mpsc::Sender<Vec<u8>>,
     pub broadcast_receiver: Arc<Mutex<tokio::sync::mpsc::Receiver<Vec<u8>>>>,
@@ -45,6 +46,7 @@ impl WorkerAgent {
         config: WorkerAgentConfig,
         on_message: Arc<dyn MessageHandler>,
         processor: Arc<dyn Processor>,
+        on_event: Arc<dyn EventHandler>,
     ) -> Self {
         let (broadcast_emitter, broadcast_receiver) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
         let admin_peer_key = create_key();
@@ -53,6 +55,7 @@ impl WorkerAgent {
             config,
             _processor: Arc::new(Mutex::new(processor)),
             _on_message: Arc::new(Mutex::new(on_message)),
+            _on_event: Arc::new(Mutex::new(on_event)),
 
             broadcast_emitter,
             broadcast_receiver: Arc::new(Mutex::new(broadcast_receiver)),
@@ -168,6 +171,7 @@ impl WorkerAgent {
 
         let agent_details = self.details().clone();
 
+        let on_event = self._on_event.clone();
         let task_admin_listener = runtime.spawn(async move {
             loop {
                 if is_request_to_shutdown {
@@ -191,6 +195,19 @@ impl WorkerAgent {
                                                 time
                                             ).await;
                                         }
+                                        
+                                        AgentMessage::AgentIntroduction { id, name, role, topic } => {
+                                            let agent_detail = AgentDetail{
+                                                name,
+                                                id,
+                                                role
+                                            };
+                                            on_event.lock().await.on_agent_connected(
+                                                topic,
+                                                agent_detail
+                                            ).await;
+                                        }
+                                        
                                         _ => {
                                             info!("Agent listener {:?}", agent_message);
                                         }

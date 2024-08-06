@@ -53,7 +53,7 @@ dictionary WorkerAgentConfig {
     string admin_ip;
 };
 interface WorkerAgent{
-    constructor(WorkerAgentConfig config,MessageHandler on_message, Processor processor);
+    constructor(WorkerAgentConfig config,MessageHandler on_message, Processor processor, EventHandler on_event);
     [Async]
     void start(bytes inputs);
 
