@@ -179,13 +179,13 @@ impl AdminAgent {
 
         let cancel_token_clone = cancel_token.clone();
 
+        let mut is_call_agent_on_connect_list: HashMap<String, bool> = HashMap::new();
         let task_admin_listener = handle.spawn(async move {
             loop {
-                select! {                    
+                select! {
                     _ = cancel_token_clone.cancelled() => {
                         break;
-                    }                   
-                    
+                    }
                    event = peer_listener_.recv() => {
                         if let Some(event) = event {
                             match event {
@@ -199,6 +199,26 @@ impl AdminAgent {
                                                 message,
                                                 time
                                             ).await;
+                                        }
+                                        AgentMessage::AgentIntroduction { id, name,role,topic } => {
+                                            info!( "Agent introduction {:?}", id);
+                                            let peer_id = id.clone();
+                                            let id_key = id.clone();
+                                            let agent_detail = AgentDetail {
+                                               name,
+                                               id,
+                                               role
+                                            };
+                                            worker_details.write().await.insert(id_key, agent_detail);
+                                            let is_call_agent_on_connect = is_call_agent_on_connect_list.get( &peer_id).unwrap_or(&false).clone();
+                                            if !is_call_agent_on_connect{
+                                                if let Some(agent) = worker_details.read().await.get(&peer_id) {
+                                                    let agent = agent.clone();
+                                                    on_event.lock().await.on_agent_connected(topic,agent)
+                                                    .await;
+                                                    is_call_agent_on_connect_list.insert(peer_id, true);
+                                                }
+                                            }
                                         }
                                         _ => {
                                             info!("Agent listener {:?}", agent_message);
@@ -214,10 +234,14 @@ impl AdminAgent {
                                             peer_id,
                                             topic,
                                         }=>{
-                                            if let Some(agent) = worker_details.read().await.get(&peer_id) {
-                                                let agent = agent.clone();
-                                                 on_event.lock().await.on_agent_connected(topic,agent)
-                                                .await;
+                                            let is_call_agent_on_connect = is_call_agent_on_connect_list.get( &peer_id).unwrap_or(&false).clone();
+                                            if !is_call_agent_on_connect{
+                                                if let Some(agent) = worker_details.read().await.get(&peer_id) {
+                                                    let agent = agent.clone();
+                                                    on_event.lock().await.on_agent_connected(topic,agent)
+                                                    .await;
+                                                    is_call_agent_on_connect_list.insert(peer_id, true);
+                                                }
                                             }
                                         }
                                         _ => {
