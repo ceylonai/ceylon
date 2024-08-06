@@ -8,7 +8,6 @@ class Worker(WorkerAgent, Processor, MessageHandler):
 
     def __init__(self, name="admin", workspace_id="admin", admin_peer="", admin_port=8888, role="worker",
                  admin_ip="127.0.0.1"):
-        logger.info(f"Worker  {name}, {workspace_id}, {admin_peer}, {admin_port}, {role}, {admin_ip}")
         super().__init__(config=WorkerAgentConfig(name=name,
                                                   role=role,
                                                   admin_peer=admin_peer,
