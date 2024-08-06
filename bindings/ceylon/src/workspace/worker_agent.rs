@@ -12,7 +12,7 @@ use tracing::{error, info};
 use crate::workspace::agent::AgentDetail;
 use crate::workspace::message::AgentMessage;
 use crate::{MessageHandler, Processor};
-use sangedama::peer::message::data::NodeMessage;
+use sangedama::peer::message::data::{EventType, NodeMessage};
 use sangedama::peer::node::{
     create_key, create_key_from_bytes, get_peer_id, MemberPeer, MemberPeerConfig,
 };
@@ -164,6 +164,10 @@ impl WorkerAgent {
 
         let on_message = self._on_message.clone();
         let cancellation_token_clone = cancellation_token.clone();
+        let peer_emitter_clone = peer_emitter.clone();
+
+        let agent_details = self.details().clone();
+
         let task_admin_listener = runtime.spawn(async move {
             loop {
                 if is_request_to_shutdown {
@@ -189,6 +193,31 @@ impl WorkerAgent {
                                         }
                                         _ => {
                                             info!("Agent listener {:?}", agent_message);
+                                        }
+                                    }
+                                }
+                                NodeMessage::Event {
+                                    event,
+                                    ..
+                                }=>{
+                                   match event{
+                                        EventType::Subscribe{
+                                            peer_id,
+                                            topic
+                                        }=>{
+                                            info!("Worker {} Subscribed to topic {:?}", agent_details.id, topic);
+                                            let agent_intro_message = AgentMessage::AgentIntroduction {
+                                                id: agent_details.id.clone(),
+                                                name: agent_details.name.clone(),
+                                                role:agent_details.role.clone(),
+                                                topic,
+                                            };
+                                            peer_emitter_clone.send(
+                                                agent_intro_message.to_bytes()
+                                            ).await.unwrap();
+                                        }
+                                        _ => {
+                                            info!("Admin Received Event {:?}", event);
                                         }
                                     }
                                 }
