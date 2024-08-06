@@ -13,7 +13,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
 
 use crate::peer::behaviour::{ClientPeerBehaviour, ClientPeerEvent};
-use crate::peer::message::data::NodeMessage;
+use crate::peer::message::data::{EventType, NodeMessage};
 use crate::peer::peer_swarm::create_swarm;
 
 #[derive(Debug, Clone)]
@@ -30,9 +30,10 @@ impl MemberPeerConfig {
         workspace_id: String,
         admin_peer: String,
         rendezvous_point_admin_port: u16,
+        rendezvous_point_public_ip: String,
     ) -> Self {
         let rendezvous_point_address = Multiaddr::empty()
-            .with(Protocol::Ip4(Ipv4Addr::LOCALHOST))
+            .with(Protocol::Ip4(Ipv4Addr::from_str(&rendezvous_point_public_ip).unwrap()))
             .with(Protocol::Udp(rendezvous_point_admin_port))
             .with(Protocol::QuicV1);
 
@@ -93,9 +94,11 @@ impl MemberPeer {
             .with(Protocol::Udp(0))
             .with(Protocol::QuicV1);
         self.swarm.add_external_address(ext_address.clone());
-
+        info!( "Peer {:?}: {:?} External address: {:?}", name.clone(), self.id.clone(), ext_address.clone());
         let admin_peer_id = self.config.admin_peer;
         let rendezvous_point_address = self.config.rendezvous_point_address.clone();
+        info!( "Peer {:?}: {:?} Rendezvous point address: {:?} / admin peer: {:?}", name.clone(),
+            self.id.clone(), rendezvous_point_address.clone(), admin_peer_id.clone());
 
         let dial_opts = DialOpts::peer_id(admin_peer_id)
             .addresses(vec![rendezvous_point_address])
@@ -188,6 +191,23 @@ impl MemberPeer {
                     info!("Subscribed to topic: {:?} from peer: {:?}", topic, peer_id);
                     if peer_id.to_string() == self.config.admin_peer.to_string() {
                         info!("Member {} Subscribe with Admin", name_.clone());
+                        let msg = NodeMessage::Event {
+                            time: std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap()
+                                .as_secs_f64() as u64,
+                            created_by: peer_id.to_string(),
+                            event: EventType::Subscribe {
+                                topic: topic.to_string(),
+                                peer_id: peer_id.to_string(),
+                            },
+                        };
+                        match self.outside_tx.send(msg).await {
+                            Ok(_) => {}
+                            Err(e) => {
+                                error!("Failed to send message to outside: {:?}", e);
+                            }
+                        };
                     }
                 }
 
