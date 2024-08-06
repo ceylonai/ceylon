@@ -14,13 +14,7 @@ class WorkerAgent1(Agent):
 
 
 worker_1 = WorkerAgent1("worker_2", "server_admin", role="What enver", admin_port=8000,
-                        admin_peer="12D3KooWFTTKVN48Ps5DYmUX6YY16Zjo5gm7NbBD65geFohuv5ke")
+                        admin_peer="12D3KooWCLKVyiM5VkwYYAaDKL5rMW4WnSbMcVicMDqy23inFz3K")
 
 
-async def run():
-    uniffi_set_event_loop(asyncio.get_event_loop())
-    await worker_1.start(pickle.dumps({}))
-
-
-# enable_log("info")
-asyncio.run(run())
+worker_1.run_worker(pickle.dumps({}))

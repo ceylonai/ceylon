@@ -1,5 +1,7 @@
+import asyncio
+
 from ceylon.ceylon import WorkerAgent, WorkerAgentConfig, Processor, \
-    MessageHandler
+    MessageHandler, uniffi_set_event_loop
 
 
 class Worker(WorkerAgent, Processor, MessageHandler):
@@ -18,3 +20,28 @@ class Worker(WorkerAgent, Processor, MessageHandler):
 
     async def on_message(self, agent_id: "str", data: "bytes", time: "int"):
         pass
+
+    def run_worker(self, inputs: bytes):
+        import asyncio
+
+        try:
+            # Try to get the running event loop
+            event_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # No running event loop, create a new one
+            event_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(event_loop)
+            return event_loop.run_until_complete(self.arun_worker(inputs))
+
+        # If the loop is already running, schedule the coroutine in the running loop
+        if event_loop.is_running():
+            # Create a future to run the coroutine
+            future = asyncio.ensure_future(self.arun_worker(inputs), loop=event_loop)
+            return event_loop.run_until_complete(future)
+        else:
+            # If no loop is running, run the coroutine with asyncio.run()
+            return asyncio.run(self.arun_worker(inputs))
+
+    async def arun_worker(self, inputs: "bytes"):
+        uniffi_set_event_loop(asyncio.get_event_loop())
+        await self.start(inputs)
