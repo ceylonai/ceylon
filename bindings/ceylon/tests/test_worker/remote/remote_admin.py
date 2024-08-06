@@ -3,7 +3,7 @@ import pickle
 from loguru import logger
 
 from ceylon import CoreAdmin, Agent
-from ceylon.ceylon import AgentDetail, enable_log
+from ceylon.ceylon import AgentDetail
 
 
 class ServerAdminAgent(CoreAdmin):
