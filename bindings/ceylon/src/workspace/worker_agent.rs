@@ -1,10 +1,11 @@
+use futures::future::join_all;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::runtime::Handle;
-use tokio::select;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
+use tokio::{select, signal};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
 
@@ -77,9 +78,40 @@ impl WorkerAgent {
             }
         }
     }
-    pub async fn start(&self, _: Vec<u8>) {
-        info!("Not yet implemented");
-        // self.run_with_config(inputs, self.config.clone()).await;
+    pub async fn start(&self, _inputs: Vec<u8>) {
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        let _inputs_ = _inputs.clone();
+        let config = self.config.clone();
+
+        let handle = runtime.handle().clone();
+        let cancel_token = CancellationToken::new();
+        let cancel_token_clone = cancel_token.clone();
+
+        let tasks = self
+            .run_with_config(
+                _inputs_.clone(),
+                config,
+                handle.clone(),
+                cancel_token_clone.clone(),
+            )
+            .await;
+
+        let task_runner = join_all(tasks);
+
+        let name = self.config.name.clone();
+        select! {
+           _ = task_runner => {
+                info!("Agent {} task_runner done ", name);
+            }
+            _ = signal::ctrl_c() => {
+                println!("Agent {:?} received exit signal", name);
+                cancel_token_clone.cancel();
+            }
+        }
     }
 
     pub async fn stop(&self) {
