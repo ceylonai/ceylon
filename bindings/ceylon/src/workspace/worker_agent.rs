@@ -24,6 +24,7 @@ pub struct WorkerAgentConfig {
     pub work_space_id: String,
     pub admin_peer: String,
     pub admin_port: u16,
+    pub admin_ip: String,
 }
 
 pub struct WorkerAgent {
@@ -143,6 +144,7 @@ impl WorkerAgent {
             config.work_space_id.clone(),
             config.admin_peer.clone(),
             config.admin_port,
+            config.admin_ip,
         );
         let peer_key = create_key_from_bytes(self._key.clone());
         let (mut peer_, mut peer_listener_) =
