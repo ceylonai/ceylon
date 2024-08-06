@@ -195,7 +195,6 @@ impl WorkerAgent {
                                                 time
                                             ).await;
                                         }
-                                        
                                         AgentMessage::AgentIntroduction { id, name, role, topic } => {
                                             let agent_detail = AgentDetail{
                                                 name,
@@ -207,7 +206,6 @@ impl WorkerAgent {
                                                 agent_detail
                                             ).await;
                                         }
-                                        
                                         _ => {
                                             info!("Agent listener {:?}", agent_message);
                                         }
@@ -219,8 +217,8 @@ impl WorkerAgent {
                                 }=>{
                                    match event{
                                         EventType::Subscribe{
-                                            peer_id,
-                                            topic
+                                            topic,
+                                            ..
                                         }=>{
                                             info!("Worker {} Subscribed to topic {:?}", agent_details.id, topic);
                                             let agent_intro_message = AgentMessage::AgentIntroduction {

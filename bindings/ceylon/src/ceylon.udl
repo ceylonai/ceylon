@@ -5,18 +5,6 @@ namespace ceylon {
   void cprint(string message);
 };
 
-dictionary WorkSpaceConfig{
-    string name;
-    u16 port = 8888;
-};
-
-interface WorkSpace{
-    constructor(WorkSpaceConfig config);
-
-    [Async]
-    void run(bytes inputs);
-};
-
 dictionary AdminAgentConfig {
     string name;
     u16 port;
