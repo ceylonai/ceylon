@@ -5,7 +5,9 @@ from ceylon.workspace.admin import Admin
 
 
 class CoreAdmin(Admin):
-    def __init__(self, name, port, workers=[], server_mode=False):
+    def __init__(self, name, port, workers=None, server_mode=False):
+        if workers is None:
+            workers = []
         self.__server_mode = server_mode
         self.__workers = workers
         self.__connected_agents = []

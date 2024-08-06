@@ -1,7 +1,5 @@
 import asyncio
 
-from loguru import logger
-
 from ceylon.ceylon import WorkerAgent, WorkerAgentConfig, Processor, \
     MessageHandler, uniffi_set_event_loop, EventHandler
 
