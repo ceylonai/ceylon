@@ -1,3 +1,5 @@
+from loguru import logger
+
 from ceylon.ceylon import AgentDetail
 from ceylon.workspace.admin import Admin
 
@@ -10,6 +12,7 @@ class CoreAdmin(Admin):
         super().__init__(name, port)
 
     async def run(self, inputs: "bytes"):
+        logger.info((f"Admin on_run  {self.details().id}", inputs))
         pass
 
     async def on_agent_connected(self, topic: "str", agent: AgentDetail):

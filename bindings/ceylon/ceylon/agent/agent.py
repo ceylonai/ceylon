@@ -22,7 +22,7 @@ def on_message(type):
 class Agent(Worker):
     history_responses = []
 
-    def __init__(self, name: str, workspace_id: str, admin_port: int, admin_peer: str, role: str = None):
+    def __init__(self, name="admin", workspace_id="admin", admin_peer="", admin_port=8888, role="worker"):
         super().__init__(
             name=name,
             workspace_id=workspace_id,
