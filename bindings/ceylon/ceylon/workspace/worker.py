@@ -1,5 +1,3 @@
-from loguru import logger
-
 from ceylon.ceylon import WorkerAgent, WorkerAgentConfig, Processor, \
     MessageHandler
 

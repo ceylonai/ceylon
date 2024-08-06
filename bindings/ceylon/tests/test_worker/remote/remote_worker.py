@@ -4,7 +4,7 @@ import pickle
 from loguru import logger
 
 from ceylon import Agent
-from ceylon.ceylon import uniffi_set_event_loop, enable_log
+from ceylon.ceylon import uniffi_set_event_loop
 
 
 class WorkerAgent1(Agent):
