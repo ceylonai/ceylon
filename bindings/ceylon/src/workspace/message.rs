@@ -1,9 +1,21 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum AgentMessage {
-    SystemMessage { id: u64, message: Vec<u8> },
-    NodeMessage { id: u64, message: Vec<u8> },
+    SystemMessage {
+        id: u64,
+        message: Vec<u8>,
+    },
+    NodeMessage {
+        id: u64,
+        message: Vec<u8>,
+    },
+    AgentIntroduction {
+        id: String,
+        role: String,
+        name: String,
+        topic: String,
+    },
 }
 
 impl AgentMessage {
