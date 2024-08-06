@@ -1,6 +1,6 @@
 from typing import Dict, Callable
 
-from ceylon.workspace.worker import Worker
+from ceylon.core.worker import Worker
 
 message_handlers: Dict[str, Callable] = {}
 

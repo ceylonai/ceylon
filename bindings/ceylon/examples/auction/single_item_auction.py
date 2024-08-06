@@ -5,8 +5,8 @@ from typing import List
 
 from pydantic.dataclasses import dataclass
 
-from ceylon.workspace.admin import Admin
-from ceylon.workspace.worker import Worker
+from ceylon.core.admin import Admin
+from ceylon.core.worker import Worker
 
 admin_port = 8000
 admin_peer = "Auctioneer"

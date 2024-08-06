@@ -6,8 +6,8 @@ from typing import List
 from ceylon.agent.types.agent_request import AgentJobStepRequest, AgentJobResponse
 from ceylon.agent.types.job import JobRequest, JobStatus
 from ceylon.ceylon import AgentDetail
-from ceylon.workspace.admin import Admin
-from ceylon.workspace.worker import Worker
+from ceylon.core.admin import Admin
+from ceylon.core.worker import Worker
 
 from loguru import logger
 

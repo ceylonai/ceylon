@@ -5,8 +5,8 @@ from typing import Type, Dict, Callable
 from loguru import logger
 from pydantic import BaseModel
 
-from ceylon.workspace.admin import Admin
-from ceylon.workspace.worker import Worker
+from ceylon.core.admin import Admin
+from ceylon.core.worker import Worker
 
 message_handlers: Dict[str, Callable] = {}
 

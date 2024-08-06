@@ -1,7 +1,7 @@
 from loguru import logger
 
 from ceylon.ceylon import AgentDetail
-from ceylon.workspace.admin import Admin
+from ceylon.core.admin import Admin
 
 
 class CoreAdmin(Admin):

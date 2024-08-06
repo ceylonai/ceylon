@@ -1,18 +1,24 @@
 import asyncio
 import pickle
 import sys
-from typing import List
+from typing import List, Any
 
+from pydantic import BaseModel
 from pydantic.dataclasses import dataclass
 
-from ceylon.ceylon import enable_log
-from ceylon.workspace.admin import Admin
-from ceylon.workspace.runner import RunnerInput
-from ceylon.workspace.worker import Worker
+from ceylon.core.admin import Admin
+from ceylon.core.worker import Worker
 
 admin_port = 8000
 admin_peer = "Coordinator"
 workspace_id = "time_scheduling"
+
+
+class RunnerInput(BaseModel):
+    request: Any
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 @dataclass(repr=True)
