@@ -1,25 +1,8 @@
-from typing import Dict, Callable
-
+from ceylon.agent.common import AgentCommon
 from ceylon.core.worker import Worker
 
-message_handlers: Dict[str, Callable] = {}
 
-
-def on_message(type):
-    def decorator(method):
-        class_name = method.__qualname__.split(".")[0]
-        method_key = f"{class_name}.{type}"
-        message_handlers[method_key] = method
-
-        def wrapper(*args, **kwargs):
-            return method(*args, **kwargs)
-
-        return wrapper
-
-    return decorator
-
-
-class Agent(Worker):
+class Agent(Worker, AgentCommon):
     history_responses = []
 
     def __init__(self, name="admin", workspace_id="admin", admin_peer="", admin_port=8888, role="worker"):
@@ -30,6 +13,7 @@ class Agent(Worker):
             admin_peer=admin_peer,
             role=role if role else name,
         )
+        AgentCommon.__init__(self)
 
     async def on_message(self, agent_id: "str", data: "bytes", time: "int"):
-        pass
+        await self._on_message_handler(agent_id, data, time)

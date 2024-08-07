@@ -1,10 +1,11 @@
 from loguru import logger
 
+from .common import AgentCommon
 from ceylon.ceylon import AgentDetail
 from ceylon.core.admin import Admin
 
 
-class CoreAdmin(Admin):
+class CoreAdmin(Admin, AgentCommon):
     def __init__(self, name, port, workers=None, server_mode=False):
         if workers is None:
             workers = []
@@ -12,6 +13,7 @@ class CoreAdmin(Admin):
         self.__workers = workers
         self.__connected_agents = []
         super().__init__(name, port)
+        AgentCommon.__init__(self)
 
     async def run(self, inputs: "bytes"):
         logger.info((f"Admin on_run  {self.details().id}", inputs))
@@ -21,4 +23,4 @@ class CoreAdmin(Admin):
         self.__connected_agents.append(agent)
 
     async def on_message(self, agent_id: "str", data: "bytes", time: "int"):
-        pass
+        await self._on_message_handler(agent_id, data, time)
