@@ -1,4 +1,6 @@
 import asyncio
+import pickle
+from typing import Any
 
 from ceylon.ceylon import WorkerAgent, WorkerAgentConfig, Processor, \
     MessageHandler, uniffi_set_event_loop, EventHandler
@@ -48,3 +50,6 @@ class Worker(WorkerAgent, Processor, MessageHandler, EventHandler):
 
     async def on_agent_connected(self, topic: "str", agent: "AgentDetail"):
         pass
+
+    async def broadcast_data(self, message: Any):
+        await self.broadcast(pickle.dumps(message))

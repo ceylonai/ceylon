@@ -55,7 +55,7 @@ class Bidder(Agent):
         if self.budget > data.item.starting_price:
             random_i = random.randint(100, 1000)
             bid_amount = min(self.budget, data.item.starting_price * random_i / 100)  # Simple bidding strategy
-            await self.broadcast(pickle.dumps(Bid(bidder=self.name, amount=bid_amount)))
+            await self.broadcast_data(Bid(bidder=self.name, amount=bid_amount))
 
     @on_message(type=Bid)
     async def on_auction_result(self, data: AuctionResult):
@@ -83,7 +83,7 @@ class Auctioneer(CoreAdmin):
 
     async def start_auction(self):
         print(f"Starting auction for {self.item.name} with starting price ${self.item.starting_price}")
-        await self.broadcast(pickle.dumps(AuctionStart(item=self.item)))
+        await self.broadcast_data(AuctionStart(item=self.item))
 
     @on_message(type=Bid)
     async def on_bid(self, bid: Bid):
@@ -97,11 +97,11 @@ class Auctioneer(CoreAdmin):
         else:
             winning_bid = max(self.bids, key=lambda x: x.amount)
             result = AuctionResult(winner=winning_bid.bidder, winning_bid=winning_bid.amount)
-            await self.broadcast(pickle.dumps(result))
+            await self.broadcast_data(result)
             print(f"Auction ended. Winner: {result.winner}, Winning Bid: ${result.winning_bid:.2f}")
             await self.stop()
 
-        await self.broadcast(pickle.dumps(AuctionEnd()))
+        await self.broadcast_data(AuctionEnd())
 
 
 if __name__ == '__main__':
