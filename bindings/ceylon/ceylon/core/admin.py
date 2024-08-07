@@ -1,6 +1,8 @@
 import asyncio
+import pickle
+from typing import Any
 
-from ceylon.ceylon import AdminAgent, AdminAgentConfig, Processor, MessageHandler, EventHandler
+from ceylon.ceylon import AdminAgent, AdminAgentConfig, Processor, MessageHandler, EventHandler, AgentDetail
 from ceylon.ceylon.ceylon import uniffi_set_event_loop
 
 
@@ -48,5 +50,8 @@ class Admin(AdminAgent, Processor, MessageHandler, EventHandler):
     async def execute_task(self, input):
         pass
 
-    async def on_agent_connected(self, topic: "str", agent_id: "str"):
+    async def on_agent_connected(self, topic: "str", agent_id: AgentDetail):
         pass
+
+    async def broadcast_data(self, message: Any):
+        await self.broadcast(pickle.dumps(message))

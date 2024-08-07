@@ -1,13 +1,11 @@
-import asyncio
 import pickle
 import random
 from typing import List
 
 from pydantic.dataclasses import dataclass
 
-from ceylon.ceylon import enable_log
+from ceylon import Agent, on_message
 from ceylon import CoreAdmin
-from ceylon import Agent
 
 admin_port = 8000
 admin_peer = "Auctioneer"
@@ -52,19 +50,17 @@ class Bidder(Agent):
         super().__init__(name=name, workspace_id=workspace_id, admin_peer=admin_peer, admin_port=admin_port,
                          role="bidder")
 
-    async def on_message(self, agent_id: str, data: bytes, time: int):
-        message = pickle.loads(data)
-        if type(message) == AuctionStart:
-            if self.budget > message.item.starting_price:
-                random_i = random.randint(100, 1000)
-                bid_amount = min(self.budget, message.item.starting_price * random_i / 100)  # Simple bidding strategy
-                await self.broadcast(pickle.dumps(Bid(bidder=self.name, amount=bid_amount)))
-        elif type(message) == AuctionResult:
-            if message.winner == self.name:
-                self.budget -= message.winning_bid
-                print(f"{self.name} won the auction for ${message.winning_bid:.2f}")
-            else:
-                print(f"{self.name} lost the auction")
+    @on_message(type=AuctionStart)
+    async def on_auction_start(self, data: AuctionStart):
+        if self.budget > data.item.starting_price:
+            random_i = random.randint(100, 1000)
+            bid_amount = min(self.budget, data.item.starting_price * random_i / 100)  # Simple bidding strategy
+            await self.broadcast(pickle.dumps(Bid(bidder=self.name, amount=bid_amount)))
+
+    @on_message(type=Bid)
+    async def on_auction_result(self, data: AuctionResult):
+        self.budget -= data.winning_bid
+        print(f"{self.name} won the auction for ${data.winning_bid:.2f}")
 
 
 class Auctioneer(CoreAdmin):
@@ -89,11 +85,10 @@ class Auctioneer(CoreAdmin):
         print(f"Starting auction for {self.item.name} with starting price ${self.item.starting_price}")
         await self.broadcast(pickle.dumps(AuctionStart(item=self.item)))
 
-    async def on_message(self, agent_id: str, data: bytes, time: int):
-        message = pickle.loads(data)
-        if type(message) == Bid:
-            self.bids.append(message)
-            print(f"Received bid from {message.bidder} for ${message.amount:.2f}")
+    @on_message(type=Bid)
+    async def on_bid(self, bid: Bid):
+        self.bids.append(bid)
+        print(f"Received bid from {bid.bidder} for ${bid.amount:.2f}")
         await self.end_auction()
 
     async def end_auction(self):
