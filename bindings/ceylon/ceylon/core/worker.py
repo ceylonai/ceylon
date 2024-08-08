@@ -3,7 +3,9 @@ import pickle
 from typing import Any
 
 from ceylon.ceylon import WorkerAgent, WorkerAgentConfig, Processor, \
-    MessageHandler, uniffi_set_event_loop, EventHandler
+    MessageHandler, EventHandler
+
+from ceylon.ceylon.ceylon import uniffi_set_event_loop
 
 
 class Worker(WorkerAgent, Processor, MessageHandler, EventHandler):
