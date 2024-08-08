@@ -10,7 +10,7 @@ readme = { file = "README.md", content-type = "text/markdown" }
 license = { file = "LICENSE" }
 keywords = ["Aritifical Intelligence", "Multi Agent Systems", "CEYLON", "Ceylon Aritficial Intelligence."]
 dynamic = []
-version = "0.15.11"
+version = "0.15.12"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
