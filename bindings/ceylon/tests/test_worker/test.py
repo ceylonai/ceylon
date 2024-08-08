@@ -62,7 +62,7 @@ async def main():
         name="worker2",
         admin_port=8000,
         admin_peer="admin",
-        workspace_id="admin"
+        workspace_id="admin"    
     )
 
     worker3 = TestWorker(
