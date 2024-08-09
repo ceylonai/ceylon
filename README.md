@@ -1,15 +1,18 @@
-# Ceylon: Multi Agent Framework
+Here’s the revised README without the "Getting Started" content, but with a link to it:
+
+---
+
+# Ceylon: Multi-Agent Framework
 
 > Empowering Collaboration, Simplifying Complexity
 
-[![PyPI - Version](https://img.shields.io/pypi/v/ceylon.svg)](https://pypi.org/project/ceylon)
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/ceylon.svg)](https://pypi.org/project/ceylon)
+![PyPI - Version](https://img.shields.io/pypi/v/ceylon.svg) ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/ceylon.svg)
 
 ## Introduction
 
 Welcome to Ceylon: A Multi-Agent System (MAS) designed to orchestrate complex task flows among multiple AI agents. Ceylon manages and automates interactions between agents, each with specific roles and responsibilities, enabling powerful collaborative AI solutions. By empowering collaboration and simplifying complexity, Ceylon opens up new possibilities in AI-driven task automation and problem-solving.
 
-![Ceylon Architecture](contents/images/img.png)
+![Ceylon Architecture](https://github.com/ceylonai/ceylon/blob/master/contents/images/img.png?raw=True)
 
 ## 🚀 Key Features
 
@@ -42,80 +45,33 @@ Ceylon pushes the boundaries of what's possible in task automation and AI collab
 - AI-driven content creation pipelines
 - Complex data processing and decision-making systems
 
-## 🚦 Getting Started
+## 📚 Tutorials and Examples
 
-Here's a simple example of how to use Ceylon to create a multi-agent system for a trading decision process:
+Ceylon provides a range of tutorials and examples to help you get started and make the most of the framework:
 
-```python
-from ceylon import Agent, AgentJobStepRequest, AgentJobResponse, JobRequest, JobSteps, Step, RunnerAgent
+### Tutorials
 
-class TechnicalAnalysisAgent(Agent):
-    async def execute_request(self, request: AgentJobStepRequest) -> AgentJobResponse:
-        return AgentJobResponse(
-            worker=self.details().name,
-            job_data={"MA": 100.0, "EMA": 200.0}
-        )
-
-class NewsSentimentAgent(Agent):
-    async def execute_request(self, request: AgentJobStepRequest) -> AgentJobResponse:
-        return AgentJobResponse(
-            worker=self.details().name,
-            job_data={"sentiment": "Positive"}
-        )
-
-class DecisionMakerAgent(Agent):
-    async def execute_request(self, request: AgentJobStepRequest) -> AgentJobResponse:
-        return AgentJobResponse(
-            worker=self.details().name,
-            job_data={"trade": True}
-        )
-
-# Create agent instances
-ta_agent = TechnicalAnalysisAgent(name="ta", role="Technical Analyst")
-news_agent = NewsSentimentAgent(name="news", role="News Analyst")
-decision_agent = DecisionMakerAgent(name="decision", role="Decision Maker")
-
-# Create the runner agent
-chief = RunnerAgent(workers=[ta_agent, news_agent, decision_agent])
-
-# Define the job
-job = JobRequest(
-    title="Trading Decision",
-    explanation="Analyze market data and make a trading decision",
-    steps=JobSteps(steps=[
-        Step(worker="ta", explanation="Perform technical analysis", dependencies=[]),
-        Step(worker="news", explanation="Analyze news sentiment", dependencies=[]),
-        Step(worker="decision", explanation="Make trading decision", dependencies=["ta", "news"])
-    ])
-)
-
-# Execute the job
-result = chief.execute(job)
-print(result)
-```
-
-This example demonstrates how to:
-1. Define custom agents for different tasks
-2. Create a runner agent to orchestrate the process
-3. Define a job with multiple steps and dependencies
-4. Execute the job and get the result
-
-## Examples
-
-- Example [Example](./bindings/ceylon/examples)
-- Colab Scripts
-    1. [News Writing panel](https://colab.research.google.com/drive/1ZMy0Iggni6fCQynBlyI1wL4WW4U_Fman?usp=sharing)
-    2. [Meeting Schedular](https://colab.research.google.com/drive/1C-E9BN992k5sZYeJWnVrsWA5_ryaaT8m?usp=sharing)
-    3. [Single Item Auction](https://colab.research.google.com/drive/1C-E9BN992k5sZYeJWnVrsWA5_ryaaT8m?usp=sharing)
-
-## Tutorials 
 - [Collaborative AI Workflow: Using Ceylon Framework for Streamlined Article Creation](https://medium.com/ceylonai/collaborative-ai-workflow-using-ceylon-framework-for-streamlined-article-creation-81bbd7ee7c01)
 - [A Meeting Scheduler with Ceylon - Multi Agent System](https://medium.com/ceylonai/a-meeting-scheduler-with-ceylon-multi-agent-system-a7aa5a906f36)
-  
-## 🚧 Todo
+
+### Example Projects
+
+- **News Writing Panel**: [Colab Script](https://colab.research.google.com/drive/1ZMy0Iggni6fCQynBlyI1wL4WW4U_Fman?usp=sharing)
+- **Meeting Scheduler**: [Colab Script](https://colab.research.google.com/drive/1C-E9BN992k5sZYeJWnVrsWA5_ryaaT8m?usp=sharing)  
+  [Read more](./docs/examples/meeting-sechdular.md)
+- **Single Item Auction**: [Colab Script](https://colab.research.google.com/drive/1C-E9BN992k5sZYeJWnVrsWA5_ryaaT8m?usp=sharing)  
+  [Read more](./docs/examples/single-item-auction.md)
+- **Task Manager**: [Read more](./docs/examples/task-manager.md)
+- **Connect Through Network**: [Read more](./docs/examples/connect-through-network.md)
+
+## 🚦 Getting Started
+
+To get started with Ceylon, refer to our detailed [Getting Started Guide](./docs/GettingStart.md). This guide walks you through setting up a basic multi-agent system with easy-to-follow steps.
+
+## 🚧 Roadmap
 
 - [X] LLM Agent Stack
-- [x] Job Handling (parallel & sequential)
+- [X] Job Handling (parallel & sequential)
 - [ ] Web Agent
 - [ ] Agent Registry
 
