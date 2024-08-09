@@ -1,7 +1,3 @@
-Here’s the revised README without the "Getting Started" content, but with a link to it:
-
----
-
 # Ceylon: Multi-Agent Framework
 
 > Empowering Collaboration, Simplifying Complexity
