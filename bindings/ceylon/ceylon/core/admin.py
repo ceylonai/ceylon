@@ -3,6 +3,7 @@ import pickle
 from typing import Any
 
 from ceylon.ceylon import AdminAgent, AdminAgentConfig, Processor, MessageHandler, EventHandler, AgentDetail
+from ceylon.ceylon.ceylon import uniffi_set_event_loop
 
 
 class Admin(AdminAgent, Processor, MessageHandler, EventHandler):

@@ -126,6 +126,11 @@ impl AdminAgent {
 
         if peer_.id == self._peer_id {
             info!("Admin peer created {}", peer_.id.clone());
+            println!("------------------------------------------------------------------");
+            println!("| Important");
+            println!("| ServerAdmin peer ID : {}", peer_.id.clone());
+            println!("| Use this ServerAdmin peer ID to connect to the server");
+            println!("-------------------------------------------------------------------");
         } else {
             panic!("Id mismatch");
         }
