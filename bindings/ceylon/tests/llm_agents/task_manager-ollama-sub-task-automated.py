@@ -1,43 +1,49 @@
 import asyncio
-import pickle
-from dataclasses import dataclass
 from typing import List, Dict
 
 from langchain.chains import LLMChain
-from langchain.chat_models import ChatOllama
 from langchain.prompts import ChatPromptTemplate
+from langchain_community.chat_models import ChatOllama
+from langchain_core.prompts import PromptTemplate
+from langchain_experimental.llms.ollama_functions import OllamaFunctions
 from loguru import logger
+from pydantic.v1 import BaseModel, Field
 
 from ceylon import Agent, CoreAdmin, on_message
 
 
-@dataclass
-class SubTask:
-    id: int
-    description: str
-    required_specialty: str
+class SubTask(BaseModel):
+    id: int = Field(description="the id of the subtask")
+    description: str = Field(description="the description of the subtask")
+    required_specialty: str = Field(description="the required specialty of the subtask")
 
 
-@dataclass
-class Task:
-    id: int
-    description: str
+class SubTaskList(BaseModel):
     subtasks: List[SubTask]
 
 
-@dataclass
-class TaskAssignment:
-    task: Task
-    subtask: SubTask
-    assigned_agent: str
+class Task(BaseModel):
+    """
+    id: int
+    description: str
+    subtasks: List[SubTask]
+    """
+    id: int = Field(description="the id of the task")
+    description: str = Field(description="the description of the task")
+    subtasks: List[SubTask] = Field(description="the subtasks of the task", default=[])
 
 
-@dataclass
-class TaskResult:
-    task_id: int
-    subtask_id: int
-    agent: str
-    result: str
+class TaskAssignment(BaseModel):
+    task: Task = Field(description="the task assigned to the agent")
+    subtask: SubTask = Field(description="the subtask assigned to the agent")
+    assigned_agent: str = Field(description="the agent assigned to the subtask")
+
+
+class TaskResult(BaseModel):
+    task_id: int = Field(description="the id of the task")
+    subtask_id: int = Field(description="the id of the subtask")
+    agent: str = Field(description="the agent who completed the subtask")
+    result: str = Field(description="the result of the subtask")
 
 
 class SpecializedAgent(Agent):
@@ -84,18 +90,19 @@ class TaskManager(CoreAdmin):
 
     async def get_best_agent_for_subtask(self, subtask: SubTask) -> str:
         agent_specialties = "\n".join([f"{agent.details().name}: {agent.specialty}" for agent in self.agents])
+
         llm = ChatOllama(model="llama3.1:latest", temperature=0)
 
         prompt_template = ChatPromptTemplate.from_template(
-            """Given the following subtask and list of agents with their specialties, determine which agent is 
-            best suited for the subtask.        
+            """Given the following subtask and list of agents with their specialties, determine which agent is
+            best suited for the subtask.
 
             Subtask: {subtask_description}
             Required Specialty: {required_specialty}
-            
+
             Agents and their specialties:
             {agent_specialties}
-            
+
             Respond with only the name of the best-suited agent."""
         )
 
@@ -126,32 +133,41 @@ class TaskManager(CoreAdmin):
                 logger.info(f"  Subtask {result.subtask_id}: {result.result}")
         await self.stop()
 
-    async def generate_tasks_from_description(self, description: str) -> List[Task]:
-        llm = ChatOllama(model="llama3.1:latest", temperature=0.7)
+    async def generate_tasks_from_description(self, description: str) -> List[SubTask]:
 
-        prompt_template = ChatPromptTemplate.from_template(
-            """Given the following description, break it down into a main task and several subtasks. Each subtask 
-            should have a specific description and required specialty. 
+        # Prompt template
+        prompt = PromptTemplate.from_template(
+            """
+            Given the following job description, break it down into a main task and 3-5 key subtasks. Each subtask should have a specific description and required specialty.
 
-            Description: {description}
-            
+            Job Description: {description}
+
             Respond with the tasks and their subtasks in the following format:
-            Task Description: <Main task description>
+
+            Main Task: <Concise description of the overall task>
+
             Subtasks:
-            1. <Subtask description> - Specialty: <Specialty>
-            2. <Subtask description> - Specialty: <Specialty>
-            ...
+            1. <Specific subtask description> - Specialty: <Required specialty or skill>
+            2. <Specific subtask description> - Specialty: <Required specialty or skill>
+            3. <Specific subtask description> - Specialty: <Required specialty or skill>
+            (Add up to 2 more subtasks if necessary)
+
+            Additional Considerations:
+            - Prioritize the subtasks in order of importance or chronological sequence
+            - Ensure each subtask is distinct and contributes uniquely to the main task
+            - Use clear, action-oriented language for each description
+            - If applicable, include any interdependencies between subtasks
             """
         )
 
-        chain = LLMChain(llm=llm, prompt=prompt_template)
-        response = chain.run(description=description, verbose=True)
-
-        print(f"LLM response: {description}")
-
-        # Parsing the LLM response to extract tasks and subtasks
-        tasks = self.parse_llm_response(response)
-        return tasks
+        # Chain
+        llm = OllamaFunctions(model="llama3.1:latest", format="json", temperature=0.7)
+        structured_llm = llm.with_structured_output(SubTaskList)
+        chain = prompt | structured_llm
+        sub_task_list = chain.invoke(input={
+            "description": description
+        })
+        return sub_task_list.subtasks
 
     @staticmethod
     def parse_llm_response(response: str) -> List[Task]:
@@ -181,17 +197,7 @@ class TaskManager(CoreAdmin):
 if __name__ == "__main__":
     # Create tasks with subtasks
     tasks = [
-        Task(id=1, description="Create an article about AI advancements", subtasks=[
-            # SubTask(id=1, description="Write the main content of the article", required_specialty="Content writing"),
-            # SubTask(id=2, description="Generate an AI-related image for the article",
-            #         required_specialty="Image generation"),
-            # SubTask(id=3, description="Proofread and format the article", required_specialty="Editing and formatting")
-        ]),
-        # Task(id=2, description="Develop a simple web application", subtasks=[
-        #     # SubTask(id=1, description="Design the user interface", required_specialty="UI/UX design"),
-        #     # SubTask(id=2, description="Implement the backend logic", required_specialty="Backend development"),
-        #     # SubTask(id=3, description="Test the application", required_specialty="Software testing")
-        # ])
+        Task(id=1, description="Create an article about AI advancements"),
     ]
 
     # Create specialized agents
@@ -199,6 +205,8 @@ if __name__ == "__main__":
         SpecializedAgent("ContentWriter", "Content writing and research"),
         SpecializedAgent("ImageGenerator", "AI image generation and editing"),
         SpecializedAgent("Editor", "Proofreading, editing, and formatting"),
+        SpecializedAgent("SEOMaster", "Search engine optimization and content optimization"),
+        SpecializedAgent("ContentResearcher", "Content research and analysis"),
         SpecializedAgent("UIDesigner", "UI/UX design and frontend development"),
         SpecializedAgent("BackendDev", "Backend development and database management"),
         SpecializedAgent("QATester", "Software testing and quality assurance")
