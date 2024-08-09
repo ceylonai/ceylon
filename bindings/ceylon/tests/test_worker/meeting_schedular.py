@@ -1,6 +1,5 @@
 import asyncio
 import pickle
-import sys
 from typing import List
 
 from loguru import logger
