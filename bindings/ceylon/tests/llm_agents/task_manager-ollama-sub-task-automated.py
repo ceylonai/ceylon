@@ -14,7 +14,7 @@ from ceylon import Agent, CoreAdmin, on_message
 
 class SubTask(BaseModel):
     id: int = Field(description="the id of the subtask")
-    description: str = Field(description="the description of the subtask")
+    description: str = Field(description="the description of the subtask, Explains the task in detail")
     required_specialty: str = Field(description="the required specialty of the subtask")
 
 
@@ -61,6 +61,11 @@ class SpecializedAgent(Agent):
             await self.broadcast_data(
                 TaskResult(task_id=data.task.id, subtask_id=data.subtask.id, agent=self.details().name, result=result))
 
+    @on_message(type=TaskResult)
+    async def other_agents_results(self, result: TaskResult):
+        logger.info(
+            f"Received result for subtask {result.subtask_id} of task {result.task_id} from {result.agent}: {result.result}")
+
 
 class TaskManager(CoreAdmin):
     tasks: List[Task] = []
@@ -88,6 +93,28 @@ class TaskManager(CoreAdmin):
                 print(f"Assigned subtask {subtask.id} of task {task.id} to agent {assigned_agent}")
                 await self.broadcast_data(TaskAssignment(task=task, subtask=subtask, assigned_agent=assigned_agent))
 
+    @on_message(type=TaskResult)
+    async def on_task_result(self, result: TaskResult):
+        self.results[result.task_id].append(result)
+        logger.info(
+            f"Received result for subtask {result.subtask_id} of task {result.task_id} from {result.agent}: {result.result}")
+        if self.all_tasks_completed():
+            await self.end_task_management()
+
+    def all_tasks_completed(self) -> bool:
+        for task in self.tasks:
+            if len(self.results[task.id]) != len(task.subtasks):
+                return False
+        return True
+
+    async def end_task_management(self):
+        logger.info("All tasks completed. Results:")
+        for task in self.tasks:
+            logger.info(f"Task {task.id} results:")
+            for result in self.results[task.id]:
+                logger.info(f"  Subtask {result.subtask_id}: {result.result}")
+        await self.stop()
+
     async def get_best_agent_for_subtask(self, subtask: SubTask) -> str:
         agent_specialties = "\n".join([f"{agent.details().name}: {agent.specialty}" for agent in self.agents])
 
@@ -110,28 +137,6 @@ class TaskManager(CoreAdmin):
         response = chain.run(subtask_description=subtask.description, required_specialty=subtask.required_specialty,
                              agent_specialties=agent_specialties)
         return response.strip()
-
-    @on_message(type=TaskResult)
-    async def on_task_result(self, result: TaskResult):
-        self.results[result.task_id].append(result)
-        logger.info(
-            f"Received result for subtask {result.subtask_id} of task {result.task_id} from {result.agent}: {result.result}")
-        if self.all_tasks_completed():
-            await self.end_task_management()
-
-    def all_tasks_completed(self) -> bool:
-        for task in self.tasks:
-            if len(self.results[task.id]) != len(task.subtasks):
-                return False
-        return True
-
-    async def end_task_management(self):
-        logger.info("All tasks completed. Results:")
-        for task in self.tasks:
-            logger.info(f"Task {task.id} results:")
-            for result in self.results[task.id]:
-                logger.info(f"  Subtask {result.subtask_id}: {result.result}")
-        await self.stop()
 
     async def generate_tasks_from_description(self, description: str) -> List[SubTask]:
 
@@ -198,6 +203,8 @@ if __name__ == "__main__":
     # Create tasks with subtasks
     tasks = [
         Task(id=1, description="Create an article about AI advancements"),
+        Task(id=2, description="Create a landing page for a new Food product and deploy it on the web"),
+        Task(id=3, description="Create a data collection form for a new product and deploy it on the web"),
     ]
 
     # Create specialized agents
@@ -209,6 +216,10 @@ if __name__ == "__main__":
         SpecializedAgent("ContentResearcher", "Content research and analysis"),
         SpecializedAgent("UIDesigner", "UI/UX design and frontend development"),
         SpecializedAgent("BackendDev", "Backend development and database management"),
+        SpecializedAgent("FrontendDev", "Frontend development and UI/UX design"),
+        SpecializedAgent("DevOps", "DevOps and infrastructure management"),
+        SpecializedAgent("DataAnalyst", "Data analysis and statistics"),
+        SpecializedAgent("DataScientist", "Data science and machine learning"),
         SpecializedAgent("QATester", "Software testing and quality assurance")
     ]
 
