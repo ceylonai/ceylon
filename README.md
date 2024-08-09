@@ -58,11 +58,11 @@ Ceylon provides a range of tutorials and examples to help you get started and ma
 
 - **News Writing Panel**: [Colab Script](https://colab.research.google.com/drive/1ZMy0Iggni6fCQynBlyI1wL4WW4U_Fman?usp=sharing)
 - **Meeting Scheduler**: [Colab Script](https://colab.research.google.com/drive/1C-E9BN992k5sZYeJWnVrsWA5_ryaaT8m?usp=sharing)  
-  [Read more](./docs/examples/meeting-sechdular.md)
+  [Read more](https://github.com/ceylonai/ceylon/blob/master/docs/examples/meeting-sechdular.md)
 - **Single Item Auction**: [Colab Script](https://colab.research.google.com/drive/1C-E9BN992k5sZYeJWnVrsWA5_ryaaT8m?usp=sharing)  
-  [Read more](./docs/examples/single-item-auction.md)
-- **Task Manager**: [Read more](./docs/examples/task-manager.md)
-- **Connect Through Network**: [Read more](./docs/examples/connect-through-network.md)
+  [Read more](https://github.com/ceylonai/ceylon/blob/master/docs/examples/single-item-auction.md)
+- **Task Manager**: [Read more](https://github.com/ceylonai/ceylon/blob/master/docs/examples/task-manager.md)
+- **Connect Through Network**: [Read more](.https://github.com/ceylonai/ceylon/blob/master/docs/examples/connect-through-network.md)
 
 ## 🚦 Getting Started
 
