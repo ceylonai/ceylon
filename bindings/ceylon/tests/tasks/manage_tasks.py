@@ -50,6 +50,23 @@ class Task(BaseModel):
             graph.add_node(subtask.name)
         return graph
 
+    def validate_sub_tasks(self) -> bool:
+        subtask_names = set(self.subtasks.keys())
+
+        # Check if all dependencies are present
+        for subtask in self.subtasks.values():
+            if not subtask.depends_on.issubset(subtask_names):
+                missing_deps = subtask.depends_on - subtask_names
+                print(f"Subtask '{subtask.name}' has missing dependencies: {missing_deps}")
+                return False
+
+        # Check for circular dependencies
+        try:
+            self._validate_dependencies()
+        except ValueError as e:
+            print(f"Circular dependency detected: {str(e)}")
+            return False
+
     def get_execution_order(self) -> List[str]:
         graph = self._create_dependency_graph()
         return list(nx.topological_sort(graph))
@@ -155,12 +172,18 @@ if __name__ == "__main__":
 
     # Execute the task
     print("Execution order:", [web_app.subtasks[task_id].name for task_id in web_app.get_execution_order()])
-    print("\nExecuting task:")
-    execute_task(task=web_app)
 
-    print("\nFinal task status:")
-    print(web_app)
+    if web_app.validate_sub_tasks():
+        print("Subtasks are valid")
 
-    # Serialization example
+        print("\nExecuting task:")
+        execute_task(task=web_app)
+
+        print("\nFinal task status:")
+        print(web_app)
+    else:
+        print("Subtasks are invalid")
+
+        # Serialization example
     print("\nSerialized Task:")
     print(web_app.model_dump_json(indent=2))
