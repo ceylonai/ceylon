@@ -19,7 +19,7 @@ class TaskManager(CoreAdmin):
     def __init__(self, tasks: List[Task], agents: List[SpecializedAgent]):
         self.tasks = tasks
         self.agents = agents
-        super().__init__(name="openai_task_management", port=8000)
+        super().__init__(name="langchain_task_management", port=8000)
 
     async def run(self, inputs: bytes):
         for idx, task in enumerate(self.tasks):
