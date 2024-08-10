@@ -1,6 +1,6 @@
+import copy
 from typing import List
 
-import openai
 from langchain.chains.llm import LLMChain
 from langchain_community.chat_models import ChatOllama
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -13,13 +13,13 @@ from ceylon.llm.data_types import TaskAssignment, TaskResult
 
 class SpecializedAgent(Agent):
     def __init__(self, name: str, specialty: str, skills: List[str], experience_level: str,
-                 tools: List[str]):
+                 tools: List[str], llm=None):
         self.specialty = specialty
         self.skills = skills
         self.experience_level = experience_level
         self.tools = tools
         self.task_history = []
-        self.llm = ChatOllama(model="llama3.1:latest", temperature=0)
+        self.llm = copy.copy(llm)
         super().__init__(name=name, workspace_id="langchain_task_management", admin_port=8000)
 
     async def get_llm_response(self, task_description: str) -> str:
