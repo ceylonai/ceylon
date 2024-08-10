@@ -1,71 +1,25 @@
-from typing import Any, List
+from loguru import logger
 
-from langchain_core.tools import render_text_description
-
-from ceylon import Agent, AgentJobStepRequest, AgentJobResponse, RunnerAgent, JobRequest
-from ceylon.llm.llm.llm_executor import LLMExecutor
-from ceylon.llm.prompt import PromptMessage
-from ceylon.llm.types.agent import AgentDefinition
+from ceylon import Agent, on_message
+from ceylon.llm.data_types import TaskAssignment, TaskResult
 
 
-def render_history(history: List[AgentJobResponse]):
-    text = ""
-    for h in history:
-        text = f"{text}\n{h.worker}-{h.job_data['response']}\n"
-    return text
+class SpecializedAgent(Agent):
+    def __init__(self, name: str, specialty: str):
+        self.specialty = specialty
+        super().__init__(name=name, workspace_id="openai_task_management", admin_peer="TaskManager", admin_port=8000)
 
+    @on_message(type=TaskAssignment)
+    async def on_task_assignment(self, data: TaskAssignment):
+        if data.assigned_agent == self.details().name:
+            logger.info(f"{self.details().name} received subtask: {data.subtask.description}")
+            # Simulate task execution
+            # await asyncio.sleep(2)
+            result = f"{self.details().name} completed the subtask: {data.subtask.description}"
+            await self.broadcast_data(
+                TaskResult(task_id=data.task.id, subtask_id=data.subtask.id, agent=self.details().name, result=result))
 
-class LLMAgent(Agent):
-    class Config:
-        arbitrary_types_allowed = True
-
-    def __init__(self,
-                 name: str,
-                 role: str,
-                 objective: str,
-                 context: str,
-                 tools: list = [],
-                 llm: Any = None
-                 ):
-        self.tools = tools
-        tool_names = render_text_description(self.tools)
-        self.definition = AgentDefinition(
-            name=name,
-            role=role,
-            objective=objective,
-            context=context,
-            tools=tool_names
-        )
-        self.llm = llm
-        super().__init__(name=name, role=role)
-
-    async def execute_request(self, request: AgentJobStepRequest) -> AgentJobResponse:
-        pm = PromptMessage(paths=[
-            "prompts.job.step_history",
-            "prompts.agent",
-            "prompts.job.step_execution_with_tools" if self.tools else "prompts.job.step_execution"
-        ])
-        prompt_wrapper = pm.build(name=self.details().name,
-                                  role=self.details().role,
-                                  objective=self.definition.objective,
-                                  context=self.definition.context,
-                                  tools=self.definition.tools,
-                                  history=render_history(self.history_responses),
-                                  explanation=f"\n\nJOB EXPLANATION: \nStep Objetive {request.step.explanation}\nOriginal user request:{request.job_data}\n", )
-        executor = LLMExecutor(llm=self.llm, type="llm_executor")
-        llm_response = executor.execute(prompt_wrapper, tools=self.tools)
-        return AgentJobResponse(
-            worker=self.details().name,
-            job_data={"response": llm_response}
-        )
-
-
-class LLMExecutorAgent(RunnerAgent):
-
-    def execute(self, job: JobRequest = None):
-        res: JobRequest = super().execute(job)
-        return res.result.data["response"]
-
-    async def aexecute(self, job: JobRequest = None):
-        res: JobRequest = await super().aexecute(job)
-        return res.result.data["response"]
+    @on_message(type=TaskResult)
+    async def other_agents_results(self, result: TaskResult):
+        logger.info(
+            f"Received result for subtask {result.subtask_id} of task {result.task_id} from {result.agent}: {result.result}")
