@@ -61,7 +61,6 @@ class SpecializedAgent(Agent):
             response = runnable.invoke({
                 context: context
             })
-            logger.info(f"LLM response: {response}")
             return response
         except Exception as e:
             logger.error(f"Error in LLM request: {e}")
@@ -78,22 +77,13 @@ class SpecializedAgent(Agent):
     async def on_task_assignment(self, data: TaskAssignment):
         if data.assigned_agent == self.details().name:
             logger.info(f"{self.details().name} received subtask: {data.task.description}")
-
             result = await self.get_llm_response(
                 data.task.description,
                 data.task.parent_task_id
             )
-            # task_related_history = self.history.get(data.task.parent_task_id, [])
-            # if task_related_history:
-            #     print("Task history:", task_related_history)
-            #
-            # # Simulate task execution
-            # # await asyncio.sleep(2)
-            # result = f"{self.details().name} completed the subtask: {data.task.description}"
             result_task = TaskResult(task_id=data.task.id, subtask_id=data.task.name, agent=self.details().name,
                                      parent_task_id=data.task.parent_task_id,
                                      result=result)
-
             # Update task history
             await self.add_result_to_history(result_task)
             await self.broadcast_data(result_task)
