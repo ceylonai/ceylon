@@ -96,3 +96,6 @@ class TaskManager(CoreAdmin):
             "agent_specialties": agent_specialties
         })
         return response.strip()
+
+    def do(self, inputs: bytes):
+        self.run_admin(inputs, self.agents)
