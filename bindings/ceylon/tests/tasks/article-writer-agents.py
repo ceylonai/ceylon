@@ -31,36 +31,32 @@ if __name__ == "__main__":
     agents = [
         SpecializedAgent(
             name="research",
-            specialty="Knowledge about research methodologies and tools",
+            context="Knowledge about research methodologies and tools",
             skills=["Market Research", "Data Analysis", "Literature Review"],  # Example skills
-            experience_level="Advanced",  # Example experience level
             tools=["Google Scholar", "JSTOR", "LexisNexis"],  # Example tools
             llm=llm
         ),
 
         SpecializedAgent(
             name="writing",
-            specialty="Knowledge about content writing",
+            context="Knowledge about content writing",
             skills=["Creative Writing", "Technical Writing", "Copywriting"],  # Example skills
-            experience_level="Advanced",  # Example experience level
             tools=["Grammarly", "Hemingway Editor", "Scrivener"],  # Example tools
             llm=llm
         ),
 
         SpecializedAgent(
             name="seo_optimization",
-            specialty="Knowledge about SEO strategies and tools",
+            context="Knowledge about SEO strategies and tools",
             skills=["Keyword Research", "On-Page SEO", "Content Optimization"],  # Example skills
-            experience_level="Intermediate",  # Example experience level
             tools=["Ahrefs", "SEMrush", "Yoast SEO"],  # Example tools
             llm=llm
         ),
 
         SpecializedAgent(
             name="web_publishing",
-            specialty="Knowledge about web publishing tools",
+            context="Knowledge about web publishing tools",
             skills=["CMS Management", "HTML/CSS", "Content Scheduling"],  # Example skills
-            experience_level="Intermediate",  # Example experience level
             tools=["WordPress", "Squarespace", "Medium"],  # Example tools
             llm=llm
         )
