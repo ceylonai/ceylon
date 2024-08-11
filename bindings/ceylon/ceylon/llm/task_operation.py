@@ -38,6 +38,7 @@ class Task(BaseModel):
     execution_order: List[str] = Field(default_factory=list)
 
     def add_subtask(self, subtask: SubTask):
+        subtask.parent_task_id = self.id
         if subtask.name in self.subtasks:
             raise ValueError(f"Subtask with id {subtask.name} already exists")
 
@@ -126,7 +127,6 @@ class Task(BaseModel):
         task = Task(name=name, description=description)
         if subtasks:
             for subtask in subtasks:
-                subtask.parent_task_id = task.id
                 task.add_subtask(subtask)
         return task
 
@@ -141,43 +141,44 @@ class TaskResult(BaseModel):
     parent_task_id: str
     agent: str
     result: str
-
-
-def execute_task(task: Task) -> None:
-    while True:
-        # Get the next subtask
-        next_subtask: Optional[tuple[str, SubTask]] = task.get_next_subtask()
-
-        # If there are no more subtasks, break the loop
-        if next_subtask is None:
-            break
-
-        subtask_name, subtask = next_subtask
-        print(f"Executing: {subtask}")
-
-        # Here you would actually execute the subtask
-        # For this example, we'll simulate execution with a simple print statement
-        print(f"Simulating execution of {subtask_name}")
-
-        # Simulate a result (in a real scenario, this would be the outcome of the subtask execution)
-        result = True
-
-        # Update the subtask status
-        task.update_subtask_status(subtask_name, result)
-
-        # Check if the entire task is completed
-        if task.is_completed():
-            print("All subtasks completed successfully!")
-            break
-
-    # Final check to see if all subtasks were completed
-    if task.is_completed():
-        print("Task execution completed successfully!")
-    else:
-        print("Task execution incomplete. Some subtasks may have failed.")
+    name: str
 
 
 if __name__ == "__main__":
+    def execute_task(task: Task) -> None:
+        while True:
+            # Get the next subtask
+            next_subtask: Optional[tuple[str, SubTask]] = task.get_next_subtask()
+
+            # If there are no more subtasks, break the loop
+            if next_subtask is None:
+                break
+
+            subtask_name, subtask = next_subtask
+            print(f"Executing: {subtask}")
+
+            # Here you would actually execute the subtask
+            # For this example, we'll simulate execution with a simple print statement
+            print(f"Simulating execution of {subtask_name}")
+
+            # Simulate a result (in a real scenario, this would be the outcome of the subtask execution)
+            result = True
+
+            # Update the subtask status
+            task.update_subtask_status(subtask_name, result)
+
+            # Check if the entire task is completed
+            if task.is_completed():
+                print("All subtasks completed successfully!")
+                break
+
+        # Final check to see if all subtasks were completed
+        if task.is_completed():
+            print("Task execution completed successfully!")
+        else:
+            print("Task execution incomplete. Some subtasks may have failed.")
+
+
     # Create a task with initial subtasks
     web_app = Task.create_task("Build Web App", "Create a simple web application",
                                subtasks=[

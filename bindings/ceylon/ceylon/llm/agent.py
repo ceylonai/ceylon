@@ -1,5 +1,5 @@
 import copy
-from typing import Dict, List
+from typing import Dict, List, Set
 
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
@@ -22,7 +22,7 @@ class SpecializedAgent(Agent):
         self.history: Dict[str, List[TaskResult]] = {}
         super().__init__(name=name, workspace_id="openai_task_management", admin_port=8000)
 
-    async def get_llm_response(self, task_description: str, parent_task_id: str, depends_on: List[str]) -> str:
+    async def get_llm_response(self, task_description: str, parent_task_id: str, depends_on: Set[str]) -> str:
         # Construct the agent profile context
         agent_profile = f"""
         Agent Profile:
@@ -41,8 +41,6 @@ class SpecializedAgent(Agent):
         Recent Task History:
         {self._format_task_history(parent_task_id, depends_on)}
         """
-
-        print(f"{agent_profile}\n\n{task_info}")
 
         # Combine all context information
         context = f"{agent_profile}\n\n{task_info}"
@@ -67,13 +65,13 @@ class SpecializedAgent(Agent):
             logger.error(f"Error in LLM request: {e}")
             return "Error in processing the task with LLM."
 
-    def _format_task_history(self, task_id, depends_on: List[str]) -> str:
+    def _format_task_history(self, task_id, depends_on: Set[str]) -> str:
         if task_id not in self.history:
             return ""
 
         results = []
         for rest_his in self.history[task_id]:
-            if rest_his.agent in depends_on:
+            if rest_his.name in depends_on:
                 results.append(f"{rest_his.agent} - \n- {rest_his.result}")
         return "\n".join(results)
 
@@ -86,7 +84,9 @@ class SpecializedAgent(Agent):
                 data.task.parent_task_id,
                 data.task.depends_on
             )
-            result_task = TaskResult(task_id=data.task.id, subtask_id=data.task.name, agent=self.details().name,
+            result_task = TaskResult(task_id=data.task.id,
+                                     name=data.task.name,
+                                     agent=self.details().name,
                                      parent_task_id=data.task.parent_task_id,
                                      result=result)
             # Update task history
