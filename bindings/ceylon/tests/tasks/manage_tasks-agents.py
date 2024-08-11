@@ -1,150 +1,95 @@
-from typing import Dict, List, Optional, Set, Tuple
-from uuid import uuid4
+import copy
+from typing import Dict, List
 
-import networkx as nx
 from langchain_community.chat_models import ChatOllama
+from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from loguru import logger
-from pydantic import BaseModel, Field
 
 from ceylon import Agent, on_message, CoreAdmin
-
-
-class SubTask(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid4()), alias='_id')
-    parent_task_id: Optional[str] = Field(default=None)
-    name: str
-    description: str
-    required_specialty: str
-    depends_on: Set[str] = Field(default_factory=set)
-    completed: bool = False
-
-    result: Optional[str] = None
-
-    def complete(self, result: Optional[str] = None):
-        self.result = result
-        self.completed = True
-
-    def __str__(self):
-        status = "Completed" if self.completed else "Pending"
-        return f"SubTask: {self.name} (ID: {self.id}) - {status} - Dependencies: {self.depends_on}"
-
-
-class Task(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid4()), alias='_id')
-    name: str
-    description: str
-    subtasks: Dict[str, SubTask] = Field(default_factory=dict)
-
-    execution_order: List[str] = Field(default_factory=list)
-
-    def add_subtask(self, subtask: SubTask):
-        if subtask.name in self.subtasks:
-            raise ValueError(f"Subtask with id {subtask.name} already exists")
-
-        self.subtasks[subtask.name] = subtask
-        self._validate_dependencies()
-        self.execution_order = self.get_execution_order()
-
-    def _validate_dependencies(self):
-        graph = self._create_dependency_graph()
-        if not nx.is_directed_acyclic_graph(graph):
-            raise ValueError("The dependencies create a cycle")
-
-    def _create_dependency_graph(self) -> nx.DiGraph:
-        graph = nx.DiGraph()
-        for subtask in self.subtasks.values():
-            graph.add_node(subtask.name)
-        return graph
-
-    def validate_sub_tasks(self) -> bool:
-        subtask_names = set(self.subtasks.keys())
-
-        # Check if all dependencies are present
-        for subtask in self.subtasks.values():
-            if not subtask.depends_on.issubset(subtask_names):
-                missing_deps = subtask.depends_on - subtask_names
-                print(f"Subtask '{subtask.name}' has missing dependencies: {missing_deps}")
-                return False
-
-        # Check for circular dependencies
-        try:
-            self._validate_dependencies()
-        except ValueError as e:
-            print(f"Circular dependency detected: {str(e)}")
-            return False
-
-        return True
-
-    def get_execution_order(self) -> List[str]:
-        graph = self._create_dependency_graph()
-        return list(nx.topological_sort(graph))
-
-    def get_next_subtask(self) -> Optional[Tuple[str, SubTask]]:
-        for subtask_name in self.execution_order:
-            subtask = self.subtasks[subtask_name]
-            if all(self.subtasks[dep].completed for dep in subtask.depends_on):
-                return (subtask_name, subtask)
-        return None
-
-    def update_subtask_status(self, subtask_name: str, result: str):
-        if subtask_name not in self.subtasks:
-            raise ValueError(f"Subtask {subtask_name} not found")
-
-        subtask = self.subtasks[subtask_name]
-        if result is not None:
-            subtask.complete()
-
-        if subtask_name in self.execution_order:
-            self.execution_order.remove(subtask_name)
-
-    def is_completed(self) -> bool:
-        return all(subtask.completed for subtask in self.subtasks.values())
-
-    def __str__(self):
-        return f"Task: {self.name}\nSubtasks:\n" + "\n".join(str(st) for st in self.subtasks.values())
-
-    @staticmethod
-    def create_task(name: str, description: str, subtasks: List[SubTask] = None) -> 'Task':
-        task = Task(name=name, description=description)
-        if subtasks:
-            for subtask in subtasks:
-                subtask.parent_task_id = task.id
-                task.add_subtask(subtask)
-        return task
-
-
-class TaskAssignment(BaseModel):
-    task: SubTask
-    assigned_agent: str
-
-
-class TaskResult(BaseModel):
-    task_id: str
-    parent_task_id: str
-    agent: str
-    result: str
+from ceylon.llm import Task, SubTask, TaskAssignment, TaskResult
 
 
 class SpecializedAgent(Agent):
-    def __init__(self, name: str, specialty: str):
+    def __init__(self, name: str, specialty: str, skills: List[str], experience_level: str,
+                 tools: List[str], llm=None):
         self.specialty = specialty
-        self.history = {}
+        self.skills = skills
+        self.experience_level = experience_level
+        self.tools = tools
+        self.task_history = []
+        self.llm = copy.copy(llm)
+        self.history: Dict[str, List[TaskResult]] = {}
         super().__init__(name=name, workspace_id="openai_task_management", admin_port=8000)
+
+    async def get_llm_response(self, task_description: str, parent_task_id: str) -> str:
+        # Construct the agent profile context
+        agent_profile = f"""
+        Agent Profile:
+        - Name: {self.details().name}
+        - Specialty: {self.specialty}
+        - Skills: {', '.join(self.skills)}
+        - Experience Level: {self.experience_level}
+        - Available Tools: {', '.join(self.tools)}
+        """
+
+        # Construct the task information context
+        task_info = f"""
+        Task Information:
+        - Description: {task_description}
+        
+        Recent Task History:
+        {self._format_task_history(parent_task_id)}
+        """
+
+        # Combine all context information
+        context = f"{agent_profile}\n\n{task_info}"
+
+        # Create the prompt template
+        prompt_template = ChatPromptTemplate.from_messages([
+            SystemMessage(
+                content="You are an AI assistant helping a specialized agent. "
+                        "Use the following context to provide the best approach for the task."),
+            HumanMessage(
+                content=f"{context}\n\nGiven this information, what's the best"
+                        f"approach to complete this task efficiently and effectively?")
+        ])
+
+        try:
+            runnable = prompt_template | self.llm | StrOutputParser()
+            response = runnable.invoke({
+                context: context
+            })
+            logger.info(f"LLM response: {response}")
+            return response
+        except Exception as e:
+            logger.error(f"Error in LLM request: {e}")
+            return "Error in processing the task with LLM."
+
+    def _format_task_history(self, task_id) -> str:
+        if task_id not in self.history:
+            return ""
+
+        history = "\n".join([f"- {task.result}" for task in self.history[task_id]])
+        return history
 
     @on_message(type=TaskAssignment)
     async def on_task_assignment(self, data: TaskAssignment):
         if data.assigned_agent == self.details().name:
             logger.info(f"{self.details().name} received subtask: {data.task.description}")
 
-            task_related_history = self.history.get(data.task.parent_task_id, [])
-            if task_related_history:
-                print("Task history:", task_related_history)
-
-            # Simulate task execution
-            # await asyncio.sleep(2)
-            result = f"{self.details().name} completed the subtask: {data.task.description}"
+            result = await self.get_llm_response(
+                data.task.description,
+                data.task.parent_task_id
+            )
+            # task_related_history = self.history.get(data.task.parent_task_id, [])
+            # if task_related_history:
+            #     print("Task history:", task_related_history)
+            #
+            # # Simulate task execution
+            # # await asyncio.sleep(2)
+            # result = f"{self.details().name} completed the subtask: {data.task.description}"
             result_task = TaskResult(task_id=data.task.id, subtask_id=data.task.name, agent=self.details().name,
                                      parent_task_id=data.task.parent_task_id,
                                      result=result)
@@ -169,7 +114,8 @@ class TaskManager(CoreAdmin):
     agents: List[SpecializedAgent] = []
     results: Dict[str, List[TaskResult]] = {}
 
-    def __init__(self, tasks: List[Task], agents: List[SpecializedAgent]):
+    def __init__(self, tasks: List[Task], agents: List[SpecializedAgent], tool_llm=None):
+        self.tool_llm = tool_llm
         self.tasks = tasks
         self.agents = agents
         super().__init__(name="openai_task_management", port=8000)
@@ -229,7 +175,6 @@ class TaskManager(CoreAdmin):
 
     async def get_best_agent_for_subtask(self, subtask: SubTask) -> str:
         agent_specialties = "\n".join([f"{agent.details().name}: {agent.specialty}" for agent in self.agents])
-        llm = ChatOllama(model="llama3.1:latest", temperature=0)
 
         prompt_template = ChatPromptTemplate.from_template(
             """Given the following subtask and list of agents with their specialties, determine which agent is 
@@ -243,7 +188,7 @@ class TaskManager(CoreAdmin):
             
             Respond with only the name of the best-suited agent."""
         )
-        runnable = prompt_template | llm | StrOutputParser()
+        runnable = prompt_template | self.tool_llm | StrOutputParser()
 
         response = runnable.invoke({
             "subtask_description": subtask.description,
@@ -287,14 +232,63 @@ if __name__ == "__main__":
         web_app
     ]
 
+    llm = ChatOllama(model="llama3.1:latest", temperature=0)
     # Create specialized agents
     agents = [
-        SpecializedAgent("backend", "Knowledge about backend tools"),
-        SpecializedAgent("frontend", "Knowledge about frontend tools"),
-        SpecializedAgent("database", "Knowledge about database management tools"),
-        SpecializedAgent("deployment", "Knowledge about deployment tools and CI tools"),
-        SpecializedAgent("qa", "Knowledge about testing tools"),
-        SpecializedAgent("delivery", "Knowledge about delivery tools")
+        SpecializedAgent(
+            name="backend",
+            specialty="Knowledge about backend tools",
+            skills=["Python", "Java", "Node.js"],  # Example skills
+            experience_level="Advanced",  # Example experience level
+            tools=["Django", "Spring Boot", "Express.js"],  # Example tools
+            llm=llm
+        ),
+
+        SpecializedAgent(
+            name="frontend",
+            specialty="Knowledge about frontend tools",
+            skills=["HTML", "CSS", "JavaScript", "React"],  # Example skills
+            experience_level="Intermediate",  # Example experience level
+            tools=["React", "Angular", "Vue.js"],  # Example tools
+            llm=llm
+        ),
+
+        SpecializedAgent(
+            name="database",
+            specialty="Knowledge about database management tools",
+            skills=["SQL", "NoSQL", "Database Design"],  # Example skills
+            experience_level="Advanced",  # Example experience level
+            tools=["MySQL", "MongoDB", "PostgreSQL"],  # Example tools
+            llm=llm
+        ),
+
+        SpecializedAgent(
+            name="deployment",
+            specialty="Knowledge about deployment tools and CI tools",
+            skills=["CI/CD", "Docker", "Kubernetes"],  # Example skills
+            experience_level="Advanced",  # Example experience level
+            tools=["Jenkins", "Docker", "Kubernetes"],  # Example tools
+            llm=llm
+        ),
+
+        SpecializedAgent(
+            name="qa",
+            specialty="Knowledge about testing tools",
+            skills=["Automated Testing", "Manual Testing", "Test Case Design"],  # Example skills
+            experience_level="Intermediate",  # Example experience level
+            tools=["Selenium", "JUnit", "TestNG"],  # Example tools
+            llm=llm
+        ),
+
+        SpecializedAgent(
+            name="delivery",
+            specialty="Knowledge about delivery tools",
+            skills=["Release Management", "Continuous Delivery"],  # Example skills
+            experience_level="Intermediate",  # Example experience level
+            tools=["Jira", "Confluence", "GitLab CI"],  # Example tools
+            llm=llm
+        )
+
     ]
-    task_manager = TaskManager(tasks, agents)
+    task_manager = TaskManager(tasks, agents, tool_llm=llm)
     task_manager.run_admin(inputs=b"", workers=agents)
