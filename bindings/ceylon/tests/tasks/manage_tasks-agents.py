@@ -1,4 +1,3 @@
-import asyncio
 from typing import Dict, List, Optional, Set, Tuple
 from uuid import uuid4
 
@@ -14,6 +13,7 @@ from ceylon import Agent, on_message, CoreAdmin
 
 class SubTask(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()), alias='_id')
+    parent_task_id: Optional[str] = Field(default=None)
     name: str
     description: str
     required_specialty: str
@@ -110,6 +110,7 @@ class Task(BaseModel):
         task = Task(name=name, description=description)
         if subtasks:
             for subtask in subtasks:
+                subtask.parent_task_id = task.id
                 task.add_subtask(subtask)
         return task
 
@@ -162,18 +163,38 @@ class TaskResult(BaseModel):
 class SpecializedAgent(Agent):
     def __init__(self, name: str, specialty: str):
         self.specialty = specialty
+        self.history = {}
         super().__init__(name=name, workspace_id="openai_task_management", admin_port=8000)
 
     @on_message(type=TaskAssignment)
     async def on_task_assignment(self, data: TaskAssignment):
         if data.assigned_agent == self.details().name:
             logger.info(f"{self.details().name} received subtask: {data.task.description}")
+
+            print("Task history:", self.history)
+            task_related_history = self.history.get(data.task.id, [])
+            if task_related_history:
+                print("Task history:", task_related_history)
+
             # Simulate task execution
             # await asyncio.sleep(2)
             result = f"{self.details().name} completed the subtask: {data.task.description}"
-            await self.broadcast_data(
-                TaskResult(task_id=data.task.id, subtask_id=data.task.name, agent=self.details().name,
-                           result=result))
+            result_task = TaskResult(task_id=data.task.id, subtask_id=data.task.name, agent=self.details().name,
+                                     result=result)
+
+            # Update task history
+            await self.add_result_to_history(result_task)
+            await self.broadcast_data(result_task)
+
+    @on_message(type=TaskResult)
+    async def on_task_result(self, data: TaskResult):
+        await self.add_result_to_history(data)
+
+    async def add_result_to_history(self, data: TaskResult):
+        if data.task_id in self.history:
+            self.history[data.task_id].append(data)
+        else:
+            self.history[data.task_id] = [data]
 
 
 class TaskManager(CoreAdmin):
