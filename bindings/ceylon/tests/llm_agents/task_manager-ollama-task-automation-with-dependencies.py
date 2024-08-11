@@ -16,7 +16,7 @@ if __name__ == "__main__":
     specialized_agents = [
         SpecializedAgent(
             name="ContentWriter",
-            specialty="Content writing and research",
+            context="Content writing and research",
             skills=["Blog writing", "Article writing", "Copywriting", "SEO writing"],
             experience_level="Expert",
             tools=["Google Docs", "Grammarly", "Hemingway Editor", "WordPress"],
@@ -24,7 +24,7 @@ if __name__ == "__main__":
         ),
         SpecializedAgent(
             name="ImageGenerator",
-            specialty="AI image generation and editing",
+            context="AI image generation and editing",
             skills=["DALL-E prompting", "Midjourney", "Photoshop", "Canva"],
             experience_level="Advanced",
             tools=["DALL-E", "Midjourney", "Adobe Photoshop", "Canva"],
@@ -32,7 +32,7 @@ if __name__ == "__main__":
         ),
         SpecializedAgent(
             name="Editor",
-            specialty="Proofreading, editing, and formatting",
+            context="Proofreading, editing, and formatting",
             skills=["Copy editing", "Content editing", "Style guide implementation", "Formatting"],
             experience_level="Expert",
             tools=["Microsoft Word", "Google Docs", "Grammarly", "Chicago Manual of Style"],
@@ -40,7 +40,7 @@ if __name__ == "__main__":
         ),
         SpecializedAgent(
             name="SEOMaster",
-            specialty="Search engine optimization and content optimization",
+            context="Search engine optimization and content optimization",
             skills=["Keyword research", "On-page SEO", "Technical SEO", "Link building"],
             experience_level="Expert",
             tools=["SEMrush", "Ahrefs", "Google Analytics", "Google Search Console"],
@@ -48,7 +48,7 @@ if __name__ == "__main__":
         ),
         SpecializedAgent(
             name="ContentResearcher",
-            specialty="Content research and analysis",
+            context="Content research and analysis",
             skills=["Academic research", "Market research", "Data collection", "Trend analysis"],
             experience_level="Advanced",
             tools=["Google Scholar", "JSTOR", "LexisNexis", "Statista"],
@@ -56,7 +56,7 @@ if __name__ == "__main__":
         ),
         SpecializedAgent(
             name="UIDesigner",
-            specialty="UI/UX design and frontend development",
+            context="UI/UX design and frontend development",
             skills=["Wireframing", "Prototyping", "User testing", "Responsive design"],
             experience_level="Expert",
             tools=["Figma", "Sketch", "Adobe XD", "InVision"],
@@ -64,7 +64,7 @@ if __name__ == "__main__":
         ),
         SpecializedAgent(
             name="BackendDev",
-            specialty="Backend development and database management",
+            context="Backend development and database management",
             skills=["Python", "Node.js", "SQL", "RESTful API design"],
             experience_level="Expert",
             tools=["Django", "Express.js", "PostgreSQL", "Docker"],
@@ -72,7 +72,7 @@ if __name__ == "__main__":
         ),
         SpecializedAgent(
             name="FrontendDev",
-            specialty="Frontend development and UI/UX design",
+            context="Frontend development and UI/UX design",
             skills=["JavaScript", "React", "HTML5", "CSS3"],
             experience_level="Expert",
             tools=["VS Code", "webpack", "npm", "Chrome DevTools"],
@@ -80,7 +80,7 @@ if __name__ == "__main__":
         ),
         SpecializedAgent(
             name="DevOps",
-            specialty="DevOps and infrastructure management",
+            context="DevOps and infrastructure management",
             skills=["CI/CD", "Cloud infrastructure", "Containerization", "Monitoring"],
             experience_level="Expert",
             tools=["Jenkins", "AWS", "Docker", "Kubernetes"],
@@ -88,7 +88,7 @@ if __name__ == "__main__":
         ),
         SpecializedAgent(
             name="DataAnalyst",
-            specialty="Data analysis and statistics",
+            context="Data analysis and statistics",
             skills=["Data visualization", "Statistical analysis", "SQL", "Excel"],
             experience_level="Advanced",
             tools=["Tableau", "R", "Python", "Microsoft Excel"],
@@ -96,7 +96,7 @@ if __name__ == "__main__":
         ),
         SpecializedAgent(
             name="DataScientist",
-            specialty="Data science and machine learning",
+            context="Data science and machine learning",
             skills=["Machine learning", "Deep learning", "NLP", "Big data"],
             experience_level="Expert",
             tools=["Python", "TensorFlow", "Scikit-learn", "Jupyter Notebook"],
@@ -104,7 +104,7 @@ if __name__ == "__main__":
         ),
         SpecializedAgent(
             name="QATester",
-            specialty="Software testing and quality assurance",
+            context="Software testing and quality assurance",
             skills=["Manual testing", "Automated testing", "Performance testing", "Security testing"],
             experience_level="Advanced",
             tools=["Selenium", "JUnit", "JIRA", "Postman"],

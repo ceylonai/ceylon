@@ -11,12 +11,11 @@ from ceylon.llm import TaskAssignment, TaskResult
 
 
 class SpecializedAgent(Agent):
-    def __init__(self, name: str, specialty: str, skills: List[str], experience_level: str,
-                 tools: List[str], llm=None):
-        self.specialty = specialty
+    def __init__(self, name: str, role: str, context: str, skills: List[str],
+                 tools: List[str] = None, llm=None):
+        self.context = context
         self.skills = skills
-        self.experience_level = experience_level
-        self.tools = tools
+        self.tools = tools if tools else []
         self.task_history = []
         self.llm = copy.copy(llm)
         self.history: Dict[str, List[TaskResult]] = {}
@@ -27,9 +26,9 @@ class SpecializedAgent(Agent):
         agent_profile = f"""
         Agent Profile:
         - Name: {self.details().name}
-        - Specialty: {self.specialty}
+        - Role: {self.details().role}
+        - Context: {self.context}
         - Skills: {', '.join(self.skills)}
-        - Experience Level: {self.experience_level}
         - Available Tools: {', '.join(self.tools)}
         """
 

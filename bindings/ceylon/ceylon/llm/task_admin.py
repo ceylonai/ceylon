@@ -105,7 +105,8 @@ class TaskManager(CoreAdmin):
         await self.stop()
 
     async def get_best_agent_for_subtask(self, subtask: SubTask) -> str:
-        agent_specialties = "\n".join([f"{agent.details().name}: {agent.specialty}" for agent in self.agents])
+        agent_specialties = "\n".join(
+            [f"{agent.details().name} - ({agent.details().role}): {agent.context}" for agent in self.agents])
 
         prompt_template = ChatPromptTemplate.from_template(
             """Given the following subtask and list of agents with their specialties, determine which agent is 
@@ -161,10 +162,8 @@ class TaskManager(CoreAdmin):
         sub_task_list = chain.invoke(input={
             "description": task.description
         })
-
+        # Make sure subtasks are valid
         sub_task_list = self.recheck_and_update_subtasks(subtasks=sub_task_list)
-        print(sub_task_list)
-
         return [t.to_v2(task.id) for t in sub_task_list.sub_task_list]
 
     def recheck_and_update_subtasks(self, subtasks):

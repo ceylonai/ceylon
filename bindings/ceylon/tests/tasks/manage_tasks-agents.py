@@ -41,54 +41,54 @@ if __name__ == "__main__":
     agents = [
         SpecializedAgent(
             name="backend",
-            specialty="Knowledge about backend tools",
+            role="Backend Developer",
+            context="Knowledge about backend tools",
             skills=["Python", "Java", "Node.js"],  # Example skills
-            experience_level="Advanced",  # Example experience level
             tools=["Django", "Spring Boot", "Express.js"],  # Example tools
             llm=llm
         ),
 
         SpecializedAgent(
             name="frontend",
-            specialty="Knowledge about frontend tools",
+            role="Frontend Developer",
+            context="Knowledge about frontend tools",
             skills=["HTML", "CSS", "JavaScript", "React"],  # Example skills
-            experience_level="Intermediate",  # Example experience level
             tools=["React", "Angular", "Vue.js"],  # Example tools
             llm=llm
         ),
 
         SpecializedAgent(
             name="database",
-            specialty="Knowledge about database management tools",
+            role="Database Administrator",
+            context="Knowledge about database management tools",
             skills=["SQL", "NoSQL", "Database Design"],  # Example skills
-            experience_level="Advanced",  # Example experience level
             tools=["MySQL", "MongoDB", "PostgreSQL"],  # Example tools
             llm=llm
         ),
 
         SpecializedAgent(
             name="deployment",
-            specialty="Knowledge about deployment tools and CI tools",
+            role="Deployment Manager",
+            context="Knowledge about deployment tools and CI tools",
             skills=["CI/CD", "Docker", "Kubernetes"],  # Example skills
-            experience_level="Advanced",  # Example experience level
             tools=["Jenkins", "Docker", "Kubernetes"],  # Example tools
             llm=llm
         ),
 
         SpecializedAgent(
             name="qa",
-            specialty="Knowledge about testing tools",
+            role="Quality Assurance Engineer",
+            context="Knowledge about testing tools",
             skills=["Automated Testing", "Manual Testing", "Test Case Design"],  # Example skills
-            experience_level="Intermediate",  # Example experience level
             tools=["Selenium", "JUnit", "TestNG"],  # Example tools
             llm=llm
         ),
 
         SpecializedAgent(
             name="delivery",
-            specialty="Knowledge about delivery tools",
+            role="Delivery Manager",
+            context="Knowledge about delivery tools",
             skills=["Release Management", "Continuous Delivery"],  # Example skills
-            experience_level="Intermediate",  # Example experience level
             tools=["Jira", "Confluence", "GitLab CI"],  # Example tools
             llm=llm
         )
