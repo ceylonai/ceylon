@@ -6,7 +6,8 @@ from ceylon.llm import Task, SubTask, SpecializedAgent, TaskManager
 # Example usage
 if __name__ == "__main__":
     # Create a task with initial subtasks
-    article_task = Task(name="Write Article", description="Write an article about AI advancements")
+    article_task = Task(name="Write Article",
+                        description="Write an article about AI advancements. The final output should strictly include only the title and the content, without any additional sections or formatting.")
 
     tasks = [
         article_task

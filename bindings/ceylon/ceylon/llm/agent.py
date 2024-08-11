@@ -19,45 +19,43 @@ class SpecializedAgent(Agent):
         self.task_history = []
         self.llm = copy.copy(llm)
         self.history: Dict[str, List[TaskResult]] = {}
-        super().__init__(name=name, workspace_id="openai_task_management", admin_port=8000)
+        super().__init__(name=name, role=role, workspace_id="openai_task_management", admin_port=8000)
 
     async def get_llm_response(self, task_description: str, parent_task_id: str, depends_on: Set[str]) -> str:
         # Construct the agent profile context
         agent_profile = f"""
-        Agent Profile:
-        - Name: {self.details().name}
-        - Role: {self.details().role}
-        - Context: {self.context}
-        - Skills: {', '.join(self.skills)}
-        - Available Tools: {', '.join(self.tools)}
+        Hello, {self.details().name}.
+        You are a {self.details().role} {self.context}.
+        
+        Your key skills include:
+            {', '.join(self.skills)}
+        
+         You have access to the following tools:
+            {', '.join(self.tools)}
         """
 
         # Construct the task information context
         task_info = f"""
-        Task Information:
-        - Description: {task_description}
+        I need you to finish the following task:
+        {task_description}
         
-        Recent Task History:
+        And also here are information from your dependent tasks:
         {self._format_task_history(parent_task_id, depends_on)}
         """
-
-        # Combine all context information
-        context = f"{agent_profile}\n\n{task_info}"
 
         # Create the prompt template
         prompt_template = ChatPromptTemplate.from_messages([
             SystemMessage(
-                content="You are an AI assistant helping a specialized agent. "
-                        "Use the following context to provide the best approach for the task."),
+                content=f"{agent_profile}"),
             HumanMessage(
-                content=f"{context}\n\nGiven this information, what's the best"
-                        f"approach to complete this task efficiently and effectively?")
+                content=f"{task_info}")
         ])
 
         try:
             runnable = prompt_template | self.llm | StrOutputParser()
             response = runnable.invoke({
-                context: context
+                agent_profile: agent_profile,
+                task_info: task_info
             })
             return response
         except Exception as e:

@@ -1,4 +1,3 @@
-import pprint
 from typing import Dict, List, Set
 
 import pydantic.v1
@@ -51,7 +50,6 @@ class TaskManager(CoreAdmin):
                 sub_tasks = await self.generate_tasks_from_description(task)
                 for sub_task in sub_tasks:
                     task.add_subtask(sub_task)
-                pprint.pprint(sub_tasks)
 
             if task.validate_sub_tasks():
                 logger.info(f"Task {task.name} is valid")
@@ -106,28 +104,46 @@ class TaskManager(CoreAdmin):
 
     async def get_best_agent_for_subtask(self, subtask: SubTask) -> str:
         agent_specialties = "\n".join(
-            [f"{agent.details().name} - ({agent.details().role}): {agent.context}" for agent in self.agents])
+            [f"{agent.details().name}: {agent.details().role} {agent.context}" for agent in self.agents])
 
         prompt_template = ChatPromptTemplate.from_template(
-            """Given the following subtask and list of agents with their specialties, determine which agent is 
-            best suited for the subtask.        
-
+            """
+            Select the most suitable agent for this subtask:
+        
             Subtask: {subtask_description}
-            Required Specialty: {required_specialty}
-            
-            Agents and their specialties:
+            Required specialty: {required_specialty}
+        
+            Agent specialties:
             {agent_specialties}
-            
-            Respond with only the name of the best-suited agent."""
+        
+            Available agents: {agent_names}
+        
+            Important: Respond ONLY with the exact name of the single most suitable agent from the available agents list.
+            If no agent perfectly matches, choose the closest fit.
+            """
         )
+
         runnable = prompt_template | self.llm | StrOutputParser()
 
-        response = runnable.invoke({
-            "subtask_description": subtask.description,
-            "required_specialty": subtask.required_specialty,
-            "agent_specialties": agent_specialties
-        })
-        return response.strip()
+        def get_valid_agent_name(max_attempts=3):
+            agent_names = [agent.details().name for agent in self.agents]
+
+            for attempt in range(max_attempts):
+                response = runnable.invoke({
+                    "subtask_description": subtask.description,
+                    "required_specialty": subtask.required_specialty,
+                    "agent_specialties": agent_specialties,
+                    "agent_names": ", ".join(agent_names)
+                }).strip()
+
+                if response in agent_names:
+                    return response
+                print(response)
+                print(f"Attempt {attempt + 1}: Invalid agent name received: {response}. Retrying...")
+
+            raise Exception(f"Failed to get a valid agent name after {max_attempts} attempts.")
+
+        return get_valid_agent_name()
 
     async def generate_tasks_from_description(self, task: Task) -> List[SubTask]:
 
