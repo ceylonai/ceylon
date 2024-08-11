@@ -156,6 +156,7 @@ class TaskAssignment(BaseModel):
 
 class TaskResult(BaseModel):
     task_id: str
+    parent_task_id: str
     agent: str
     result: str
 
@@ -171,8 +172,7 @@ class SpecializedAgent(Agent):
         if data.assigned_agent == self.details().name:
             logger.info(f"{self.details().name} received subtask: {data.task.description}")
 
-            print("Task history:", self.history)
-            task_related_history = self.history.get(data.task.id, [])
+            task_related_history = self.history.get(data.task.parent_task_id, [])
             if task_related_history:
                 print("Task history:", task_related_history)
 
@@ -180,6 +180,7 @@ class SpecializedAgent(Agent):
             # await asyncio.sleep(2)
             result = f"{self.details().name} completed the subtask: {data.task.description}"
             result_task = TaskResult(task_id=data.task.id, subtask_id=data.task.name, agent=self.details().name,
+                                     parent_task_id=data.task.parent_task_id,
                                      result=result)
 
             # Update task history
@@ -191,10 +192,10 @@ class SpecializedAgent(Agent):
         await self.add_result_to_history(data)
 
     async def add_result_to_history(self, data: TaskResult):
-        if data.task_id in self.history:
-            self.history[data.task_id].append(data)
+        if data.parent_task_id in self.history:
+            self.history[data.parent_task_id].append(data)
         else:
-            self.history[data.task_id] = [data]
+            self.history[data.parent_task_id] = [data]
 
 
 class TaskManager(CoreAdmin):
