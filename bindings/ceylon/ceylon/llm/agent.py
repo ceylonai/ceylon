@@ -22,7 +22,7 @@ class SpecializedAgent(Agent):
         self.history: Dict[str, List[TaskResult]] = {}
         super().__init__(name=name, workspace_id="openai_task_management", admin_port=8000)
 
-    async def get_llm_response(self, task_description: str, parent_task_id: str) -> str:
+    async def get_llm_response(self, task_description: str, parent_task_id: str, depends_on: List[str]) -> str:
         # Construct the agent profile context
         agent_profile = f"""
         Agent Profile:
@@ -39,8 +39,10 @@ class SpecializedAgent(Agent):
         - Description: {task_description}
         
         Recent Task History:
-        {self._format_task_history(parent_task_id)}
+        {self._format_task_history(parent_task_id, depends_on)}
         """
+
+        print(f"{agent_profile}\n\n{task_info}")
 
         # Combine all context information
         context = f"{agent_profile}\n\n{task_info}"
@@ -65,12 +67,15 @@ class SpecializedAgent(Agent):
             logger.error(f"Error in LLM request: {e}")
             return "Error in processing the task with LLM."
 
-    def _format_task_history(self, task_id) -> str:
+    def _format_task_history(self, task_id, depends_on: List[str]) -> str:
         if task_id not in self.history:
             return ""
 
-        history = "\n".join([f"- {task.result}" for task in self.history[task_id]])
-        return history
+        results = []
+        for rest_his in self.history[task_id]:
+            if rest_his.agent in depends_on:
+                results.append(f"{rest_his.agent} - \n- {rest_his.result}")
+        return "\n".join(results)
 
     @on_message(type=TaskAssignment)
     async def on_task_assignment(self, data: TaskAssignment):
@@ -78,7 +83,8 @@ class SpecializedAgent(Agent):
             logger.info(f"{self.details().name} received subtask: {data.task.description}")
             result = await self.get_llm_response(
                 data.task.description,
-                data.task.parent_task_id
+                data.task.parent_task_id,
+                data.task.depends_on
             )
             result_task = TaskResult(task_id=data.task.id, subtask_id=data.task.name, agent=self.details().name,
                                      parent_task_id=data.task.parent_task_id,

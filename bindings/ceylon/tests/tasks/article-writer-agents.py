@@ -5,7 +5,7 @@ from ceylon.llm import Task, SubTask, SpecializedAgent, TaskManager
 # Example usage
 if __name__ == "__main__":
     # Create a task with initial subtasks
-    article_task = Task.create_task("Write Article", "Create an SEO-optimized article",
+    article_task = Task.create_task("Write Article", "Write an article about AI advancements",
                                     subtasks=[
                                         SubTask(name="research", description="Conduct research for the article",
                                                 required_specialty="Knowledge about research methodologies and tools"),
