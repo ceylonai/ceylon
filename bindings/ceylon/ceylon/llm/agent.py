@@ -1,5 +1,5 @@
 import copy
-from typing import Dict, List, Set
+from typing import Dict, List, Set, Any
 
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
@@ -12,12 +12,13 @@ from ceylon.llm import TaskAssignment, TaskResult
 
 class SpecializedAgent(Agent):
     def __init__(self, name: str, role: str, context: str, skills: List[str],
-                 tools: List[str] = None, llm=None):
+                 tools: List[Any] = None, llm=None, tool_llm=None):
         self.context = context
         self.skills = skills
         self.tools = tools if tools else []
         self.task_history = []
         self.llm = copy.copy(llm)
+        self.tool_llm = copy.copy(tool_llm)
         self.history: Dict[str, List[TaskResult]] = {}
         super().__init__(name=name, role=role, workspace_id="openai_task_management", admin_port=8000)
 
@@ -30,8 +31,6 @@ class SpecializedAgent(Agent):
         Your key skills include:
             {', '.join(self.skills)}
         
-         You have access to the following tools:
-            {', '.join(self.tools)}
         """
 
         # Construct the task information context
@@ -43,6 +42,12 @@ class SpecializedAgent(Agent):
         {self._format_task_history(parent_task_id, depends_on)}
         """
 
+        if len(self.tools) > 0 and self.tool_llm:
+            tool_llm = self.tool_llm
+            tool_llm = tool_llm.bind_tools(self.tools, verbose=True)
+        else:
+            tool_llm = self.llm
+
         # Create the prompt template
         prompt_template = ChatPromptTemplate.from_messages([
             SystemMessage(
@@ -52,13 +57,14 @@ class SpecializedAgent(Agent):
         ])
 
         try:
-            runnable = prompt_template | self.llm | StrOutputParser()
+            runnable = prompt_template | tool_llm | StrOutputParser()
             response = runnable.invoke({
                 agent_profile: agent_profile,
                 task_info: task_info
             })
             return response
         except Exception as e:
+            raise e
             logger.error(f"Error in LLM request: {e}")
             return "Error in processing the task with LLM."
 
