@@ -15,7 +15,8 @@ if __name__ == "__main__":
                                         SubTask(name="seo_optimization", description="Optimize the article for SEO",
                                                 depends_on={"writing"},
                                                 required_specialty="Knowledge about SEO strategies and tools"),
-                                        SubTask(name="web_publishing", description="Publish the article on the website",
+                                        SubTask(name="web_publishing",
+                                                description="Final article for web publishing, need to ready for publication",
                                                 depends_on={"seo_optimization"},
                                                 required_specialty="Knowledge about web publishing tools"),
                                     ])
@@ -66,4 +67,7 @@ if __name__ == "__main__":
     ]
 
     task_manager = TaskManager(tasks, agents, tool_llm=llm)
-    task_manager.do(inputs=b"")
+    tasks = task_manager.do(inputs=b"")
+
+    for t in tasks:
+        print(t.final_answer)
