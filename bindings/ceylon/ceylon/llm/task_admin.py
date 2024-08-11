@@ -45,7 +45,7 @@ class TaskManager(CoreAdmin):
 
     @on_message(type=TaskResult)
     async def on_task_result(self, result: TaskResult):
-        for task in self.tasks:
+        for idx, task in enumerate(self.tasks):
             sub_task = task.get_next_subtask()
             if sub_task is None or result.task_id != sub_task[1].id:
                 continue
@@ -97,5 +97,6 @@ class TaskManager(CoreAdmin):
         })
         return response.strip()
 
-    def do(self, inputs: bytes):
+    def do(self, inputs: bytes) -> List[Task]:
         self.run_admin(inputs, self.agents)
+        return self.tasks

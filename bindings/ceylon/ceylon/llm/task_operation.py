@@ -1,3 +1,4 @@
+import datetime
 from typing import List, Optional, Tuple, Set, Dict
 from uuid import uuid4
 
@@ -14,11 +15,13 @@ class SubTask(BaseModel):
     required_specialty: str
     depends_on: Set[str] = Field(default_factory=set)
     completed: bool = False
+    completed_at: Optional[float] = None
 
     result: Optional[str] = None
 
     def complete(self, result: Optional[str] = None):
         self.result = result
+        self.completed_at = datetime.datetime.now().timestamp()
         self.completed = True
 
     def __str__(self):
@@ -89,16 +92,34 @@ class Task(BaseModel):
 
         subtask = self.subtasks[subtask_name]
         if result is not None:
-            subtask.complete()
+            subtask.complete(result)
 
         if subtask_name in self.execution_order:
             self.execution_order.remove(subtask_name)
 
+    def get_sub_task_by_name(self, subtask_name: str) -> SubTask:
+        if subtask_name not in self.subtasks:
+            raise ValueError(f"Subtask {subtask_name} not found")
+
+        return self.subtasks[subtask_name]
+
     def is_completed(self) -> bool:
         return all(subtask.completed for subtask in self.subtasks.values())
 
+    @property
+    def sub_tasks(self) -> List[SubTask]:
+        tasks = list(self.subtasks.values())
+        tasks.sort(key=lambda x: x.completed_at)
+        return tasks
+
+    @property
+    def final_answer(self) -> Optional[str]:
+        if not self.is_completed() or len(self.sub_tasks) == 0:
+            return None
+        return self.sub_tasks[-1].result
+
     def __str__(self):
-        return f"Task: {self.name}\nSubtasks:\n" + "\n".join(str(st) for st in self.subtasks.values())
+        return f"Task: {self.name}\nSubtasks:\n" + "\n".join(str(st) for st in self.subtasks)
 
     @staticmethod
     def create_task(name: str, description: str, subtasks: List[SubTask] = None) -> 'Task':
