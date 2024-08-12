@@ -1,12 +1,15 @@
+import asyncio
 from typing import Optional, Type
 
 from langchain.pydantic_v1 import BaseModel, Field
-from langchain_community.tools import DuckDuckGoSearchRun
+from langchain_community.chat_models import ChatOllama
+from langchain_community.tools import DuckDuckGoSearchRun, DuckDuckGoSearchResults
 from langchain_core.callbacks import (
     AsyncCallbackManagerForToolRun,
     CallbackManagerForToolRun,
 )
 from langchain_core.tools import BaseTool
+from langchain_experimental.llms.ollama_functions import OllamaFunctions
 from langchain_openai import ChatOpenAI
 from loguru import logger
 
@@ -53,7 +56,11 @@ if __name__ == "__main__":
         article_task
     ]
 
-    llm_lib = ChatOpenAI(model="gpt-4o-mini")
+    # llm_lib = ChatOpenAI(model="gpt-4o-mini")
+    # llm_tool = ChatOpenAI(model="gpt-4o")
+
+    llm_lib = ChatOllama(model="llama3.1:latest")
+    llm_tool = OllamaFunctions(model="llama3.1:latest", format="json")
 
     # Create specialized agents
     agents = [
@@ -70,11 +77,11 @@ if __name__ == "__main__":
                 "Research"
             ],
             tools=[
-                DuckDuckGoSearchRun()
+                DuckDuckGoSearchResults()
                 # Add any additional tools here, e.g., WikipediaQueryRun
             ],
             llm=llm_lib,
-            tool_llm=llm_lib
+            tool_llm=llm_tool
         ),
         SpecializedAgent(
             name="illustrator",
@@ -91,7 +98,7 @@ if __name__ == "__main__":
                 # Add any additional tools here, e.g., WikipediaQueryRun
             ],
             llm=llm_lib,
-            tool_llm=llm_lib
+            tool_llm=llm_tool
         ),
 
         SpecializedAgent(
@@ -108,12 +115,12 @@ if __name__ == "__main__":
             ],
             tools=[],
             llm=llm_lib,
-            tool_llm=llm_lib
+            tool_llm=llm_tool
         ),
     ]
 
-    task_manager = TaskManager(tasks, agents, tool_llm=llm_lib, llm=llm_lib)
-    tasks = task_manager.do(inputs=b"")
+    task_manager = TaskManager(tasks, agents, tool_llm=llm_tool, llm=llm_lib)
+    tasks = asyncio.run(task_manager.async_do(inputs=b""))
 
     for t in tasks:
         print(t.final_answer)

@@ -232,3 +232,7 @@ class TaskManager(CoreAdmin):
     def do(self, inputs: bytes) -> List[Task]:
         self.run_admin(inputs, self.agents)
         return self.tasks
+
+    async def async_do(self, inputs: bytes) -> List[Task]:
+        await self.arun_admin(inputs, self.agents)
+        return self.tasks
