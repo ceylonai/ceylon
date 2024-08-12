@@ -59,6 +59,9 @@ if __name__ == "__main__":
     llm = ChatOpenAI(model="gpt-4o-mini")
     tool_llm = ChatOpenAI(model="gpt-4o-mini")
 
+    # llm = ChatOllama(model="llama3.1:latest")
+    # tool_llm = OllamaFunctions(model="llama3.1:latest", format="json")
+
     # Create specialized agents
     agents = [
         SpecializedAgent(

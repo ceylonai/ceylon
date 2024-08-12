@@ -10,9 +10,9 @@ from pydantic import BaseModel
 class SubTask(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()), alias='_id')
     parent_task_id: Optional[str] = Field(default=None)
-    name: str
-    description: str
-    required_specialty: str
+    name: str = Field(description="the name of the subtask write in snake_case")
+    description: str = Field(description="the description of the subtask, Explains the task in detail")
+    required_specialty: str = Field(description="the required specialty of the subtask")
     depends_on: Set[str] = Field(default_factory=set)
     completed: bool = False
     completed_at: Optional[float] = None
@@ -142,6 +142,7 @@ class TaskResult(BaseModel):
     agent: str
     result: str
     name: str
+    description: str
 
 
 if __name__ == "__main__":
