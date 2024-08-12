@@ -1,18 +1,11 @@
-from langchain_community.chat_models import ChatOllama
 from langchain_openai import ChatOpenAI
 
 from ceylon.llm import Task, SpecializedAgent, TaskManager
 
 # Define the main task
 task_management_app = Task(
-    name="Create a Very Simple Ping Pong Game",
-    description="""Develop a minimalist single-player Ping Pong game:
-1. Create a game window with one paddle and a ball.
-2. Move the paddle up and down using arrow keys.
-3. Make the ball bounce off the walls and paddle.
-4. Count and display how many times the player hits the ball.
-5. End the game if the ball passes the paddle.
-6. Allow restarting the game after it ends."""
+    name="Create Task Management App",
+    description="Develop a simple task management application with features for adding, listing, and completing tasks."
 )
 
 tasks = [task_management_app]
@@ -21,7 +14,8 @@ tasks = [task_management_app]
 
 llm = ChatOpenAI(model="gpt-4o-mini")
 tool_llm = ChatOpenAI(model="gpt-4o-mini")
-code_llm = ChatOllama(model="codestral:latest")
+code_llm = ChatOpenAI(model="gpt-4o-mini")
+# code_llm = ChatOllama(model="codestral:latest")
 # code_llm = ChatOpenAI(model="codestral:latest")
 
 # Create specialized agents
@@ -53,39 +47,39 @@ agents = [
         tools=[],
         llm=code_llm
     ),
-    SpecializedAgent(
-        name="testing_specialist",
-        role="Quality Assurance Engineer",
-        context="Expertise in software testing methodologies and test automation for Python applications.",
-        skills=[
-            "Unit Testing",
-            "Integration Testing",
-            "Test Automation",
-            "Python Testing Frameworks"
-        ],
-        tools=[],
-        llm=code_llm
-    ),
-    SpecializedAgent(
-        name="game_developer",
-        role="Python Game Developer",
-        context="Experienced in creating interactive games and simulations using Python, with a focus on 2D game development.",
-        skills=[
-            "Game Design",
-            "Game Mechanics",
-            "2D Graphics",
-            "Collision Detection",
-            "Game Loop Implementation",
-            "Player Input Handling",
-            "Basic Game AI"
-        ],
-        tools=[
-            "Pygame",
-            "Arcade",
-            "Pyglet"
-        ],
-        llm=code_llm
-    )
+    # SpecializedAgent(
+    #     name="testing_specialist",
+    #     role="Quality Assurance Engineer",
+    #     context="Expertise in software testing methodologies and test automation for Python applications.",
+    #     skills=[
+    #         "Unit Testing",
+    #         "Integration Testing",
+    #         "Test Automation",
+    #         "Python Testing Frameworks"
+    #     ],
+    #     tools=[],
+    #     llm=code_llm
+    # ),
+    # SpecializedAgent(
+    #     name="game_developer",
+    #     role="Python Game Developer",
+    #     context="Experienced in creating interactive games and simulations using Python, with a focus on 2D game development.",
+    #     skills=[
+    #         "Game Design",
+    #         "Game Mechanics",
+    #         "2D Graphics",
+    #         "Collision Detection",
+    #         "Game Loop Implementation",
+    #         "Player Input Handling",
+    #         "Basic Game AI"
+    #     ],
+    #     tools=[
+    #         "Pygame",
+    #         "Arcade",
+    #         "Pyglet"
+    #     ],
+    #     llm=code_llm
+    # )
 ]
 
 # Initialize TaskManager

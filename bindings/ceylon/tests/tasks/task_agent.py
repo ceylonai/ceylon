@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 import networkx as nx
 from ceylon import Agent, CoreAdmin, on_message
 
+
 # Data Models
 class SubTask(BaseModel):
     id: str
@@ -18,6 +19,7 @@ class SubTask(BaseModel):
     def __str__(self):
         status = "Completed" if self.completed else "Pending"
         return f"SubTask: {self.name} (ID: {self.id}) - {status}"
+
 
 class Task(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()), alias='_id')
@@ -53,14 +55,17 @@ class Task(BaseModel):
     def __str__(self):
         return f"Task: {self.name}\nSubtasks:\n" + "\n".join(str(st) for st in self.subtasks.values())
 
+
 # Messages
 class TaskAssignment(BaseModel):
     task_id: str
     subtask_id: str
 
+
 class SubTaskCompletion(BaseModel):
     task_id: str
     subtask_id: str
+
 
 # Admin Agent
 class TaskManagerAdmin(CoreAdmin):
@@ -116,6 +121,7 @@ class TaskManagerAdmin(CoreAdmin):
             # Continue executing remaining subtasks
             await self.execute_task(data.task_id)
 
+
 # Worker Agent
 class WorkerAgent(Agent):
     def __init__(self, name: str):
@@ -129,6 +135,7 @@ class WorkerAgent(Agent):
         print(f"{self.details().name} completed subtask: {data.subtask_id}")
         await self.broadcast_data(SubTaskCompletion(task_id=data.task_id, subtask_id=data.subtask_id))
 
+
 # Example usage
 async def main():
     admin = TaskManagerAdmin()
@@ -140,7 +147,8 @@ async def main():
         SubTask(id="database", name="Database", description="Set up the database"),
         SubTask(id="backend", name="Backend", description="Develop the backend API", depends_on={"setup", "database"}),
         SubTask(id="frontend", name="Frontend", description="Develop the frontend UI", depends_on={"setup"}),
-        SubTask(id="testing", name="Testing", description="Perform unit and integration tests", depends_on={"backend", "frontend"}),
+        SubTask(id="testing", name="Testing", description="Perform unit and integration tests",
+                depends_on={"backend", "frontend"}),
         SubTask(id="deployment", name="Deployment", description="Deploy the application", depends_on={"testing"})
     ]
 
@@ -155,7 +163,9 @@ async def main():
         workers=workers
     )
 
+
 if __name__ == "__main__":
     import asyncio
     import pickle
+
     asyncio.run(main())
