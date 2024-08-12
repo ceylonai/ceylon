@@ -5,6 +5,7 @@
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />
     <envs>
+      <env name="OPENAI_API_KEY" value="<>" />
       <env name="PYTHONUNBUFFERED" value="1" />
       <env name="RUST_LOG" value="trace" />
     </envs>
