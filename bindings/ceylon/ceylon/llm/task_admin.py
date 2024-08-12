@@ -51,6 +51,17 @@ class TaskManager(CoreAdmin):
                 for sub_task in sub_tasks:
                     task.add_subtask(sub_task)
 
+                depends_on = [sub_task.name for sub_task in sub_tasks]
+                print(task.description)
+                final_sub_task = SubTask(
+                    name="final_answer",
+                    description=task.description,
+                    required_specialty="This is the final answer. This will be directly present as the answer",
+                    depends_on=set(depends_on),
+                )
+                print(final_sub_task)
+                task.add_subtask(final_sub_task)
+
             if task.validate_sub_tasks():
                 logger.info(f"Task {task.name} is valid")
             else:
