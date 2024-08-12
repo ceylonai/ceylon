@@ -3,17 +3,17 @@ from typing import Optional, Type
 
 from langchain.pydantic_v1 import BaseModel, Field
 from langchain_community.chat_models import ChatOllama
-from langchain_community.tools import DuckDuckGoSearchRun, DuckDuckGoSearchResults
+from langchain_community.tools import DuckDuckGoSearchRun
 from langchain_core.callbacks import (
     AsyncCallbackManagerForToolRun,
     CallbackManagerForToolRun,
 )
 from langchain_core.tools import BaseTool
 from langchain_experimental.llms.ollama_functions import OllamaFunctions
-from langchain_openai import ChatOpenAI
 from loguru import logger
 
 from ceylon import Task, SpecializedAgent, TaskManager
+from ceylon.llm.tools.search_tool import SearchTools
 
 
 class QueryInput(BaseModel):
@@ -77,7 +77,7 @@ if __name__ == "__main__":
                 "Research"
             ],
             tools=[
-                DuckDuckGoSearchResults()
+                SearchTools.search_internet
                 # Add any additional tools here, e.g., WikipediaQueryRun
             ],
             llm=llm_lib,

@@ -53,10 +53,10 @@ class TaskManager(CoreAdmin):
 
                 depends_on = [sub_task.name for sub_task in sub_tasks]
                 final_sub_task = SubTask(
-                    name="final_answer",
-                    description=task.description,
-                    required_specialty="This is the final answer. This will be directly present as the answer",
-                    depends_on=set(depends_on),
+                    name="Generate Final Answer",
+                    description=f"Based on all previous sub-tasks, provide a comprehensive final answer to the main task: {task.description}",
+                    required_specialty="Synthesize information and generate conclusive answers",
+                    depends_on=depends_on,
                 )
                 task.add_subtask(final_sub_task)
 
