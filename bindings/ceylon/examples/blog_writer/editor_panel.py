@@ -10,7 +10,7 @@ from langchain_core.tools import BaseTool
 from langchain_openai import ChatOpenAI
 from loguru import logger
 
-from ceylon.llm import Task, SpecializedAgent, TaskManager
+from ceylon import Task, SpecializedAgent, TaskManager
 
 
 class QueryInput(BaseModel):
