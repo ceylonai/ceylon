@@ -3,8 +3,8 @@ from typing import List, Optional, Tuple, Set, Dict
 from uuid import uuid4
 
 import networkx as nx
-from pydantic import Field
 from pydantic import BaseModel
+from pydantic import Field
 
 
 class SubTask(BaseModel):

@@ -8,7 +8,7 @@ from loguru import logger
 
 from ceylon import Agent, on_message
 from ceylon.llm import TaskAssignment, TaskResult
-from tasks.task_agent import SubTask
+from ceylon.llm.task_operation import SubTask
 
 
 class SpecializedAgent(Agent):
