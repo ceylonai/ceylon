@@ -52,14 +52,12 @@ class TaskManager(CoreAdmin):
                     task.add_subtask(sub_task)
 
                 depends_on = [sub_task.name for sub_task in sub_tasks]
-                print(task.description)
                 final_sub_task = SubTask(
                     name="final_answer",
                     description=task.description,
                     required_specialty="This is the final answer. This will be directly present as the answer",
                     depends_on=set(depends_on),
                 )
-                print(final_sub_task)
                 task.add_subtask(final_sub_task)
 
             if task.validate_sub_tasks():
@@ -151,7 +149,7 @@ class TaskManager(CoreAdmin):
                 if response in agent_names:
                     return response
                 print(response)
-                print(f"Attempt {attempt + 1}: Invalid agent name received: {response}. Retrying...")
+                print(f"Attempt {attempt + 1}: Invalid agent name received: {response} {subtask}. Retrying...")
 
             raise Exception(f"Failed to get a valid agent name after {max_attempts} attempts.")
 
