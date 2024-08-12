@@ -8,6 +8,7 @@ from loguru import logger
 
 from ceylon import Agent, on_message
 from ceylon.llm import TaskAssignment, TaskResult
+from tasks.task_agent import SubTask
 
 
 class SpecializedAgent(Agent):
@@ -22,7 +23,8 @@ class SpecializedAgent(Agent):
         self.history: Dict[str, List[TaskResult]] = {}
         super().__init__(name=name, role=role, workspace_id="openai_task_management", admin_port=8000)
 
-    async def get_llm_response(self, task_description: str, parent_task_id: str, depends_on: Set[str]) -> str:
+    async def get_llm_response(self, subtask: SubTask) -> str:
+
         # Construct the agent profile context
         agent_profile = f"""
         Hello, {self.details().name}.
@@ -35,16 +37,21 @@ class SpecializedAgent(Agent):
 
         # Construct the task information context
         task_info = f"""
-        I need you to finish the following task:
-        {task_description}
-        
-        And also here are information from your dependent tasks:
-        {self._format_task_history(parent_task_id, depends_on)}
-        """
+          I need you to finish the following task,
+            {subtask.name},{subtask.description}
+             
+             Here are some additional information to help you:
+               {self._format_task_history(subtask.id, subtask.depends_on)}
+               Ensure these results are sufficient for executing the subtask.
+               
+            
+            Give most successful response for {subtask.name}
+            
+            """
 
         if len(self.tools) > 0 and self.tool_llm:
             tool_llm = self.tool_llm
-            tool_llm = tool_llm.bind_tools(self.tools, verbose=True)
+            tool_llm = tool_llm.bind_tools(self.tools)
         else:
             tool_llm = self.llm
 
@@ -75,20 +82,17 @@ class SpecializedAgent(Agent):
         results = []
         for rest_his in self.history[task_id]:
             if rest_his.name in depends_on:
-                results.append(f"{rest_his.agent} - \n- {rest_his.result}")
+                results.append(f"{rest_his.name}: {rest_his.result}\n")
         return "\n".join(results)
 
     @on_message(type=TaskAssignment)
     async def on_task_assignment(self, data: TaskAssignment):
         if data.assigned_agent == self.details().name:
             logger.info(f"{self.details().name} received subtask: {data.task.description}")
-            result = await self.get_llm_response(
-                data.task.description,
-                data.task.parent_task_id,
-                data.task.depends_on
-            )
+            result = await self.get_llm_response(data.task)
             result_task = TaskResult(task_id=data.task.id,
                                      name=data.task.name,
+                                     description=data.task.description,
                                      agent=self.details().name,
                                      parent_task_id=data.task.parent_task_id,
                                      result=result)
