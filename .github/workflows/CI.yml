@@ -50,7 +50,7 @@ jobs:
       - name: Change Directory
         run: cd bindings/ceylon
       - name: Build
-        run: maturin build --release --out dist --find-interpreter --no-sdist -m bindings/ceylon/Cargo.toml
+        run: maturin build --release --out dist --find-interpreter -m bindings/ceylon/Cargo.toml
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -81,7 +81,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist --find-interpreter --no-sdist -m bindings/ceylon/Cargo.toml
+          args: --release --out dist --find-interpreter -m bindings/ceylon/Cargo.toml
           sccache: 'true'
       - name: Upload wheels
         uses: actions/upload-artifact@v4
