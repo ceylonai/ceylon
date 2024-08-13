@@ -39,7 +39,7 @@ jobs:
             target: s390x
           - runner: ubuntu-latest
             target: ppc64le
-        python-version: ['3.8', '3.9', '3.10', '3.11','3.12']
+        python-version: [ '3.8', '3.9', '3.10', '3.11','3.12' ]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -69,7 +69,7 @@ jobs:
             target: x64
           - runner: windows-latest
             target: x86
-        python-version: ['3.8', '3.9', '3.10', '3.11','3.12']
+        python-version: [ '3.8', '3.9', '3.10', '3.11','3.12' ]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -120,7 +120,7 @@ jobs:
             target: x86_64
           - runner: macos-14
             target: aarch64
-        python-version: ['3.8', '3.9', '3.10', '3.11','3.12']
+        python-version: [ '3.8', '3.9', '3.10', '3.11','3.12' ]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -147,42 +147,74 @@ jobs:
     strategy:
       matrix:
         python:
-            [
-              { version: "3.8", abi: "cp38-cp38" },
-          { version: "3.9", abi: "cp39-cp39" },
-          { version: "3.10", abi: "cp310-cp310" },
-          { version: "3.11", abi: "cp311-cp311" },
-          { version: "3.12", abi: "cp312-cp312" },
-      ]
-        target: [ x86_64, x86, aarch64, armv7, s390x, ppc64le ]
+          [
+            { version: "3.8", abi: "cp38-cp38" },
+            { version: "3.9", abi: "cp39-cp39" },
+            { version: "3.10", abi: "cp310-cp310" },
+            { version: "3.11", abi: "cp311-cp311" },
+            { version: "3.12", abi: "cp312-cp312" },
+          ]
+        target: [ x86_64, i686, aarch64, armv7, s390x, ppc64le ]
     steps:
       - uses: actions/checkout@v4
-      - name: Install OpenSSL
+
+      - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libssl-dev pkg-config
+          sudo apt-get install -y libssl-dev pkg-config build-essential zlib1g-dev
+
       - name: Build OpenSSL from source
         run: |
-          wget https://www.openssl.org/source/openssl-1.1.1k.tar.gz
-          tar xzf openssl-1.1.1k.tar.gz
-          cd openssl-1.1.1k
-          ./config --prefix=/usr/local/ssl --openssldir=/usr/local/ssl shared zlib
+          wget https://www.openssl.org/source/openssl-1.1.1w.tar.gz
+          tar xzf openssl-1.1.1w.tar.gz
+          cd openssl-1.1.1w
+          ./config --prefix=/usr/local/ssl --openssldir=/usr/local/ssl shared zlib no-async
           make -j $(nproc)
           sudo make install
           echo "OPENSSL_DIR=/usr/local/ssl" >> $GITHUB_ENV
           echo "LD_LIBRARY_PATH=/usr/local/ssl/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=/usr/local/ssl/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+
+      - name: Set up cross-compilation toolchain
+        run: |
+          sudo apt-get install -y gcc-multilib
+          case ${{ matrix.target }} in
+            i686)
+              sudo apt-get install -y gcc-i686-linux-gnu
+              echo "CARGO_TARGET_I686_UNKNOWN_LINUX_GNU_LINKER=i686-linux-gnu-gcc" >> $GITHUB_ENV
+              ;;
+            aarch64)
+              sudo apt-get install -y gcc-aarch64-linux-gnu
+              echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+              ;;
+            armv7)
+              sudo apt-get install -y gcc-arm-linux-gnueabihf
+              echo "CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER=arm-linux-gnueabihf-gcc" >> $GITHUB_ENV
+              ;;
+            s390x)
+              sudo apt-get install -y gcc-s390x-linux-gnu
+              echo "CARGO_TARGET_S390X_UNKNOWN_LINUX_GNU_LINKER=s390x-linux-gnu-gcc" >> $GITHUB_ENV
+              ;;
+            ppc64le)
+              sudo apt-get install -y gcc-powerpc64le-linux-gnu
+              echo "CARGO_TARGET_POWERPC64LE_UNKNOWN_LINUX_GNU_LINKER=powerpc64le-linux-gnu-gcc" >> $GITHUB_ENV
+              ;;
+          esac
+
       - name: Build Wheels
         uses: PyO3/maturin-action@v1
         env:
           PYO3_CROSS_LIB_DIR: /opt/python/${{ matrix.python.abi }}/lib
           OPENSSL_DIR: ${{ env.OPENSSL_DIR }}
           LD_LIBRARY_PATH: ${{ env.LD_LIBRARY_PATH }}
+          PKG_CONFIG_PATH: ${{ env.PKG_CONFIG_PATH }}
         with:
-          target: ${{ matrix.target }}
+          target: ${{ matrix.target }}-unknown-linux-gnu
           manylinux: auto
           args: -i python${{matrix.python.version}} --release --out dist -m bindings/ceylon/Cargo.toml
-      - uses: uraimo/run-on-arch-action@v2.2.0
-        name: Install build wheel
+
+      - name: Install and test wheel
+        uses: uraimo/run-on-arch-action@v2.5.0
         with:
           arch: ${{ matrix.target }}
           distro: ubuntu20.04
@@ -190,22 +222,23 @@ jobs:
           dockerRunArgs: |
             --volume "${PWD}/dist:/artifacts"
           install: |
-            apt update -y
-            apt install -y gcc musl-dev python3-dev libssl-dev pkg-config
-            apt install -y --no-install-recommends software-properties-common
+            apt-get update -y
+            apt-get install -y gcc musl-dev python3-dev libssl-dev pkg-config
+            apt-get install -y --no-install-recommends software-properties-common
             add-apt-repository ppa:deadsnakes/ppa
-            apt update -y
+            apt-get update -y
             PYTHON=python${{ matrix.python.version }}
-            apt install -y $PYTHON $PYTHON-distutils $PYTHON-venv
+            apt-get install -y $PYTHON $PYTHON-distutils $PYTHON-venv
           run: |
             ls -lrth /artifacts
             PYTHON=python${{ matrix.python.version }}
             $PYTHON --version
             $PYTHON -m venv venv
-            source venv/bin/activate
+            . venv/bin/activate
             pip install --upgrade pip setuptools wheel
-            pip install --force-reinstall dist/ceylon*.whl
-            cd ~ && python -c 'import ceylon'
+            pip install --force-reinstall /artifacts/ceylon*.whl
+            cd ~ && python -c 'import ceylon; print(ceylon.__file__)'
+
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
