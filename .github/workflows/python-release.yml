@@ -156,45 +156,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libssl-dev pkg-config build-essential zlib1g-dev
-
-      - name: Build OpenSSL from source
-        run: |
-          wget https://www.openssl.org/source/openssl-1.1.1w.tar.gz
-          tar xzf openssl-1.1.1w.tar.gz
-          cd openssl-1.1.1w
-          ./config --prefix=/usr/local/ssl --openssldir=/usr/local/ssl shared zlib no-async
-          make -j $(nproc)
-          sudo make install
-          echo "OPENSSL_DIR=/usr/local/ssl" >> $GITHUB_ENV
-          echo "LD_LIBRARY_PATH=/usr/local/ssl/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
-          echo "PKG_CONFIG_PATH=/usr/local/ssl/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
-
-      - name: Set up cross-compilation toolchain
-        run: |
-          sudo apt-get install -y gcc-multilib
-          case ${{ matrix.target }} in
-            i686)
-              sudo apt-get install -y gcc-i686-linux-gnu
-              echo "CARGO_TARGET_I686_UNKNOWN_LINUX_GNU_LINKER=i686-linux-gnu-gcc" >> $GITHUB_ENV
-              ;;
-            aarch64)
-              sudo apt-get install -y gcc-aarch64-linux-gnu
-              echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-              ;;
-            armv7)
-          esac
-
       - name: Build Wheels
         uses: PyO3/maturin-action@v1
         env:
           PYO3_CROSS_LIB_DIR: /opt/python/${{ matrix.python.abi }}/lib
-          OPENSSL_DIR: ${{ env.OPENSSL_DIR }}
-          LD_LIBRARY_PATH: ${{ env.LD_LIBRARY_PATH }}
-          PKG_CONFIG_PATH: ${{ env.PKG_CONFIG_PATH }}
         with:
           target: ${{ matrix.target }}-unknown-linux-gnu
           manylinux: auto
@@ -210,7 +175,7 @@ jobs:
             --volume "${PWD}/dist:/artifacts"
           install: |
             apt-get update -y
-            apt-get install -y gcc musl-dev python3-dev libssl-dev pkg-config
+            apt-get install -y gcc musl-dev python3-dev
             apt-get install -y --no-install-recommends software-properties-common
             add-apt-repository ppa:deadsnakes/ppa
             apt-get update -y
