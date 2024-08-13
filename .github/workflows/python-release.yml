@@ -39,7 +39,7 @@ jobs:
             target: s390x
           - runner: ubuntu-latest
             target: ppc64le
-        python-version: [ '3.8', '3.9', '3.10', '3.11','3.12' ]
+        python-version: ['3.8', '3.9', '3.10', '3.11','3.12']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -69,7 +69,7 @@ jobs:
             target: x64
           - runner: windows-latest
             target: x86
-        python-version: [ '3.8', '3.9', '3.10', '3.11','3.12' ]
+        python-version: ['3.8', '3.9', '3.10', '3.11','3.12']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -120,7 +120,7 @@ jobs:
             target: x86_64
           - runner: macos-14
             target: aarch64
-        python-version: [ '3.8', '3.9', '3.10', '3.11','3.12' ]
+        python-version: ['3.8', '3.9', '3.10', '3.11','3.12']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -154,7 +154,7 @@ jobs:
             { version: "3.11", abi: "cp311-cp311" },
             { version: "3.12", abi: "cp312-cp312" },
           ]
-        target: [ armv7l]
+        target: [ aarch64, armv7 ]
     steps:
       - uses: actions/checkout@v4
 
@@ -182,35 +182,13 @@ jobs:
             i686)
               sudo apt-get install -y gcc-i686-linux-gnu
               echo "CARGO_TARGET_I686_UNKNOWN_LINUX_GNU_LINKER=i686-linux-gnu-gcc" >> $GITHUB_ENV
-              echo "TARGET_TRIPLE=i686-unknown-linux-gnu" >> $GITHUB_ENV
               ;;
             aarch64)
               sudo apt-get install -y gcc-aarch64-linux-gnu
               echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-              echo "TARGET_TRIPLE=aarch64-unknown-linux-gnu" >> $GITHUB_ENV
               ;;
-            armv7l)
-              sudo apt-get install -y gcc-arm-linux-gnueabihf
-              echo "CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER=arm-linux-gnueabihf-gcc" >> $GITHUB_ENV
-              echo "TARGET_TRIPLE=armv7-unknown-linux-gnueabihf" >> $GITHUB_ENV
-              ;;
-            s390x)
-              sudo apt-get install -y gcc-s390x-linux-gnu
-              echo "CARGO_TARGET_S390X_UNKNOWN_LINUX_GNU_LINKER=s390x-linux-gnu-gcc" >> $GITHUB_ENV
-              echo "TARGET_TRIPLE=s390x-unknown-linux-gnu" >> $GITHUB_ENV
-              ;;
-            ppc64le)
-              sudo apt-get install -y gcc-powerpc64le-linux-gnu
-              echo "CARGO_TARGET_POWERPC64LE_UNKNOWN_LINUX_GNU_LINKER=powerpc64le-linux-gnu-gcc" >> $GITHUB_ENV
-              echo "TARGET_TRIPLE=powerpc64le-unknown-linux-gnu" >> $GITHUB_ENV
-              ;;
-            *)
-              echo "TARGET_TRIPLE=${{ matrix.target }}-unknown-linux-gnu" >> $GITHUB_ENV
-              ;;
+            armv7)
           esac
-
-      - name: Add Rust target
-        run: rustup target add ${{ env.TARGET_TRIPLE }}
 
       - name: Build Wheels
         uses: PyO3/maturin-action@v1
@@ -220,10 +198,9 @@ jobs:
           LD_LIBRARY_PATH: ${{ env.LD_LIBRARY_PATH }}
           PKG_CONFIG_PATH: ${{ env.PKG_CONFIG_PATH }}
         with:
-          target: ${{ env.TARGET_TRIPLE }}
+          target: ${{ matrix.target }}-unknown-linux-gnu
           manylinux: auto
           args: -i python${{matrix.python.version}} --release --out dist -m bindings/ceylon/Cargo.toml
-
 
       - name: Install and test wheel
         uses: uraimo/run-on-arch-action@v2.5.0
