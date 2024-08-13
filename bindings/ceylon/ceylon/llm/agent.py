@@ -2,11 +2,9 @@ import copy
 from typing import Dict, List, Set, Any
 
 from langchain.agents import create_react_agent, AgentExecutor
-from langchain.memory import ConversationBufferMemory
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
-from langchain_core.tools import StructuredTool
 from loguru import logger
 
 from ceylon import Agent, on_message
@@ -16,8 +14,9 @@ from ceylon.llm.task_operation import SubTask
 
 class SpecializedAgent(Agent):
     def __init__(self, name: str, role: str, context: str, skills: List[str],
-                 tools: List[Any] = None, llm=None, tool_llm=None):
+                 tools: List[Any] = None, llm=None, tool_llm=None, verbose=False):
         self.context = context
+        self.verbose = verbose
         self.tools = tools if tools else []
         self.task_history = []
         self.skills = skills
@@ -76,7 +75,7 @@ class SpecializedAgent(Agent):
 
             # Create a ReAct agent with tools
             react_agent = create_react_agent(self.llm, self.tools, prompt=chat_prompt)
-            agent_executor = AgentExecutor(agent=react_agent, tools=self.tools, verbose=True)
+            agent_executor = AgentExecutor(agent=react_agent, tools=self.tools, verbose=self.verbose)
 
             try:
                 response = agent_executor.invoke({
@@ -106,7 +105,6 @@ class SpecializedAgent(Agent):
                 return f"Error in processing the task with LLM: {str(e)}"
 
     def _format_task_history(self, task_id, depends_on: Set[str]) -> str:
-        # print(task_id, self.history)
         if task_id not in self.history:
             return ""
 

@@ -3,7 +3,6 @@ from typing import Optional, Type
 
 from langchain.pydantic_v1 import BaseModel, Field
 from langchain_community.chat_models import ChatOllama
-from langchain_community.tools import DuckDuckGoSearchRun
 from langchain_core.callbacks import (
     AsyncCallbackManagerForToolRun,
     CallbackManagerForToolRun,
