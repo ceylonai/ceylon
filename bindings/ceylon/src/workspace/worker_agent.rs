@@ -236,9 +236,6 @@ impl WorkerAgent {
                                         }
                                     }
                                 }
-                                _ => {
-                                    info!("Agent listener {:?}", event);
-                                }
                             }
                         }
                     }

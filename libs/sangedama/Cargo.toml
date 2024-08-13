@@ -2,7 +2,6 @@
 name = "sangedama"
 version = "0.1.1"
 edition = "2021"
-crate-type = ["rlib"]
 
 [dependencies]
 futures = "0.3.30"
@@ -11,10 +10,10 @@ tokio = { version = "1.38.1", features = ["full"] }
 tokio-util = { version = "0.7.11", features = ["rt"] }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-serde = { version = "1.0.203", features = ["derive"] }
+serde = { version = "1.0.207", features = ["derive"] }
 serde_json = "1.0.120"
 reqwest = { version = "0.12.5", features = ["json"] }
-libp2p = { version = "0.53.2", features = [
+libp2p = { version = "0.54.0", features = [
     "tokio",
     "gossipsub",
     "mdns",
