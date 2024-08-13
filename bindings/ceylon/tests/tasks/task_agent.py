@@ -1,7 +1,9 @@
-from uuid import UUID, uuid4
-from typing import Dict, List, Optional, Set
-from pydantic import BaseModel, Field
+from typing import Dict, List, Set
+from uuid import uuid4
+
 import networkx as nx
+from pydantic import BaseModel, Field
+
 from ceylon import Agent, CoreAdmin, on_message
 
 

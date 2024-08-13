@@ -1,19 +1,16 @@
 from typing import Optional, Type
 
 from langchain.pydantic_v1 import BaseModel, Field
-from langchain.runnables.openai_functions import OpenAIFunction
-from langchain_community.chat_models import ChatOllama
-from langchain_community.llms.openai import OpenAIChat, OpenAI
 from langchain_core.callbacks import (
     AsyncCallbackManagerForToolRun,
     CallbackManagerForToolRun,
 )
 from langchain_core.tools import BaseTool
-from langchain_experimental.llms.ollama_functions import OllamaFunctions
 from langchain_openai import ChatOpenAI
 from loguru import logger
 
-from ceylon.llm import Task, SpecializedAgent, TaskManager
+from ceylon.task import Task
+from ceylon.llm import SpecializedAgent, TaskManager
 
 
 class QueryInput(BaseModel):

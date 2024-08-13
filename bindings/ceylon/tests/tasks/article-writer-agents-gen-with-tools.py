@@ -10,7 +10,8 @@ from langchain_core.tools import BaseTool
 from langchain_experimental.llms.ollama_functions import OllamaFunctions
 from loguru import logger
 
-from ceylon.llm import Task, SpecializedAgent, TaskManager
+from ceylon.llm import SpecializedAgent, TaskManager
+from ceylon.task import Task
 
 
 class QueryInput(BaseModel):

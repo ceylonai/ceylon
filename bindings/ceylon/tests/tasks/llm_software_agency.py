@@ -1,6 +1,7 @@
 from langchain_openai import ChatOpenAI
 
-from ceylon.llm import Task, SpecializedAgent, TaskManager
+from ceylon.llm import SpecializedAgent, TaskManager
+from ceylon.task import Task
 
 # Define the main task
 task_management_app = Task(
