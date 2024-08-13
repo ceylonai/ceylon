@@ -22,6 +22,7 @@ permissions:
 
 jobs:
   linux:
+    if: "startsWith(github.ref, 'refs/tags/')"
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -59,6 +60,7 @@ jobs:
           path: dist
 
   windows:
+    if: "startsWith(github.ref, 'refs/tags/')"
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -109,6 +111,7 @@ jobs:
           path: dist
 
   macos:
+    if: "startsWith(github.ref, 'refs/tags/')"
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
