@@ -155,6 +155,8 @@ jobs:
         target: [aarch64]
     steps:
       - uses: actions/checkout@v4
+      - name: Setup GCC
+        uses: egor-tensin/setup-gcc@v1.3
       - name: Build Wheels
         uses: PyO3/maturin-action@v1
         env:
@@ -163,8 +165,6 @@ jobs:
           target: ${{ matrix.target }}-unknown-linux-gnu
           manylinux: auto
           args: -i python${{matrix.python.version}} --release --out dist -m bindings/ceylon/Cargo.toml
-      - name: Setup GCC
-        uses: egor-tensin/setup-gcc@v1.3
       - name: Install and test wheel
         uses: uraimo/run-on-arch-action@v2.5.0
         with:
