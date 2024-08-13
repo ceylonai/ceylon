@@ -13,6 +13,8 @@ jobs:
       matrix:
         python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
     steps:
+      - name: Change Directory
+        run: cd bindings/ceylon
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
@@ -51,14 +53,14 @@ jobs:
         python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
         target: [x64, x86]
     steps:
+      - name: Change Directory
+        run: cd bindings/ceylon
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
           architecture: ${{ matrix.target }}
       - uses: dtolnay/rust-toolchain@stable
-      - name: Change Directory
-        run: cd bindings/ceylon
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -81,13 +83,13 @@ jobs:
         python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
         target: [x86_64, i686]
     steps:
+      - name: Change Directory
+        run: cd bindings/ceylon
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Change Directory
-        run: cd bindings/ceylon
       - name: Build Wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -118,6 +120,8 @@ jobs:
           ]
         target: [aarch64, armv7]
     steps:
+      - name: Change Directory
+        run: cd bindings/ceylon
       - uses: actions/checkout@v3
       - name: Build Wheels
         uses: PyO3/maturin-action@v1
@@ -127,8 +131,6 @@ jobs:
           target: ${{ matrix.target }}
           manylinux: auto
           args: -i python${{matrix.python.version}} --release --out dist
-      - name: Change Directory
-        run: cd bindings/ceylon
       - uses: uraimo/run-on-arch-action@v2.2.0
         name: Install build wheel
         with:
