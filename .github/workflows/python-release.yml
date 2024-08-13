@@ -2,6 +2,8 @@ name: Ceylon-Release
 
 on:
   push:
+    branches:
+      - release
     tags:
       - 'v*'
 
