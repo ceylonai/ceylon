@@ -1,0 +1,137 @@
+name: CI and Release
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - devops
+    tags:
+      - '*'
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Dry run
+        type: boolean
+        default: false
+
+env:
+  PYTHON_VERSION: '3.10'
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
+
+jobs:
+  build:
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64
+          - runner: ubuntu-latest
+            target: x86
+          - runner: ubuntu-latest
+            target: aarch64
+          - runner: windows-latest
+            target: x64
+          - runner: windows-latest
+            target: x86
+          - runner: macos-latest
+            target: x86_64
+          - runner: macos-14
+            target: aarch64
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          architecture: ${{ matrix.platform.target }}
+      - name: Install dependencies
+        run: |
+          pip install uniffi-bindgen maturin
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.platform.target }}
+          args: --release --out dist --find-interpreter -m bindings/ceylon/Cargo.toml
+          sccache: 'true'
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ runner.os }}-${{ matrix.platform.target }}
+          path: dist
+
+  create-sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist -m bindings/ceylon/Cargo.toml
+      - name: Upload sdist
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist
+
+  release:
+    needs: [build, create-sdist]
+    if: startsWith(github.ref, 'refs/tags/') && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ steps.get_version.outputs.VERSION }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/ceylon-${{ steps.get_version.outputs.VERSION }}.tar.gz
+          asset_name: ceylon-${{ steps.get_version.outputs.VERSION }}.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Publish to PyPI
+        if: github.event.inputs.dry-run != 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          packages_dir: dist/
+
+      - name: Trigger post-release workflows
+        if: github.event.inputs.dry-run != 'true'
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          event-type: python-release
+          client-payload: >
+            {
+              "version": "${{ steps.get_version.outputs.VERSION }}",
+              "tag": "${{ github.ref }}",
+              "sha": "${{ github.sha }}"
+            }
