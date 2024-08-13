@@ -33,7 +33,7 @@ jobs:
             target: aarch64
           - runner: ubuntu-20.04
             target: armv7
-        python-version: [ '3.8', '3.9', '3.10', '3.11','3.12' ]
+        python-version: [ '3.8' ]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -63,7 +63,7 @@ jobs:
             target: x64
           - runner: windows-latest
             target: x86
-        python-version: [ '3.8', '3.9', '3.10', '3.11','3.12' ]
+        python-version: [ '3.8' ]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -97,7 +97,7 @@ jobs:
             target: x86_64
           - runner: macos-14
             target: aarch64
-        python-version: [ '3.8', '3.9', '3.10', '3.11','3.12' ]
+        python-version: [ '3.8' ]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -139,15 +139,13 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     if: "startsWith(github.ref, 'refs/tags/')"
-    needs: [ macos, windows, linux, sdist ]
+    needs: [ linux,windows,sdist,macos ]
     steps:
       - uses: actions/download-artifact@v4
-        with:
-          name: wheels
       - name: Publish to PyPI
         uses: PyO3/maturin-action@v1
         env:
           MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
         with:
           command: upload
-          args: --non-interactive --skip-existing *
+          args: --non-interactive --skip-existing wheels-*/*
