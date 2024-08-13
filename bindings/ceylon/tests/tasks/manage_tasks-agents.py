@@ -1,6 +1,7 @@
 from langchain_community.chat_models import ChatOllama
 
-from ceylon.llm import Task, SubTask, SpecializedAgent, TaskManager
+from ceylon.llm import SpecializedAgent, TaskManager
+from ceylon.task import Task, SubTask
 
 # Example usage
 if __name__ == "__main__":

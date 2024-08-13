@@ -6,7 +6,7 @@ from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from loguru import logger
 
 from ceylon import on_message, CoreAdmin
-from ceylon.llm import TaskAssignment, TaskResult, Task, SubTask
+from ceylon.task import TaskAssignment, TaskResult, Task, SubTask
 from ceylon.llm.agent import SpecializedAgent
 
 

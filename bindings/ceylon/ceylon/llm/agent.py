@@ -8,8 +8,8 @@ from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTempla
 from loguru import logger
 
 from ceylon import Agent, on_message
-from ceylon.llm import TaskAssignment, TaskResult
-from ceylon.llm.task_operation import SubTask
+from ceylon.task import TaskAssignment, TaskResult
+from ceylon.task.task_operation import SubTask
 
 
 class SpecializedAgent(Agent):

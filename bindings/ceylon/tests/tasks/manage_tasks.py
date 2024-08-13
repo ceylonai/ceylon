@@ -4,9 +4,6 @@ from uuid import uuid4
 import networkx as nx
 from pydantic import BaseModel, Field
 
-from ceylon.core.admin import Admin
-from ceylon.core.worker import Worker
-
 
 class SubTask(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()), alias='_id')
