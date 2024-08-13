@@ -1,4 +1,4 @@
-name: Ceylon-Build-Python
+name: Ceylon-Release-Python
 
 on:
   workflow_run:
