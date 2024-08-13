@@ -2,6 +2,8 @@ name: Ceylon Release CI
 
 on:
   push:
+    branches:
+      - release
     tags:
       - v*
 
@@ -10,8 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
-        target: [x86_64, i686, aarch64, armv7, s390x, ppc64le]
+        python-version: [ "3.8", "3.9", "3.10", "3.11", "3.12" ]
+        target: [ x86_64, i686, aarch64, armv7, s390x, ppc64le ]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -20,15 +22,32 @@ jobs:
       - name: Install dependencies
         run: |
           pip install uniffi-bindgen maturin
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}-unknown-linux-gnu
       - name: Change Directory
         run: cd bindings/ceylon
+      - name: Debug - List directory contents
+        run: ls -R
+      - name: Debug - Print Rust version and target info
+        run: |
+          rustc --version
+          rustc --print target-list
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
-          target: ${{ matrix.target }}
+          target: ${{ matrix.target }}-unknown-linux-gnu
           args: --release --out dist --find-interpreter
           manylinux: auto
           working-directory: ./bindings/ceylon
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+          CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER: arm-linux-gnueabihf-gcc
+      - name: Debug - List built wheels
+        run: ls -R ./bindings/ceylon/dist
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
