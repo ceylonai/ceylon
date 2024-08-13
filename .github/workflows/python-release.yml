@@ -116,10 +116,6 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           architecture: ${{ matrix.target }}
-      - name: Setup GCC
-        uses: egor-tensin/setup-gcc@v1.3
-        with:
-          platform: ${{ matrix.target }}
       - name: Install dependencies
         run: |
           pip install uniffi-bindgen maturin
