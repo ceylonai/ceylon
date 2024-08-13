@@ -19,8 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
-        target: [x86_64, i686]
+        python-version: [ "3.8", "3.9", "3.10", "3.11", "3.12" ]
+        target: [ x86_64, i686 ]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -37,8 +37,11 @@ jobs:
           pip install uniffi-bindgen maturin
       - name: Set OpenSSL environment variables
         run: |
-          echo "OPENSSL_DIR=/usr" >> $GITHUB_ENV
-          echo "OPENSSL_LIB_DIR=/usr/lib/${{ matrix.target }}-linux-gnu" >> $GITHUB_ENV
+          if [ "${{ matrix.target }}" = "x86_64" ]; then
+            echo "OPENSSL_LIB_DIR=/usr/lib/x86_64-linux-gnu" >> $GITHUB_ENV
+          else
+            echo "OPENSSL_LIB_DIR=/usr/lib/i686-linux-gnu" >> $GITHUB_ENV
+          fi
           echo "OPENSSL_INCLUDE_DIR=/usr/include/openssl" >> $GITHUB_ENV
       - name: Build Wheels
         run: |
