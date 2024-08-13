@@ -11,6 +11,7 @@ on:
       - main
       - master
       - devops
+      - release
     tags:
       - '*'
   pull_request:
