@@ -165,7 +165,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         env:
           PYO3_CROSS_LIB_DIR: /opt/python/${{ matrix.python.abi }}/lib
-          OPENSSL_DIR: /usr/lib/ssl
+          OPENSSL_DIR: /usr/include/openssl
         with:
           target: ${{ matrix.target }}
           manylinux: auto
