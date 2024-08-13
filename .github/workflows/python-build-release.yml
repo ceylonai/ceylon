@@ -33,10 +33,6 @@ jobs:
             target: aarch64
           - runner: ubuntu-20.04
             target: armv7
-        #          - runner: ubuntu-20.04
-        #            target: s390x
-        #          - runner: ubuntu-20.04
-        #            target: ppc64le
         python-version: [ '3.8', '3.9', '3.10', '3.11','3.12' ]
     steps:
       - uses: actions/checkout@v4
@@ -123,6 +119,22 @@ jobs:
         with:
           name: wheels-macos-${{ matrix.platform.target }}-py${{ matrix.python-version }}
           path: dist
+
+  sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist -m bindings/ceylon/Cargo.toml
+      - name: Upload sdist
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels
+          path: dist
+
   release:
     name: Release
     runs-on: ubuntu-latest
