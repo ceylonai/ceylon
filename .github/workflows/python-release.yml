@@ -93,6 +93,8 @@ jobs:
         target: [x86_64, i686]
     steps:
       - uses: actions/checkout@v4
+      - name: Setup GCC
+        uses: egor-tensin/setup-gcc@v1.3
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -131,6 +133,8 @@ jobs:
         target: [aarch64, armv7, s390x, ppc64le]
     steps:
       - uses: actions/checkout@v4
+      - name: Setup GCC
+        uses: egor-tensin/setup-gcc@v1.3
       - name: Build Wheels
         uses: PyO3/maturin-action@v1
         env:
