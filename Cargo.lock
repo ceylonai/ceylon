@@ -430,7 +430,7 @@ checksum = "e9e8aabfac534be767c909e0690571677d49f41bd8465ae876fe043d52ba5292"
 
 [[package]]
 name = "ceylon"
-version = "0.16.9"
+version = "0.16.10-alpha"
 dependencies = [
  "async-trait",
  "futures",
