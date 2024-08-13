@@ -142,18 +142,74 @@ jobs:
         with:
           name: wheels-macos-${{ matrix.platform.target }}-py${{ matrix.python-version }}
           path: dist
-
+  linux-cross:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python:
+          [
+            { version: "3.8", abi: "cp38-cp38" },
+            { version: "3.9", abi: "cp39-cp39" },
+            { version: "3.10", abi: "cp310-cp310" },
+            { version: "3.11", abi: "cp311-cp311" },
+            { version: "3.12", abi: "cp312-cp312" },
+          ]
+        target: [ x86_64, x86, aarch64, armv7, s390x, ppc64le ]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Wheels
+        uses: PyO3/maturin-action@v1
+        env:
+          PYO3_CROSS_LIB_DIR: /opt/python/${{ matrix.python.abi }}/lib
+        with:
+          target: ${{ matrix.target }}
+          manylinux: auto
+          args: -i python${{matrix.python.version}} --release --out dist -m bindings/ceylon/Cargo.toml
+      - uses: uraimo/run-on-arch-action@v2.2.0
+        name: Install build wheel
+        with:
+          arch: ${{ matrix.target }}
+          distro: ubuntu20.04
+          githubToken: ${{ github.token }}
+          dockerRunArgs: |
+            --volume "${PWD}/dist:/artifacts"
+          install: |
+            apt update -y
+            apt install -y gcc musl-dev python3-dev
+            apt install -y --no-install-recommends software-properties-common
+            add-apt-repository ppa:deadsnakes/ppa
+            apt update -y
+            PYTHON=python${{ matrix.python.version }}
+            apt install -y $PYTHON $PYTHON-distutils $PYTHON-venv
+          run: |
+            ls -lrth /artifacts
+            PYTHON=python${{ matrix.python.version }}
+            $PYTHON --version
+            $PYTHON -m venv venv
+            source venv/bin/activate
+            pip install --upgrade pip setuptools wheel
+            pip install --force-reinstall dist/ceylon*.whl
+            cd ~ && python -c 'import ceylon'
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-linux-${{ matrix.target }}-py${{ matrix.python.version }}
+          path: dist
   release:
     name: Release
     runs-on: ubuntu-latest
-    if: "startsWith(github.ref, 'refs/tags/')"
-    needs: [ linux,windows,sdist,macos ]
+    needs: [ linux-cross ]
     steps:
-      - uses: actions/download-artifact@v4
-      - name: Publish to PyPI
-        uses: PyO3/maturin-action@v1
-        env:
-          MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+      - uses: actions/download-artifact@v3
         with:
-          command: upload
-          args: --non-interactive --skip-existing wheels-*/*
+          name: wheels
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.x
+      - name: Publish to PyPi
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+        run: |
+          pip install --upgrade twine
+          twine upload --skip-existing *
