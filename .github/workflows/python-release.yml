@@ -46,7 +46,7 @@ jobs:
         run: |
           cd bindings/ceylon
           cargo build --verbose
-          maturin build --release --out dist --target ${{ matrix.target }}-unknown-linux-gnu -i python${{ matrix.python-version }} --verbose
+          maturin build --release --out dist -i python${{ matrix.python-version }} --verbose
         env:
           RUST_BACKTRACE: full
       - name: List build artifacts
@@ -89,7 +89,7 @@ jobs:
       - name: Build wheels
         run: |
           cd bindings/ceylon
-          maturin build --release --out dist --target ${{ matrix.platform.target }}-apple-darwin -i python${{ matrix.python-version }} --verbose
+          maturin build --release --out dist -i python${{ matrix.python-version }} --verbose
       - name: Install build wheel
         run: |
           pip install --force-reinstall bindings/ceylon/dist/ceylon*.whl
@@ -118,7 +118,7 @@ jobs:
       - name: Build wheels
         run: |
           cd bindings/ceylon
-          maturin build --release --out dist --target ${{ matrix.target }}-pc-windows-msvc -i python${{ matrix.python-version }} --verbose
+          maturin build --release --out dist  -i python${{ matrix.python-version }} --verbose
       - name: Install build wheel
         shell: bash
         run: |
