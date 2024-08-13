@@ -141,61 +141,42 @@ jobs:
           name: wheels-macos-${{ matrix.platform.target }}-py${{ matrix.python-version }}
           path: dist
   linux-cross:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python:
-          [
-            { version: "3.8", abi: "cp38-cp38" },
-            { version: "3.9", abi: "cp39-cp39" },
-            { version: "3.10", abi: "cp310-cp310" },
-            { version: "3.11", abi: "cp311-cp311" },
-            { version: "3.12", abi: "cp312-cp312" },
-          ]
-        target: [aarch64]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup GCC
-        uses: egor-tensin/setup-gcc@v1.3
-      - name: Build Wheels
-        uses: PyO3/maturin-action@v1
-        env:
-          PYO3_CROSS_LIB_DIR: /opt/python/${{ matrix.python.abi }}/lib
-        with:
-          target: ${{ matrix.target }}-unknown-linux-gnu
-          manylinux: auto
-          args: -i python${{matrix.python.version}} --release --out dist -m bindings/ceylon/Cargo.toml
-      - name: Install and test wheel
-        uses: uraimo/run-on-arch-action@v2.5.0
-        with:
-          arch: ${{ matrix.target }}
-          distro: ubuntu20.04
-          githubToken: ${{ github.token }}
-          dockerRunArgs: |
-            --volume "${PWD}/dist:/artifacts"
-          install: |
-            apt-get update -y
-            apt-get install -y gcc musl-dev python3-dev
-            apt-get install -y --no-install-recommends software-properties-common
-            add-apt-repository ppa:deadsnakes/ppa
-            apt-get update -y
-            PYTHON=python${{ matrix.python.version }}
-            apt-get install -y $PYTHON $PYTHON-distutils $PYTHON-venv
-          run: |
-            ls -lrth /artifacts
-            PYTHON=python${{ matrix.python.version }}
-            $PYTHON --version
-            $PYTHON -m venv venv
-            . venv/bin/activate
-            pip install --upgrade pip setuptools wheel
-            pip install --force-reinstall /artifacts/ceylon*.whl
-            cd ~ && python -c 'import ceylon; print(ceylon.__file__)'
-
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheels-linux-${{ matrix.target }}-py${{ matrix.python.version }}
-          path: dist
+      runs-on: ubuntu-latest
+      strategy:
+        matrix:
+          target: [aarch64, armv7, s390x, ppc64le, ppc64]
+      steps:
+        - uses: actions/checkout@v3
+        - uses: actions/setup-python@v4
+          with:
+            python-version: ${{ env.PYTHON_VERSION }}
+        - name: Build wheels
+          uses: messense/maturin-action@v1
+          with:
+            target: ${{ matrix.target }}
+            manylinux: auto
+            working-directory: bindings/ceylon
+            args: --release --out dist
+        - uses: uraimo/run-on-arch-action@v2.0.5
+          if: matrix.target != 'ppc64'
+          name: Install built wheel
+          with:
+            arch: ${{ matrix.target }}
+            distro: ubuntu20.04
+            githubToken: ${{ github.token }}
+            install: |
+              apt-get update
+              apt-get install -y --no-install-recommends python3 python3-pip
+              pip3 install -U pip
+            run: |
+              pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
+              pip install pytest
+              pytest -v
+        - name: Upload wheels
+          uses: actions/upload-artifact@v2
+          with:
+            name: wheels
+            path: dist
   release:
     name: Release
     runs-on: ubuntu-latest
