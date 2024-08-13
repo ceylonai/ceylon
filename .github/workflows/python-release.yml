@@ -23,15 +23,13 @@ jobs:
         target: [x86_64, i686]
     steps:
       - uses: actions/checkout@v4
-      - name: Setup GCC
-        uses: egor-tensin/setup-gcc@v1.3
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup GCC
+        uses: egor-tensin/setup-gcc@v1.3
         with:
-          targets: ${{ matrix.target }}-unknown-linux-gnu
+          platform: ${{ matrix.target }}
       - name: Install OpenSSL and other dependencies
         run: |
           sudo apt-get update
@@ -40,21 +38,22 @@ jobs:
       - name: Set OpenSSL environment variables
         run: |
           echo "OPENSSL_DIR=/usr" >> $GITHUB_ENV
-          echo "OPENSSL_LIB_DIR=/usr/lib/x86_64-linux-gnu" >> $GITHUB_ENV
+          echo "OPENSSL_LIB_DIR=/usr/lib/${{ matrix.target }}-linux-gnu" >> $GITHUB_ENV
           echo "OPENSSL_INCLUDE_DIR=/usr/include/openssl" >> $GITHUB_ENV
       - name: Build Wheels
         run: |
           cd bindings/ceylon
-          cargo build --verbose
           maturin build --release --out dist -i python${{ matrix.python-version }} --verbose
         env:
+          PYTHON_SYS_EXECUTABLE: ${{ env.pythonLocation }}/bin/python
           RUST_BACKTRACE: full
       - name: List build artifacts
         run: ls -R bindings/ceylon/dist
       - name: Install build wheel
         if: matrix.target == 'x86_64'
         run: |
-          pip install --force-reinstall bindings/ceylon/dist/ceylon*.whl
+          wheel=$(ls bindings/ceylon/dist/ceylon*.whl | head -n 1)
+          pip install --force-reinstall $wheel
           python -c 'import ceylon; print(ceylon.__file__)'
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -90,9 +89,14 @@ jobs:
         run: |
           cd bindings/ceylon
           maturin build --release --out dist -i python${{ matrix.python-version }} --verbose
+        env:
+          PYTHON_SYS_EXECUTABLE: ${{ env.pythonLocation }}/bin/python
+      - name: List build artifacts
+        run: ls -R bindings/ceylon/dist
       - name: Install build wheel
         run: |
-          pip install --force-reinstall bindings/ceylon/dist/ceylon*.whl
+          wheel=$(ls bindings/ceylon/dist/ceylon*.whl | head -n 1)
+          pip install --force-reinstall $wheel
           python -c 'import ceylon; print(ceylon.__file__)'
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -112,18 +116,27 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           architecture: ${{ matrix.target }}
+      - name: Setup GCC
+        uses: egor-tensin/setup-gcc@v1.3
+        with:
+          platform: ${{ matrix.target }}
       - name: Install dependencies
         run: |
           pip install uniffi-bindgen maturin
       - name: Build wheels
         run: |
           cd bindings/ceylon
-          maturin build --release --out dist  -i python${{ matrix.python-version }} --verbose
+          maturin build --release --out dist -i python${{ matrix.python-version }} --verbose
+        env:
+          PYTHON_SYS_EXECUTABLE: ${{ env.pythonLocation }}\python.exe
+      - name: List build artifacts
+        run: Get-ChildItem -Recurse bindings\ceylon\dist
       - name: Install build wheel
-        shell: bash
+        shell: pwsh
         run: |
-          pip install --force-reinstall bindings/ceylon/dist/ceylon*.whl
-          python -c 'import ceylon; print(ceylon.__file__)'
+          $wheel = Get-ChildItem bindings\ceylon\dist\ceylon*.whl | Select-Object -First 1
+          pip install --force-reinstall $wheel
+          python -c "import ceylon; print(ceylon.__file__)"
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
