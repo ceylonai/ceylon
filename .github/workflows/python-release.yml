@@ -161,11 +161,22 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libssl-dev pkg-config
+      - name: Build OpenSSL from source
+        run: |
+          wget https://www.openssl.org/source/openssl-1.1.1k.tar.gz
+          tar xzf openssl-1.1.1k.tar.gz
+          cd openssl-1.1.1k
+          ./config --prefix=/usr/local/ssl --openssldir=/usr/local/ssl shared zlib
+          make -j $(nproc)
+          sudo make install
+          echo "OPENSSL_DIR=/usr/local/ssl" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=/usr/local/ssl/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
       - name: Build Wheels
         uses: PyO3/maturin-action@v1
         env:
           PYO3_CROSS_LIB_DIR: /opt/python/${{ matrix.python.abi }}/lib
-          OPENSSL_DIR: /usr/include/openssl
+          OPENSSL_DIR: ${{ env.OPENSSL_DIR }}
+          LD_LIBRARY_PATH: ${{ env.LD_LIBRARY_PATH }}
         with:
           target: ${{ matrix.target }}
           manylinux: auto
