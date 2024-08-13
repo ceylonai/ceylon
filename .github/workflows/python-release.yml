@@ -13,12 +13,12 @@ jobs:
       matrix:
         python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
     steps:
-      - name: Change Directory
-        run: cd bindings/ceylon
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Change Directory
+        run: cd bindings/ceylon
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin
@@ -53,13 +53,13 @@ jobs:
         python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
         target: [x64, x86]
     steps:
-      - name: Change Directory
-        run: cd bindings/ceylon
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
           architecture: ${{ matrix.target }}
+      - name: Change Directory
+        run: cd bindings/ceylon
       - uses: dtolnay/rust-toolchain@stable
       - name: Build wheels
         uses: PyO3/maturin-action@v1
@@ -83,9 +83,9 @@ jobs:
         python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
         target: [x86_64, i686]
     steps:
+      - uses: actions/checkout@v3
       - name: Change Directory
         run: cd bindings/ceylon
-      - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
       - uses: actions/setup-python@v4
         with:
@@ -120,9 +120,9 @@ jobs:
           ]
         target: [aarch64, armv7]
     steps:
+      - uses: actions/checkout@v3
       - name: Change Directory
         run: cd bindings/ceylon
-      - uses: actions/checkout@v3
       - name: Build Wheels
         uses: PyO3/maturin-action@v1
         env:
