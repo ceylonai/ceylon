@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        
+        <link rel="canonical" href="https://ceylon.ai/examples/task-manager.html">
+        <link rel="shortcut icon" href="../img/favicon.ico">
+        <title>Task manager - Ceylon: A Multi-Agent System (MAS)</title>
+        <link href="../css/bootstrap.min.css" rel="stylesheet">
+        <link href="../css/fontawesome.min.css" rel="stylesheet">
+        <link href="../css/brands.min.css" rel="stylesheet">
+        <link href="../css/solid.min.css" rel="stylesheet">
+        <link href="../css/v4-font-face.min.css" rel="stylesheet">
+        <link href="../css/base.css" rel="stylesheet">
+        <link id="hljs-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" >
+        <link id="hljs-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" disabled>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script>hljs.highlightAll();</script> 
+    </head>
+
+    <body>
+        <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="../index.html">Ceylon: A Multi-Agent System (MAS)</a>
+                <!-- Expander button -->
+                <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse" aria-controls="navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Expanded navigation -->
+                <div id="navbar-collapse" class="navbar-collapse collapse">
+                        <!-- Main navigation -->
+                        <ul class="nav navbar-nav">
+                            <li class="nav-item">
+                                <a href="../index.html" class="nav-link">Ceylon: A Multi-Agent System (MAS)</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../GettingStart.html" class="nav-link">🚦 Getting Started</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle active" aria-current="page" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Examples</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="connect-through-network.html" class="dropdown-item">Tutorial: Setting Up Remote Admin and Worker Agents</a>
+</li>
+                                    
+<li>
+    <a href="meeting-sechdular.html" class="dropdown-item">Simplified Meeting Scheduler Tutorial</a>
+</li>
+                                    
+<li>
+    <a href="single-item-auction.html" class="dropdown-item">Single-Item Auction System with Ceylon</a>
+</li>
+                                    
+<li>
+    <a href="task-manager.html" class="dropdown-item active" aria-current="page">Task manager</a>
+</li>
+                                </ul>
+                            </li>
+                        </ul>
+
+                    <ul class="nav navbar-nav ms-md-auto">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-bs-toggle="modal" data-bs-target="#mkdocs_search_modal">
+                                <i class="fa fa-search"></i> Search
+                            </a>
+                        </li>
+                            <li class="nav-item">
+                                <a rel="prev" href="single-item-auction.html" class="nav-link">
+                                    <i class="fa fa-arrow-left"></i> Previous
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a rel="next" class="nav-link disabled">
+                                    Next <i class="fa fa-arrow-right"></i>
+                                </a>
+                            </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="row">
+                    <div class="col-md-3"><div class="navbar-expand-md bs-sidebar hidden-print affix" role="complementary">
+    <div class="navbar-header">
+        <button type="button" class="navbar-toggler collapsed" data-bs-toggle="collapse" data-bs-target="#toc-collapse" title="Table of Contents">
+            <span class="fa fa-angle-down"></span>
+        </button>
+    </div>
+
+    
+    <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
+        <ul class="nav flex-column">
+            
+            <li class="nav-item" data-bs-level="2"><a href="#building-a-distributed-task-management-system-with-ceylon" class="nav-link">Building a Distributed Task Management System with Ceylon</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+        </ul>
+    </div>
+</div></div>
+                    <div class="col-md-9" role="main">
+
+<h2 id="building-a-distributed-task-management-system-with-ceylon">Building a Distributed Task Management System with Ceylon</h2>
+<h3 id="overview">Overview</h3>
+<p>In this tutorial, you'll learn how to create a distributed task management system using Python. This system will distribute tasks to worker agents based on their skill levels, execute the tasks asynchronously, and collect the results. We will use several Python libraries including <code>asyncio</code>, <code>pydantic</code>, and a custom distributed agent system called <code>ceylon</code>.</p>
+<h3 id="prerequisites">Prerequisites</h3>
+<p>Before starting, ensure you have the following Python packages installed:</p>
+<ul>
+<li><code>asyncio</code>: For asynchronous task handling.</li>
+<li><code>pydantic</code>: For data validation and management.</li>
+<li><code>loguru</code>: For logging.</li>
+<li><code>ceylon</code>: For creating distributed agents.</li>
+</ul>
+<p>You can install the necessary packages using pip:</p>
+<pre><code class="language-bash">pip install pydantic loguru ceylon
+</code></pre>
+<h3 id="step-1-define-data-structures">Step 1: Define Data Structures</h3>
+<p>We'll start by defining the data structures that will represent tasks, task assignments, and task results.</p>
+<pre><code class="language-python">from pydantic.dataclasses import dataclass
+
+@dataclass
+class Task:
+    id: int
+    description: str
+    difficulty: int  # 1-10 scale
+
+
+@dataclass
+class TaskAssignment:
+    task: Task
+
+
+@dataclass
+class TaskResult:
+    task_id: int
+    worker: str
+    success: bool
+</code></pre>
+<h3 id="step-2-create-the-worker-agent">Step 2: Create the Worker Agent</h3>
+<p>The <code>WorkerAgent</code> class represents a worker that performs tasks. Each worker has a name and a skill level that determines its ability to complete tasks of varying difficulties.</p>
+<pre><code class="language-python">import asyncio
+from ceylon import Agent, on_message
+from loguru import logger
+
+class WorkerAgent(Agent):
+    def __init__(self, name: str, skill_level: int):
+        self.name = name
+        self.skill_level = skill_level
+        super().__init__(name=name, workspace_id=&quot;task_management&quot;, admin_port=8000)
+
+    @on_message(type=TaskAssignment)
+    async def on_task_assignment(self, data: TaskAssignment):
+        logger.info(f&quot;{self.name} received task: {data.task.description}&quot;)
+        # Simulate task execution
+        await asyncio.sleep(data.task.difficulty)
+        success = self.skill_level &gt;= data.task.difficulty
+        await self.broadcast_data(TaskResult(task_id=data.task.id, worker=self.name, success=success))
+</code></pre>
+<h3 id="step-3-create-the-task-manager">Step 3: Create the Task Manager</h3>
+<p>The <code>TaskManager</code> class is responsible for assigning tasks to workers and collecting the results.</p>
+<pre><code class="language-python">from ceylon import CoreAdmin
+
+class TaskManager(CoreAdmin):
+    tasks = []
+    workers = []
+    task_results = []
+
+    def __init__(self, tasks, workers):
+        self.workers = workers
+        self.tasks = tasks
+        super().__init__(name=&quot;task_management&quot;, port=8000)
+
+    async def on_agent_connected(self, topic: str, agent_id: AgentDetail):
+        logger.info(f&quot;Worker {agent_id} connected&quot;)
+        if len(self.workers) == len(self.tasks):
+            await self.assign_tasks()
+
+    async def assign_tasks(self):
+        for task, worker in zip(self.tasks, self.workers):
+            await self.broadcast_data(TaskAssignment(task=task))
+
+    @on_message(type=TaskResult)
+    async def on_task_result(self, result: TaskResult):
+        self.task_results.append(result)
+        logger.info(
+            f&quot;Received result for task {result.task_id} from {result.worker}: {'Success' if result.success else 'Failure'}&quot;)
+        if len(self.task_results) == len(self.tasks):
+            await self.end_task_management()
+
+    async def end_task_management(self):
+        success_rate = sum(1 for result in self.task_results if result.success) / len(self.task_results)
+        logger.info(f&quot;All tasks completed. Success rate: {success_rate:.2%}&quot;)
+        await self.stop()
+</code></pre>
+<h3 id="step-4-main-execution-script">Step 4: Main Execution Script</h3>
+<p>Finally, we need a script to create tasks, instantiate workers, and run the task manager.</p>
+<pre><code class="language-python">if __name__ == '__main__':
+    # Create tasks
+    tasks = [
+        Task(id=1, description=&quot;Simple calculation&quot;, difficulty=2),
+        Task(id=2, description=&quot;Data analysis&quot;, difficulty=5),
+        Task(id=3, description=&quot;Machine learning model training&quot;, difficulty=8),
+    ]
+
+    # Create workers
+    workers = [
+        WorkerAgent(&quot;Junior&quot;, skill_level=3),
+        WorkerAgent(&quot;Intermediate&quot;, skill_level=6),
+        WorkerAgent(&quot;Senior&quot;, skill_level=9),
+    ]
+
+    # Create and run task manager
+    task_manager = TaskManager(tasks, workers)
+    task_manager.run_admin(inputs=b&quot;&quot;, workers=workers)
+</code></pre>
+<h3 id="running-the-system">Running the System</h3>
+<p>To run the distributed task management system, simply execute the main script. The <code>TaskManager</code> will distribute tasks to workers based on their skill levels, and each worker will either succeed or fail in completing the task. The results will be collected and logged.</p></div>
+            </div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+            <p>Documentation built with <a href="https://www.mkdocs.org/">MkDocs</a>.</p>
+        </footer>
+        <script src="../js/bootstrap.bundle.min.js"></script>
+        <script>
+            var base_url = "..",
+                shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
+        </script>
+        <script src="../js/base.js"></script>
+        <script src="../search/main.js"></script>
+
+        <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="searchModalLabel">Search</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>From here you can search these documents. Enter your search terms below.</p>
+                <form>
+                    <div class="form-group">
+                        <input type="search" class="form-control" placeholder="Search..." id="mkdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="mkdocs-search-results" data-no-results-text="No results found"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="mkdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="keyboardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="keyboardModalLabel">Keyboard Shortcuts</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    </body>
+</html>

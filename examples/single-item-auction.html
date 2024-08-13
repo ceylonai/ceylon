@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        
+        
+        <link rel="canonical" href="https://ceylon.ai/examples/single-item-auction.html">
+        <link rel="shortcut icon" href="../img/favicon.ico">
+        <title>Single-Item Auction System with Ceylon - Ceylon: A Multi-Agent System (MAS)</title>
+        <link href="../css/bootstrap.min.css" rel="stylesheet">
+        <link href="../css/fontawesome.min.css" rel="stylesheet">
+        <link href="../css/brands.min.css" rel="stylesheet">
+        <link href="../css/solid.min.css" rel="stylesheet">
+        <link href="../css/v4-font-face.min.css" rel="stylesheet">
+        <link href="../css/base.css" rel="stylesheet">
+        <link id="hljs-light" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" >
+        <link id="hljs-dark" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css" disabled>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+        <script>hljs.highlightAll();</script> 
+    </head>
+
+    <body>
+        <div class="navbar fixed-top navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="../index.html">Ceylon: A Multi-Agent System (MAS)</a>
+                <!-- Expander button -->
+                <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar-collapse" aria-controls="navbar-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Expanded navigation -->
+                <div id="navbar-collapse" class="navbar-collapse collapse">
+                        <!-- Main navigation -->
+                        <ul class="nav navbar-nav">
+                            <li class="nav-item">
+                                <a href="../index.html" class="nav-link">Ceylon: A Multi-Agent System (MAS)</a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="../GettingStart.html" class="nav-link">🚦 Getting Started</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a href="#" class="nav-link dropdown-toggle active" aria-current="page" role="button" data-bs-toggle="dropdown"  aria-expanded="false">Examples</a>
+                                <ul class="dropdown-menu">
+                                    
+<li>
+    <a href="connect-through-network.html" class="dropdown-item">Tutorial: Setting Up Remote Admin and Worker Agents</a>
+</li>
+                                    
+<li>
+    <a href="meeting-sechdular.html" class="dropdown-item">Simplified Meeting Scheduler Tutorial</a>
+</li>
+                                    
+<li>
+    <a href="single-item-auction.html" class="dropdown-item active" aria-current="page">Single-Item Auction System with Ceylon</a>
+</li>
+                                    
+<li>
+    <a href="task-manager.html" class="dropdown-item">Task manager</a>
+</li>
+                                </ul>
+                            </li>
+                        </ul>
+
+                    <ul class="nav navbar-nav ms-md-auto">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-bs-toggle="modal" data-bs-target="#mkdocs_search_modal">
+                                <i class="fa fa-search"></i> Search
+                            </a>
+                        </li>
+                            <li class="nav-item">
+                                <a rel="prev" href="meeting-sechdular.html" class="nav-link">
+                                    <i class="fa fa-arrow-left"></i> Previous
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a rel="next" href="task-manager.html" class="nav-link">
+                                    Next <i class="fa fa-arrow-right"></i>
+                                </a>
+                            </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="row">
+                    <div class="col-md-3"><div class="navbar-expand-md bs-sidebar hidden-print affix" role="complementary">
+    <div class="navbar-header">
+        <button type="button" class="navbar-toggler collapsed" data-bs-toggle="collapse" data-bs-target="#toc-collapse" title="Table of Contents">
+            <span class="fa fa-angle-down"></span>
+        </button>
+    </div>
+
+    
+    <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
+        <ul class="nav flex-column">
+            
+            <li class="nav-item" data-bs-level="1"><a href="#single-item-auction-system-with-ceylon" class="nav-link">Single-Item Auction System with Ceylon</a>
+              <ul class="nav flex-column">
+            <li class="nav-item" data-bs-level="2"><a href="#introduction" class="nav-link">Introduction</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#system-overview" class="nav-link">System Overview</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#prerequisites" class="nav-link">Prerequisites</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#step-by-step-implementation" class="nav-link">Step-by-Step Implementation</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#key-ceylon-framework-features-used" class="nav-link">Key Ceylon Framework Features Used</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#potential-enhancements" class="nav-link">Potential Enhancements</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+              </ul>
+            </li>
+        </ul>
+    </div>
+</div></div>
+                    <div class="col-md-9" role="main">
+
+<h1 id="single-item-auction-system-with-ceylon">Single-Item Auction System with Ceylon</h1>
+<h2 id="introduction">Introduction</h2>
+<p>In this guide, we will walk you through the process of building a single-item auction system using the Ceylon framework. The system simulates an auction where multiple bidders compete to purchase an item, with an auctioneer managing the entire process.</p>
+<h2 id="system-overview">System Overview</h2>
+<p>The auction system is composed of two primary components:</p>
+<ol>
+<li><strong>Auctioneer</strong>: Manages the auction, collects bids, and determines the winner.</li>
+<li><strong>Bidders</strong>: Participate in the auction by placing bids.</li>
+</ol>
+<p>Ceylon's agent-based architecture allows seamless communication and coordination between these components, making it ideal for such a system.</p>
+<h2 id="prerequisites">Prerequisites</h2>
+<p>Before you dive into the code, ensure you have the following:</p>
+<ul>
+<li>Python 3.7 or higher installed on your system.</li>
+<li>The Ceylon framework installed (<code>pip install ceylon</code>).</li>
+<li>A basic understanding of asynchronous programming in Python.</li>
+</ul>
+<h2 id="step-by-step-implementation">Step-by-Step Implementation</h2>
+<h3 id="1-defining-data-structures">1. Defining Data Structures</h3>
+<p>The first step in building our auction system is to define the data structures that will be used for communication between the auctioneer and bidders. We use Pydantic dataclasses for this purpose:</p>
+<pre><code class="language-python">from pydantic.dataclasses import dataclass
+
+@dataclass(repr=True)
+class Item:
+    name: str
+    starting_price: float
+
+@dataclass(repr=True)
+class Bid:
+    bidder: str
+    amount: float
+
+@dataclass(repr=True)
+class AuctionStart:
+    item: Item
+
+@dataclass(repr=True)
+class AuctionResult:
+    winner: str
+    winning_bid: float
+
+@dataclass(repr=True)
+class AuctionEnd:
+    pass
+</code></pre>
+<ul>
+<li><strong>Item</strong>: Represents the item being auctioned, including its name and starting price.</li>
+<li><strong>Bid</strong>: Represents a bid placed by a bidder, including the bidder's name and the bid amount.</li>
+<li><strong>AuctionStart</strong>: Signals the start of the auction, carrying information about the item.</li>
+<li><strong>AuctionResult</strong>: Contains the result of the auction, including the winner's name and the winning bid.</li>
+<li><strong>AuctionEnd</strong>: Signals the end of the auction process.</li>
+</ul>
+<h3 id="2-implementing-the-bidder-agent">2. Implementing the Bidder Agent</h3>
+<p>Next, we'll implement the bidder agent. Each bidder will listen for the start of the auction and place a bid if their budget allows.</p>
+<pre><code class="language-python">import random
+from ceylon import Agent, on_message
+
+class Bidder(Agent):
+    name: str
+    budget: float
+
+    def __init__(self, name: str, budget: float):
+        self.name = name
+        self.budget = budget
+        super().__init__(name=name, workspace_id=&quot;single_item_auction&quot;, admin_peer=&quot;Auctioneer&quot;, admin_port=8000, role=&quot;bidder&quot;)
+
+    @on_message(type=AuctionStart)
+    async def on_auction_start(self, data: AuctionStart):
+        if self.budget &gt; data.item.starting_price:
+            random_i = random.randint(100, 1000)
+            bid_amount = min(self.budget, data.item.starting_price * random_i / 100)
+            await self.broadcast_data(Bid(bidder=self.name, amount=bid_amount))
+
+    @on_message(type=AuctionResult)
+    async def on_auction_result(self, data: AuctionResult):
+        if data.winner == self.name:
+            self.budget -= data.winning_bid
+            print(f&quot;{self.name} won the auction for ${data.winning_bid:.2f}&quot;)
+</code></pre>
+<ul>
+<li><strong>Initialization</strong>: Each <code>Bidder</code> is initialized with a name and budget.</li>
+<li><strong>Handling Auction Start</strong>: The bidder listens for the <code>AuctionStart</code> message and places a random bid within their budget.</li>
+<li><strong>Handling Auction Result</strong>: The bidder listens for the <code>AuctionResult</code> message and deducts the winning bid amount from their budget if they win.</li>
+</ul>
+<h3 id="3-implementing-the-auctioneer">3. Implementing the Auctioneer</h3>
+<p>The auctioneer is responsible for managing the auction, including starting it, collecting bids, and determining the winner.</p>
+<pre><code class="language-python">from ceylon import CoreAdmin
+from typing import List
+
+class Auctioneer(CoreAdmin):
+    item: Item
+    bids: List[Bid] = []
+    expected_bidders: int
+    connected_bidders: int = 0
+
+    def __init__(self, item: Item, expected_bidders: int):
+        self.item = item
+        self.expected_bidders = expected_bidders
+        super().__init__(name=&quot;single_item_auction&quot;, port=8000)
+
+    async def on_agent_connected(self, topic: str, agent_id: str):
+        self.connected_bidders += 1
+        print(f&quot;Bidder {agent_id} connected. {self.connected_bidders}/{self.expected_bidders} bidders connected.&quot;)
+        if self.connected_bidders == self.expected_bidders:
+            print(&quot;All bidders connected. Starting the auction.&quot;)
+            await self.start_auction()
+
+    async def start_auction(self):
+        print(f&quot;Starting auction for {self.item.name} with starting price ${self.item.starting_price}&quot;)
+        await self.broadcast_data(AuctionStart(item=self.item))
+
+    @on_message(type=Bid)
+    async def on_bid(self, bid: Bid):
+        self.bids.append(bid)
+        print(f&quot;Received bid from {bid.bidder} for ${bid.amount:.2f}&quot;)
+        await self.end_auction()
+
+    async def end_auction(self):
+        if not self.bids:
+            print(f&quot;No bids received for {self.item.name}&quot;)
+        else:
+            winning_bid = max(self.bids, key=lambda x: x.amount)
+            result = AuctionResult(winner=winning_bid.bidder, winning_bid=winning_bid.amount)
+            await self.broadcast_data(result)
+            print(f&quot;Auction ended. Winner: {result.winner}, Winning Bid: ${result.winning_bid:.2f}&quot;)
+            await self.stop()
+
+        await self.broadcast_data(AuctionEnd())
+</code></pre>
+<ul>
+<li><strong>Initialization</strong>: The <code>Auctioneer</code> is initialized with the auction item and the expected number of bidders.</li>
+<li><strong>Handling Agent Connection</strong>: The auctioneer waits for all bidders to connect before starting the auction.</li>
+<li><strong>Starting the Auction</strong>: The auctioneer broadcasts the <code>AuctionStart</code> message to all bidders.</li>
+<li><strong>Handling Bids</strong>: The auctioneer collects bids and ends the auction after receiving bids.</li>
+<li><strong>Ending the Auction</strong>: The auctioneer determines the highest bid and announces the winner.</li>
+</ul>
+<h3 id="4-running-the-auction-system">4. Running the Auction System</h3>
+<p>Finally, we set up the auction environment by creating the auctioneer and bidders, and then running the system.</p>
+<pre><code class="language-python">if __name__ == '__main__':
+    item = Item(&quot;Rare Painting&quot;, 1000)
+
+    bidders = [
+        Bidder(&quot;Alice&quot;, 1500),
+        Bidder(&quot;Bob&quot;, 1200),
+        Bidder(&quot;Charlie&quot;, 2000),
+    ]
+
+    auctioneer = Auctioneer(item, expected_bidders=len(bidders))
+    auctioneer.run_admin(inputs=b&quot;&quot;, workers=bidders)
+</code></pre>
+<ul>
+<li><strong>Item Creation</strong>: An item to be auctioned is created with a name and starting price.</li>
+<li><strong>Bidder Creation</strong>: Three bidders are created with different budgets.</li>
+<li><strong>Auctioneer Setup</strong>: An auctioneer is created with the item and the expected number of bidders.</li>
+<li><strong>System Execution</strong>: The auction system is run, with the auctioneer managing the process and bidders placing bids.</li>
+</ul>
+<h2 id="key-ceylon-framework-features-used">Key Ceylon Framework Features Used</h2>
+<ol>
+<li><strong>Agent-based Architecture</strong>: The system uses <code>Agent</code> for bidders and <code>CoreAdmin</code> for the auctioneer.</li>
+<li><strong>Message Handling</strong>: The <code>@on_message</code> decorator handles specific message types, making it easy to react to different events in the auction process.</li>
+<li><strong>Asynchronous Programming</strong>: Ceylon leverages Python's async capabilities, ensuring efficient communication and coordination between agents.</li>
+<li><strong>Broadcast Messaging</strong>: The <code>broadcast_data()</code> method is used to send messages to all agents, ensuring everyone is informed of the auction's progress.</li>
+</ol>
+<h2 id="potential-enhancements">Potential Enhancements</h2>
+<p>While the current implementation is functional, there are several ways to extend and enhance the system:</p>
+<ol>
+<li>Implement a more sophisticated bidding strategy for the bidders.</li>
+<li>Add support for multiple rounds of bidding.</li>
+<li>Introduce a time limit for the auction, adding urgency to the bidding process.</li>
+<li>Implement different auction types, such as Dutch auctions or silent auctions.</li>
+<li>Improve error handling and account for edge cases, such as network failures or disconnected agents.</li>
+</ol></div>
+            </div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+            <p>Documentation built with <a href="https://www.mkdocs.org/">MkDocs</a>.</p>
+        </footer>
+        <script src="../js/bootstrap.bundle.min.js"></script>
+        <script>
+            var base_url = "..",
+                shortcuts = {"help": 191, "next": 78, "previous": 80, "search": 83};
+        </script>
+        <script src="../js/base.js"></script>
+        <script src="../search/main.js"></script>
+
+        <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="searchModalLabel">Search</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>From here you can search these documents. Enter your search terms below.</p>
+                <form>
+                    <div class="form-group">
+                        <input type="search" class="form-control" placeholder="Search..." id="mkdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="mkdocs-search-results" data-no-results-text="No results found"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="mkdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="keyboardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="keyboardModalLabel">Keyboard Shortcuts</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+
+    </body>
+</html>
