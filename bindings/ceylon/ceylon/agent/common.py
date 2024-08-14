@@ -33,18 +33,28 @@ class AgentCommon:
         # Deserialize the message
         message = pickle.loads(data)
         message_type = type(message)
-        class_name = self.__class__.__qualname__.split(".")[0]
-        method_key = f"{class_name}.{message_type}"
+
+        # Get the class hierarchy
+        class_hierarchy = inspect.getmro(self.__class__)
+
+        # Find the most specific handler in the class hierarchy
+        handler = None
+        for cls in class_hierarchy:
+            class_name = cls.__name__
+            method_key = f"{class_name}.{message_type}"
+            if method_key in message_handlers:
+                handler = message_handlers[method_key]
+                break
+
         # Trigger the appropriate handler if one is registered
-        if method_key in message_handlers:
-            func = message_handlers[method_key]
-            if has_param(func, "agent_id") and has_param(func, "time"):
-                await message_handlers[method_key](self, message, agent_id=agent_id, time=time)
-            elif has_param(func, "agent_id"):
-                await message_handlers[method_key](self, message, agent_id=agent_id)
-            elif has_param(func, "time"):
-                await message_handlers[method_key](self, message, time=time)
+        if handler:
+            if has_param(handler, "agent_id") and has_param(handler, "time"):
+                await handler(self, message, agent_id=agent_id, time=time)
+            elif has_param(handler, "agent_id"):
+                await handler(self, message, agent_id=agent_id)
+            elif has_param(handler, "time"):
+                await handler(self, message, time=time)
             else:
-                await message_handlers[method_key](self, message)
+                await handler(self, message)
         else:
-            logger.warning(f"No handler registered ({self.__class__.__qualname__}) for message type: {message_type}")
+            logger.warning(f"No handler registered in the class hierarchy for message type: {message_type}")
