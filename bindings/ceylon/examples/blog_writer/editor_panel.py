@@ -11,7 +11,8 @@ from langchain_core.tools import BaseTool
 from langchain_experimental.llms.ollama_functions import OllamaFunctions
 from loguru import logger
 
-from ceylon import Task, SpecializedAgent, TaskManager
+from ceylon.task import Task
+from ceylon.llm import SpecializedAgent, TaskManager
 from ceylon.llm.tools.search_tool import SearchTools
 
 
