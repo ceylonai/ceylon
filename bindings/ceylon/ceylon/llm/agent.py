@@ -7,12 +7,12 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
 from loguru import logger
 
-from ceylon import Agent, on_message
-from ceylon.task import TaskAssignment, TaskResult
+from ceylon.task import TaskResult
 from ceylon.task.task_operation import SubTask
+from ceylon.task.task_operator import TaskOperator
 
 
-class SpecializedAgent(Agent):
+class SpecializedAgent(TaskOperator):
     def __init__(self, name: str, role: str, context: str, skills: List[str],
                  tools: List[Any] = None, llm=None, tool_llm=None, verbose=False):
         self.context = context
@@ -24,6 +24,9 @@ class SpecializedAgent(Agent):
         self.tool_llm = copy.copy(tool_llm)
         self.history: Dict[str, List[TaskResult]] = {}
         super().__init__(name=name, role=role, workspace_id="openai_task_management", admin_port=8000)
+
+    async def get_result(self, task):
+        return await self.get_llm_response(task)
 
     async def get_llm_response(self, subtask: SubTask) -> str:
         agent_profile = f"""
@@ -118,28 +121,3 @@ class SpecializedAgent(Agent):
             return ""
         logger.info(f"Task history length: {len_history}")
         return "\n".join(results)
-
-    @on_message(type=TaskAssignment)
-    async def on_task_assignment(self, data: TaskAssignment):
-        if data.assigned_agent == self.details().name:
-            logger.info(f"{self.details().name} received subtask: {data.task.description}")
-            result = await self.get_llm_response(data.task)
-            result_task = TaskResult(task_id=data.task.id,
-                                     name=data.task.name,
-                                     description=data.task.description,
-                                     agent=self.details().name,
-                                     parent_task_id=data.task.parent_task_id,
-                                     result=result)
-            # Update task history
-            await self.add_result_to_history(result_task)
-            await self.broadcast_data(result_task)
-
-    @on_message(type=TaskResult)
-    async def on_task_result(self, data: TaskResult):
-        await self.add_result_to_history(data)
-
-    async def add_result_to_history(self, data: TaskResult):
-        if data.parent_task_id in self.history:
-            self.history[data.parent_task_id].append(data)
-        else:
-            self.history[data.parent_task_id] = [data]

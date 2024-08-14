@@ -4,7 +4,7 @@ from loguru import logger
 
 from ceylon import CoreAdmin, on_message
 from ceylon.ceylon import AgentDetail
-from ceylon.task import Task, TaskResult, TaskAssignment
+from ceylon.task import Task, TaskResult, TaskAssignment, SubTask
 from ceylon.task.task_operator import TaskOperator
 
 
@@ -13,13 +13,22 @@ class TaskCoordinator(CoreAdmin):
     agents: List[TaskOperator] = []
     results: Dict[str, List[TaskResult]] = {}
 
-    def __init__(self, tasks: List[Task], agents: List[TaskOperator], name="task_management", port=8000):
+    def __init__(self, tasks: List[Task], agents: List[TaskOperator], name="task_management", port=8000, *args,
+                 **kwargs):
         self.tasks = tasks
         self.agents = agents
-        super().__init__(name=name, port=port)
+        super().__init__(name=name, port=port, *args, **kwargs)
+
+    async def update_task(self, idx: int, task: Task) -> Task:
+        return task
+
+    async def get_task_executor(self, task: SubTask) -> str:
+        return task.executor
 
     async def run(self, inputs: bytes):
         for idx, task in enumerate(self.tasks):
+            task = await self.update_task(idx, task)
+            print(task)
             if task.validate_sub_tasks():
                 logger.info(f"Task {task.name} is valid")
             else:
@@ -38,8 +47,11 @@ class TaskCoordinator(CoreAdmin):
             if sub_task is None:
                 continue
             subtask_name, subtask_ = sub_task
-            logger.info(f"Assigned agent {sub_task[1].executor} to subtask {sub_task[0]}")
-            await self.broadcast_data(TaskAssignment(task=subtask_, assigned_agent=subtask_.executor))
+            assigned_agent = await self.get_task_executor(subtask_)
+            subtask_ = task.update_subtask_executor(subtask_name, assigned_agent)
+            logger.debug(f"Assigned agent {subtask_.executor} to subtask {subtask_name}")
+            await self.broadcast_data(
+                TaskAssignment(task=subtask_, assigned_agent=subtask_.executor))
 
     @on_message(type=TaskResult)
     async def on_task_result(self, result: TaskResult):
