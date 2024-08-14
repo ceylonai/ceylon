@@ -1,6 +1,6 @@
 from langchain_openai import ChatOpenAI
 
-from ceylon.llm import SpecializedAgent, TaskManager
+from ceylon.llm import LLMTaskAgent, LLMTaskManager
 from ceylon.task import Task
 
 # Define the main task
@@ -21,7 +21,7 @@ code_llm = ChatOpenAI(model="gpt-4o-mini")
 
 # Create specialized agents
 agents = [
-    SpecializedAgent(
+    LLMTaskAgent(
         name="backend_developer",
         role="Python Backend Developer",
         context="Experienced in developing backend systems, API design, and database integration.",
@@ -35,7 +35,7 @@ agents = [
         tools=[],
         llm=code_llm
     ),
-    SpecializedAgent(
+    LLMTaskAgent(
         name="frontend_developer",
         role="Python Frontend Developer",
         context="Proficient in creating user interfaces and handling user interactions in Python applications.",
@@ -84,7 +84,7 @@ agents = [
 ]
 
 # Initialize TaskManager
-task_manager = TaskManager(tasks, agents, tool_llm=tool_llm, llm=llm)
+task_manager = LLMTaskManager(tasks, agents, tool_llm=tool_llm, llm=llm)
 
 # Execute tasks
 completed_tasks = task_manager.do(inputs=b"")

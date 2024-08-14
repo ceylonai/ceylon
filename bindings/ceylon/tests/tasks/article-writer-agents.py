@@ -1,6 +1,6 @@
 from langchain_community.chat_models import ChatOllama
 
-from ceylon.llm import Task, SubTask, SpecializedAgent, TaskManager
+from ceylon.llm import Task, SubTask, LLMTaskAgent, LLMTaskManager
 
 # Example usage
 if __name__ == "__main__":
@@ -29,7 +29,7 @@ if __name__ == "__main__":
 
     # Create specialized agents
     agents = [
-        SpecializedAgent(
+        LLMTaskAgent(
             name="research",
             context="Knowledge about research methodologies and tools",
             skills=["Market Research", "Data Analysis", "Literature Review"],  # Example skills
@@ -37,7 +37,7 @@ if __name__ == "__main__":
             llm=llm
         ),
 
-        SpecializedAgent(
+        LLMTaskAgent(
             name="writing",
             context="Knowledge about content writing",
             skills=["Creative Writing", "Technical Writing", "Copywriting"],  # Example skills
@@ -45,7 +45,7 @@ if __name__ == "__main__":
             llm=llm
         ),
 
-        SpecializedAgent(
+        LLMTaskAgent(
             name="seo_optimization",
             context="Knowledge about SEO strategies and tools",
             skills=["Keyword Research", "On-Page SEO", "Content Optimization"],  # Example skills
@@ -53,7 +53,7 @@ if __name__ == "__main__":
             llm=llm
         ),
 
-        SpecializedAgent(
+        LLMTaskAgent(
             name="web_publishing",
             context="Knowledge about web publishing tools",
             skills=["CMS Management", "HTML/CSS", "Content Scheduling"],  # Example skills
@@ -62,7 +62,7 @@ if __name__ == "__main__":
         )
     ]
 
-    task_manager = TaskManager(tasks, agents, llm=llm)
+    task_manager = LLMTaskManager(tasks, agents, llm=llm)
     tasks = task_manager.do(inputs=b"")
 
     for t in tasks:
