@@ -18,6 +18,7 @@ class SubTask(BaseModel):
     completed_at: Optional[float] = None
 
     result: Optional[str] = None
+    executor: Optional[str] = None
 
     def complete(self, result: Optional[str] = None):
         self.result = result
@@ -97,6 +98,13 @@ class Task(BaseModel):
 
         if subtask_name in self.execution_order:
             self.execution_order.remove(subtask_name)
+
+    def update_subtask_executor(self, subtask_name: str, executor: str) -> SubTask:
+        if subtask_name not in self.subtasks:
+            raise ValueError(f"Subtask {subtask_name} not found")
+        subtask = self.subtasks[subtask_name]
+        subtask.executor = executor
+        return subtask
 
     def get_sub_task_by_name(self, subtask_name: str) -> SubTask:
         if subtask_name not in self.subtasks:
