@@ -2,7 +2,7 @@ from langchain_community.chat_models import ChatOllama
 
 from ceylon import JobSteps, Step, JobRequest
 from ceylon.llm import LLMAgent
-from ceylon.llm.agent import LLMExecutorAgent
+from ceylon.llm.llm_task_operator import LLMExecutorAgent
 from ceylon.tools.search_tool import SearchTool
 
 llm_lib = ChatOllama(model="llama3.1:latest")

@@ -4,7 +4,7 @@ import pydantic.v1
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 
-from ceylon.llm.agent import SpecializedAgent
+from ceylon.llm.llm_task_operator import LLMTaskOperator
 from ceylon.task import TaskResult, Task, SubTask
 from ceylon.task.task_coordinator import TaskCoordinator
 
@@ -31,12 +31,12 @@ class SubTaskList(pydantic.v1.BaseModel):
     sub_task_list: List[SubTaskModel] = pydantic.v1.Field(description="the subtasks of the task", default=[])
 
 
-class TaskManager(TaskCoordinator):
+class LLMTaskCoordinator(TaskCoordinator):
     tasks: List[Task] = []
-    agents: List[SpecializedAgent] = []
+    agents: List[LLMTaskOperator] = []
     results: Dict[str, List[TaskResult]] = {}
 
-    def __init__(self, tasks: List[Task], agents: List[SpecializedAgent], llm=None, tool_llm=None):
+    def __init__(self, tasks: List[Task], agents: List[LLMTaskOperator], llm=None, tool_llm=None):
         self.llm = llm
         self.tool_llm = tool_llm
         self.tasks = tasks

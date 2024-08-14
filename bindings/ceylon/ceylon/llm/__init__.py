@@ -1,2 +1,2 @@
-from .task_admin import TaskManager
-from .agent import SpecializedAgent
+from .llm_task_coordinator import LLMTaskCoordinator
+from .llm_task_operator import LLMTaskOperator

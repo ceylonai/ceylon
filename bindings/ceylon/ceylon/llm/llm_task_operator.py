@@ -12,7 +12,7 @@ from ceylon.task.task_operation import SubTask
 from ceylon.task.task_operator import TaskOperator
 
 
-class SpecializedAgent(TaskOperator):
+class LLMTaskOperator(TaskOperator):
     def __init__(self, name: str, role: str, context: str, skills: List[str],
                  tools: List[Any] = None, llm=None, tool_llm=None, verbose=False):
         self.context = context

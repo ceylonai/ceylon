@@ -12,7 +12,7 @@ from langchain_experimental.llms.ollama_functions import OllamaFunctions
 from loguru import logger
 
 from ceylon.task import Task
-from ceylon.llm import SpecializedAgent, TaskManager
+from ceylon.llm import LLMTaskOperator, LLMTaskCoordinator
 from ceylon.llm.tools.search_tool import SearchTools
 
 
@@ -64,7 +64,7 @@ if __name__ == "__main__":
 
     # Create specialized agents
     agents = [
-        SpecializedAgent(
+        LLMTaskOperator(
             name="researcher",
             role="Research Specialist",
             context="Searches for relevant information on the web to gather data for content creation.",
@@ -83,7 +83,7 @@ if __name__ == "__main__":
             llm=llm_lib,
             tool_llm=llm_tool
         ),
-        SpecializedAgent(
+        LLMTaskOperator(
             name="illustrator",
             role="Illustrator ",
             context="Creates images from text descriptions. The final output should strictly include only the title and the content and cover image, without any additional sections or formatting.",
@@ -101,7 +101,7 @@ if __name__ == "__main__":
             tool_llm=llm_tool
         ),
 
-        SpecializedAgent(
+        LLMTaskOperator(
             name="writer",
             role="Content Writer",
             context="Simplifies technical concepts with metaphors and creates narrative-driven content while ensuring scientific accuracy.",
@@ -119,7 +119,7 @@ if __name__ == "__main__":
         ),
     ]
 
-    task_manager = TaskManager(tasks, agents, tool_llm=llm_tool, llm=llm_lib)
+    task_manager = LLMTaskCoordinator(tasks, agents, tool_llm=llm_tool, llm=llm_lib)
     tasks = asyncio.run(task_manager.async_do(inputs=b""))
 
     for t in tasks:
