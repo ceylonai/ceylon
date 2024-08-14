@@ -79,8 +79,9 @@ class TaskManager(CoreAdmin):
                 continue
             subtask_name, subtask_ = sub_task
             assigned_agent = await self.get_best_agent_for_subtask(subtask_)
+            subtask_ = task.update_subtask_executor(subtask_name, assigned_agent)
             logger.info(f"Assigned agent {assigned_agent} to subtask {subtask_name}")
-            await self.broadcast_data(TaskAssignment(task=subtask_, assigned_agent=assigned_agent))
+            await self.broadcast_data(TaskAssignment(task=subtask_, assigned_agent=subtask_.executor))
 
     @on_message(type=TaskResult)
     async def on_task_result(self, result: TaskResult):
