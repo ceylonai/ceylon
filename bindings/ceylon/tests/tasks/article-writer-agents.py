@@ -1,6 +1,7 @@
 from langchain_community.chat_models import ChatOllama
 
-from ceylon.llm import Task, SubTask, LLMTaskAgent, LLMTaskManager
+from ceylon.task import Task, SubTask
+from ceylon.llm import  LLMTaskOperator,LLMTaskCoordinator
 
 # Example usage
 if __name__ == "__main__":
@@ -29,40 +30,40 @@ if __name__ == "__main__":
 
     # Create specialized agents
     agents = [
-        LLMTaskAgent(
+        LLMTaskOperator(
             name="research",
+            role="Researcher",
             context="Knowledge about research methodologies and tools",
             skills=["Market Research", "Data Analysis", "Literature Review"],  # Example skills
-            tools=["Google Scholar", "JSTOR", "LexisNexis"],  # Example tools
             llm=llm
         ),
 
-        LLMTaskAgent(
+        LLMTaskOperator(
             name="writing",
+            role="Content Writer",
             context="Knowledge about content writing",
             skills=["Creative Writing", "Technical Writing", "Copywriting"],  # Example skills
-            tools=["Grammarly", "Hemingway Editor", "Scrivener"],  # Example tools
             llm=llm
         ),
 
-        LLMTaskAgent(
+        LLMTaskOperator(
             name="seo_optimization",
+            role="SEO Expert",
             context="Knowledge about SEO strategies and tools",
             skills=["Keyword Research", "On-Page SEO", "Content Optimization"],  # Example skills
-            tools=["Ahrefs", "SEMrush", "Yoast SEO"],  # Example tools
             llm=llm
         ),
 
-        LLMTaskAgent(
+        LLMTaskOperator(
             name="web_publishing",
+            role="Writer",
             context="Knowledge about web publishing tools",
             skills=["CMS Management", "HTML/CSS", "Content Scheduling"],  # Example skills
-            tools=["WordPress", "Squarespace", "Medium"],  # Example tools
             llm=llm
         )
     ]
 
-    task_manager = LLMTaskManager(tasks, agents, llm=llm)
+    task_manager = LLMTaskCoordinator(tasks, agents, llm=llm)
     tasks = task_manager.do(inputs=b"")
 
     for t in tasks:

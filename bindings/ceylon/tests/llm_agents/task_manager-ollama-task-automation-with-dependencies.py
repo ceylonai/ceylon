@@ -1,7 +1,7 @@
 from langchain_community.chat_models import ChatOllama
 
 from ceylon.llm import LLMTaskManager
-from ceylon.llm.agent import LLMTaskAgent
+from ceylon.llm.llm_task_operator import LLMTaskAgent
 from ceylon.llm.data_types import Task
 
 if __name__ == "__main__":

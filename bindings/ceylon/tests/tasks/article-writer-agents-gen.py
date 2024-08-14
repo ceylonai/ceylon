@@ -1,8 +1,8 @@
 from langchain_community.chat_models import ChatOllama
 from langchain_experimental.llms.ollama_functions import OllamaFunctions
 
+from ceylon.llm import LLMTaskOperator, LLMTaskCoordinator
 from ceylon.task import Task
-from ceylon.llm import LLMTaskAgent, LLMTaskManager
 
 # Example usage
 if __name__ == "__main__":
@@ -19,7 +19,7 @@ if __name__ == "__main__":
 
     # Create specialized agents
     agents = [
-        LLMTaskAgent(
+        LLMTaskOperator(
             name="research",
             role="Research Analyst",
             context="Extensive knowledge of research methodologies,"
@@ -38,22 +38,10 @@ if __name__ == "__main__":
                 "Research Report Writing",
                 "Data Visualization"
             ],
-            tools=[
-                "Google Scholar",
-                "JSTOR",
-                "LexisNexis",
-                "SPSS",
-                "Tableau",
-                "Qualtrics",
-                "Web of Science",
-                "EndNote",
-                "NVivo",
-                "R Programming"
-            ],
             llm=llm
         ),
 
-        LLMTaskAgent(
+        LLMTaskOperator(
             name="writing",
             role="Content Strategist & Writer",
             context="Deep understanding of various writing styles, content formats, "
@@ -72,22 +60,10 @@ if __name__ == "__main__":
                 "Audience Analysis",
                 "Multimedia Content Creation"
             ],
-            tools=[
-                "Grammarly",
-                "Hemingway Editor",
-                "Scrivener",
-                "CoSchedule Headline Analyzer",
-                "Canva",
-                "Airtable",
-                "Trello",
-                "Google Docs",
-                "Copyscape",
-                "Readable"
-            ],
             llm=llm
         ),
 
-        LLMTaskAgent(
+        LLMTaskOperator(
             name="seo_optimization",
             role="SEO Strategist",
             context="Comprehensive understanding of search engine algorithms,"
@@ -106,22 +82,10 @@ if __name__ == "__main__":
                 "Voice Search Optimization",
                 "SEO Analytics and Reporting"
             ],
-            tools=[
-                "Ahrefs",
-                "SEMrush",
-                "Yoast SEO",
-                "Google Search Console",
-                "Google Analytics",
-                "Moz Pro",
-                "Screaming Frog",
-                "BrightLocal",
-                "Answer the Public",
-                "SpyFu"
-            ],
             llm=llm
         ),
 
-        LLMTaskAgent(
+        LLMTaskOperator(
             name="web_publishing",
             role="Digital Content Manager",
             context="Extensive knowledge of web publishing platforms, "
@@ -140,23 +104,11 @@ if __name__ == "__main__":
                 "Web Analytics",
                 "User Experience Optimization"
             ],
-            tools=[
-                "WordPress",
-                "Squarespace",
-                "Medium",
-                "Git",
-                "Adobe Experience Manager",
-                "Drupal",
-                "Cloudinary",
-                "Google Tag Manager",
-                "Optimizely",
-                "Hotjar"
-            ],
             llm=llm
         )
     ]
 
-    task_manager = LLMTaskManager(tasks, agents, tool_llm=tool_llm, llm=llm)
+    task_manager = LLMTaskCoordinator(tasks, agents, tool_llm=tool_llm, llm=llm)
     tasks = task_manager.do(inputs=b"")
 
     for t in tasks:
