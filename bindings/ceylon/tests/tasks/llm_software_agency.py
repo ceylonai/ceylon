@@ -1,5 +1,3 @@
-from langchain_community.chat_models import ChatOllama
-from langchain_experimental.llms.ollama_functions import OllamaFunctions
 from langchain_openai import ChatOpenAI
 
 from ceylon.llm import LLMTaskOperator, LLMTaskCoordinator
@@ -19,9 +17,6 @@ tasks = [task_management_app]
 llm = ChatOpenAI(model="gpt-4o-mini")
 tool_llm = ChatOpenAI(model="gpt-4o-mini")
 code_llm = ChatOpenAI(model="gpt-4o-mini")
-# llm = ChatOllama(model="llama3.1:latest")
-# tool_llm = OllamaFunctions(model="llama3.1:latest", format="json")
-# code_llm = ChatOllama(model="codestral:latest")
 
 # Create specialized agents
 agents = [
@@ -52,39 +47,6 @@ agents = [
         tools=[],
         llm=code_llm
     ),
-    # SpecializedAgent(
-    #     name="testing_specialist",
-    #     role="Quality Assurance Engineer",
-    #     context="Expertise in software testing methodologies and test automation for Python applications.",
-    #     skills=[
-    #         "Unit Testing",
-    #         "Integration Testing",
-    #         "Test Automation",
-    #         "Python Testing Frameworks"
-    #     ],
-    #     tools=[],
-    #     llm=code_llm
-    # ),
-    # SpecializedAgent(
-    #     name="game_developer",
-    #     role="Python Game Developer",
-    #     context="Experienced in creating interactive games and simulations using Python, with a focus on 2D game development.",
-    #     skills=[
-    #         "Game Design",
-    #         "Game Mechanics",
-    #         "2D Graphics",
-    #         "Collision Detection",
-    #         "Game Loop Implementation",
-    #         "Player Input Handling",
-    #         "Basic Game AI"
-    #     ],
-    #     tools=[
-    #         "Pygame",
-    #         "Arcade",
-    #         "Pyglet"
-    #     ],
-    #     llm=code_llm
-    # )
 ]
 
 # Initialize TaskManager
