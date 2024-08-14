@@ -10,7 +10,7 @@ from langchain_openai import ChatOpenAI
 from loguru import logger
 
 from ceylon.task import Task
-from ceylon.llm import SpecializedAgent, TaskManager
+from ceylon.llm import LLMTaskAgent, LLMTaskManager
 
 
 class QueryInput(BaseModel):
@@ -61,7 +61,7 @@ if __name__ == "__main__":
 
     # Create specialized agents
     agents = [
-        SpecializedAgent(
+        LLMTaskAgent(
             name="research",
             role="Online search things",
             context="Can search for facts and points on the internet in a variety of ways.",
@@ -77,7 +77,7 @@ if __name__ == "__main__":
             llm=llm,
             tool_llm=tool_llm
         ),
-        SpecializedAgent(
+        LLMTaskAgent(
             name="image_generation",
             role="Image Generation",
             context="Can generate images from text.",
@@ -91,7 +91,7 @@ if __name__ == "__main__":
             tool_llm=tool_llm
         ),
 
-        SpecializedAgent(
+        LLMTaskAgent(
             name="writing",
             role="Content Strategist & Writer",
             context="Deep understanding of various writing styles, content formats, "
@@ -114,7 +114,7 @@ if __name__ == "__main__":
             llm=llm
         ),
 
-        SpecializedAgent(
+        LLMTaskAgent(
             name="seo_optimization",
             role="SEO Strategist",
             context="Comprehensive understanding of search engine algorithms,"
@@ -137,7 +137,7 @@ if __name__ == "__main__":
             llm=llm
         ),
 
-        SpecializedAgent(
+        LLMTaskAgent(
             name="web_publishing",
             role="Digital Content Manager",
             context="Extensive knowledge of web publishing platforms, "
@@ -161,7 +161,7 @@ if __name__ == "__main__":
         )
     ]
 
-    task_manager = TaskManager(tasks, agents, tool_llm=tool_llm, llm=llm)
+    task_manager = LLMTaskManager(tasks, agents, tool_llm=tool_llm, llm=llm)
     tasks = task_manager.do(inputs=b"")
 
     for t in tasks:
