@@ -1,3 +1,5 @@
+from loguru import logger
+
 from ceylon.task import Task, SubTask
 from task_coordinator import TaskCoordinator
 from task_operator import TaskOperator
@@ -6,14 +8,14 @@ from task_operator import TaskOperator
 class DeveloperAgent(TaskOperator):
     async def get_result(self, task):
         # Simulate task execution
-        print(f"Developer agent executing task: {task.name}")
+        logger.info(f"Developer agent executing task: {task.name}")
         return f"Completed {task.name}"
 
 
 class QAAgent(TaskOperator):
     async def get_result(self, task):
         # Simulate task execution
-        print(f"QA agent executing task: {task.name}")
+        logger.info(f"QA agent executing task: {task.name}")
         return f"Tested {task.name}"
 
 

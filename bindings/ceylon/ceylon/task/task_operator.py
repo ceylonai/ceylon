@@ -15,7 +15,6 @@ class TaskOperator(Agent, abc.ABC):
 
     @on_message(type=TaskAssignment)
     async def on_task_assignment(self, data: TaskAssignment):
-        print(f"{self.details().name} received subtask: {data.assigned_agent}")
         if data.assigned_agent == self.details().name:
             logger.info(f"{self.details().name} received subtask: {data.task.description}")
             result = await self.get_result(data.task)
