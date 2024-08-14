@@ -3,11 +3,10 @@ from typing import Dict, List, Set
 import pydantic.v1
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
-from loguru import logger
 
-from ceylon import on_message, CoreAdmin
-from ceylon.task import TaskAssignment, TaskResult, Task, SubTask
 from ceylon.llm.agent import SpecializedAgent
+from ceylon.task import TaskResult, Task, SubTask
+from ceylon.task.task_coordinator import TaskCoordinator
 
 
 class SubTaskModel(pydantic.v1.BaseModel):
@@ -32,7 +31,7 @@ class SubTaskList(pydantic.v1.BaseModel):
     sub_task_list: List[SubTaskModel] = pydantic.v1.Field(description="the subtasks of the task", default=[])
 
 
-class TaskManager(CoreAdmin):
+class TaskManager(TaskCoordinator):
     tasks: List[Task] = []
     agents: List[SpecializedAgent] = []
     results: Dict[str, List[TaskResult]] = {}
@@ -42,76 +41,26 @@ class TaskManager(CoreAdmin):
         self.tool_llm = tool_llm
         self.tasks = tasks
         self.agents = agents
-        super().__init__(name="openai_task_management", port=8000)
+        super().__init__(name="openai_task_management", port=8000, tasks=tasks, agents=agents)
 
-    async def run(self, inputs: bytes):
-        for idx, task in enumerate(self.tasks):
-            if len(task.subtasks) == 0:
-                sub_tasks = await self.generate_tasks_from_description(task)
-                for sub_task in sub_tasks:
-                    task.add_subtask(sub_task)
+    async def get_task_executor(self, task: SubTask) -> str:
+        return await self.get_best_agent_for_subtask(task)
 
-                depends_on = [sub_task.name for sub_task in sub_tasks]
-                final_sub_task = SubTask(
-                    name="Generate Final Answer",
-                    description=f"Based on all previous sub-tasks, provide a comprehensive final answer to the main task: {task.description}",
-                    required_specialty="Synthesize information and generate conclusive answers",
-                    depends_on=depends_on,
-                )
-                task.add_subtask(final_sub_task)
+    async def update_task(self, idx: int, task: Task):
+        if len(task.subtasks) == 0:
+            sub_tasks = await self.generate_tasks_from_description(task)
+            for sub_task in sub_tasks:
+                task.add_subtask(sub_task)
 
-            if task.validate_sub_tasks():
-                logger.info(f"Task {task.name} is valid")
-            else:
-                logger.info(f"Task {task.name} is invalid")
-                del self.tasks[idx]
-
-        await self.run_tasks()
-
-    async def run_tasks(self):
-        if len(self.tasks) == 0:
-            logger.info("No tasks found")
-            return
-        for task in self.tasks:
-            self.results[task.id] = []
-            sub_task = task.get_next_subtask()
-            if sub_task is None:
-                continue
-            subtask_name, subtask_ = sub_task
-            assigned_agent = await self.get_best_agent_for_subtask(subtask_)
-            subtask_ = task.update_subtask_executor(subtask_name, assigned_agent)
-            logger.info(f"Assigned agent {assigned_agent} to subtask {subtask_name}")
-            await self.broadcast_data(TaskAssignment(task=subtask_, assigned_agent=subtask_.executor))
-
-    @on_message(type=TaskResult)
-    async def on_task_result(self, result: TaskResult):
-        for idx, task in enumerate(self.tasks):
-            sub_task = task.get_next_subtask()
-            if sub_task is None or result.task_id != sub_task[1].id:
-                continue
-            if result.task_id == sub_task[1].id:
-                task.update_subtask_status(sub_task[1].name, result.result)
-                break
-
-        if self.all_tasks_completed():
-            await self.end_task_management()
-
-        await self.run_tasks()
-
-    def all_tasks_completed(self) -> bool:
-        for task in self.tasks:
-            subtask_completed_status = [st.completed for st in task.subtasks.values()]
-            if not all(subtask_completed_status):
-                return False
-        return True
-
-    async def end_task_management(self):
-        logger.info("All tasks completed. Results:")
-        for task in self.tasks:
-            logger.info(f"Task {task.id} results:")
-            for result in self.results[task.id]:
-                logger.info(f"  Subtask {result.subtask_id}: {result.result}")
-        await self.stop()
+            depends_on = [sub_task.name for sub_task in sub_tasks]
+            final_sub_task = SubTask(
+                name="Generate Final Answer",
+                description=f"Based on all previous sub-tasks, provide a comprehensive final answer to the main task: {task.description}",
+                required_specialty="Synthesize information and generate conclusive answers",
+                depends_on=depends_on,
+            )
+            task.add_subtask(final_sub_task)
+        return task
 
     async def get_best_agent_for_subtask(self, subtask: SubTask) -> str:
         agent_specialties = "\n".join(
@@ -229,11 +178,3 @@ class TaskManager(CoreAdmin):
             "subtasks": subtasks
         })
         return sub_task_list
-
-    def do(self, inputs: bytes) -> List[Task]:
-        self.run_admin(inputs, self.agents)
-        return self.tasks
-
-    async def async_do(self, inputs: bytes) -> List[Task]:
-        await self.arun_admin(inputs, self.agents)
-        return self.tasks

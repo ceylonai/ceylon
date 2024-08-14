@@ -8,7 +8,7 @@ from pydantic import Field
 
 
 class SubTask(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid4()), alias='_id')
+    id: str = Field(default_factory=lambda: str(uuid4()))
     parent_task_id: Optional[str] = Field(default=None)
     name: str = Field(description="the name of the subtask write in snake_case")
     description: str = Field(description="the description of the subtask, Explains the task in detail")
@@ -31,7 +31,7 @@ class SubTask(BaseModel):
 
 
 class Task(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid4()), alias='_id')
+    id: str = Field(default_factory=lambda: str(uuid4()))
     name: str
     description: str
     subtasks: Dict[str, SubTask] = Field(default_factory=dict)
@@ -128,7 +128,7 @@ class Task(BaseModel):
         return self.sub_tasks[-1].result
 
     def __str__(self):
-        return f"Task: {self.name}\nSubtasks:\n" + "\n".join(str(st) for st in self.subtasks)
+        return f"Task: {self.name}\nSubtasks:\n" + "\n".join(f"\t{st}" for st in self.subtasks)
 
     @staticmethod
     def create_task(name: str, description: str, subtasks: List[SubTask] = None) -> 'Task':

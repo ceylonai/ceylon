@@ -1,6 +1,6 @@
 from langchain_community.chat_models import ChatOllama
 
-from ceylon.llm import SpecializedAgent, TaskManager
+from ceylon.llm import LLMTaskAgent, LLMTaskManager
 from ceylon.task import Task, SubTask
 
 # Example usage
@@ -40,7 +40,7 @@ if __name__ == "__main__":
     llm = ChatOllama(model="llama3.1:latest", temperature=0)
     # Create specialized agents
     agents = [
-        SpecializedAgent(
+        LLMTaskAgent(
             name="backend",
             role="Backend Developer",
             context="Knowledge about backend tools",
@@ -49,7 +49,7 @@ if __name__ == "__main__":
             llm=llm
         ),
 
-        SpecializedAgent(
+        LLMTaskAgent(
             name="frontend",
             role="Frontend Developer",
             context="Knowledge about frontend tools",
@@ -58,7 +58,7 @@ if __name__ == "__main__":
             llm=llm
         ),
 
-        SpecializedAgent(
+        LLMTaskAgent(
             name="database",
             role="Database Administrator",
             context="Knowledge about database management tools",
@@ -67,7 +67,7 @@ if __name__ == "__main__":
             llm=llm
         ),
 
-        SpecializedAgent(
+        LLMTaskAgent(
             name="deployment",
             role="Deployment Manager",
             context="Knowledge about deployment tools and CI tools",
@@ -76,7 +76,7 @@ if __name__ == "__main__":
             llm=llm
         ),
 
-        SpecializedAgent(
+        LLMTaskAgent(
             name="qa",
             role="Quality Assurance Engineer",
             context="Knowledge about testing tools",
@@ -85,7 +85,7 @@ if __name__ == "__main__":
             llm=llm
         ),
 
-        SpecializedAgent(
+        LLMTaskAgent(
             name="delivery",
             role="Delivery Manager",
             context="Knowledge about delivery tools",
@@ -95,5 +95,5 @@ if __name__ == "__main__":
         )
 
     ]
-    task_manager = TaskManager(tasks, agents, tool_llm=llm)
+    task_manager = LLMTaskManager(tasks, agents, tool_llm=llm)
     task_manager.run_admin(inputs=b"", workers=agents)
