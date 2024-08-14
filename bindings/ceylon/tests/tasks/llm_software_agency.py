@@ -1,5 +1,6 @@
 from langchain_community.chat_models import ChatOllama
 from langchain_experimental.llms.ollama_functions import OllamaFunctions
+from langchain_openai import ChatOpenAI
 
 from ceylon.llm import LLMTaskOperator, LLMTaskCoordinator
 from ceylon.task import Task
@@ -8,18 +9,19 @@ from ceylon.task import Task
 task_management_app = Task(
     name="Create Task Management App",
     description="Develop a simple task management application with features for adding, listing, and completing tasks."
+                " no need to use DB. only UI base output is enough"
 )
 
 tasks = [task_management_app]
 
 # Initialize language models
 
-# llm = ChatOpenAI(model="gpt-4o-mini")
-# tool_llm = ChatOpenAI(model="gpt-4o-mini")
-# code_llm = ChatOpenAI(model="gpt-4o-mini")
-llm = ChatOllama(model="llama3.1:latest")
-tool_llm = OllamaFunctions(model="llama3.1:latest", format="json")
-code_llm = ChatOllama(model="codestral:latest")
+llm = ChatOpenAI(model="gpt-4o-mini")
+tool_llm = ChatOpenAI(model="gpt-4o-mini")
+code_llm = ChatOpenAI(model="gpt-4o-mini")
+# llm = ChatOllama(model="llama3.1:latest")
+# tool_llm = OllamaFunctions(model="llama3.1:latest", format="json")
+# code_llm = ChatOllama(model="codestral:latest")
 
 # Create specialized agents
 agents = [
