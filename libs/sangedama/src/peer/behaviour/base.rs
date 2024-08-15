@@ -22,6 +22,7 @@ pub fn create_gossip_sub_config() -> Config {
     gossipsub::ConfigBuilder::default()
         .history_length(10)
         .history_gossip(10)
+        .max_transmit_size(1024 * 1024 * 10)
         .heartbeat_interval(Duration::from_secs(1)) // This is set to aid debugging by not cluttering the log space
         .validation_mode(gossipsub::ValidationMode::Strict) // This sets the kind of message validation. The default is Strict (enforce message signing)
         .message_id_fn(message_id_fn) // content-address messages. No two messages of the same content will be propagated.
