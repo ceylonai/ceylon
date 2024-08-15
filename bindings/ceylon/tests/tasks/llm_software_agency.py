@@ -6,7 +6,8 @@ from ceylon.task import Task
 # Define the main task
 task_management_app = Task(
     name="Create Task Management App",
-    description="Develop a simple task management application with features for adding, listing, and completing tasks."
+    description="Develop a advanced task management application with features for adding, "
+                "listing, and completing tasks. and with priority from list.also need to download list of tasks by date.and need to check finished tasks"
                 " no need to use DB. only UI base output is enough"
 )
 
@@ -14,9 +15,9 @@ tasks = [task_management_app]
 
 # Initialize language models
 
-llm = ChatOpenAI(model="gpt-4o-mini")
-tool_llm = ChatOpenAI(model="gpt-4o-mini")
-code_llm = ChatOpenAI(model="gpt-4o-mini")
+llm = ChatOpenAI(model="gpt-4o")
+tool_llm = ChatOpenAI(model="gpt-4o")
+code_llm = ChatOpenAI(model="gpt-4o")
 
 # Create specialized agents
 agents = [
@@ -48,7 +49,7 @@ agents = [
         llm=code_llm
     ),
 ]
-
+# enable_log("DEBUG")
 # Initialize TaskManager
 task_manager = LLMTaskCoordinator(tasks, agents, tool_llm=tool_llm, llm=llm)
 
