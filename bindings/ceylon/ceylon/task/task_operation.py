@@ -41,9 +41,6 @@ class Task(BaseModel):
 
     def add_subtask(self, subtask: SubTask):
         subtask.parent_task_id = self.id
-        if subtask.name in self.subtasks:
-            raise ValueError(f"Subtask with id {subtask.name} already exists")
-
         self.subtasks[subtask.name] = subtask
         self._validate_dependencies()
         self.execution_order = self.get_execution_order()

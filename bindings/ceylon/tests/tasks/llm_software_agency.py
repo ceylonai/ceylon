@@ -52,7 +52,7 @@ agents = [
     ),
     AgentMonitor()
 ]
-# enable_log("DEBUG")
+# enable_log("INFO")
 # Initialize TaskManager
 task_manager = LLMTaskCoordinator(tasks, agents, tool_llm=tool_llm, llm=llm)
 

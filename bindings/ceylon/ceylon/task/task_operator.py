@@ -10,6 +10,8 @@ from ceylon.task.task_operation import TaskResultStatus
 
 
 class TaskOperator(Agent, abc.ABC):
+    agent_type = "TASK_OPERATOR"
+
     def __init__(self, name: str, role: str, workspace_id: str = DEFAULT_WORKSPACE_ID,
                  admin_port: int = DEFAULT_ADMIN_PORT, *args,
                  **kwargs):
