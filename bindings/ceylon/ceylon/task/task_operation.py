@@ -1,4 +1,5 @@
 import datetime
+import enum
 from typing import List, Optional, Tuple, Set, Dict
 from uuid import uuid4
 
@@ -144,6 +145,12 @@ class TaskAssignment(BaseModel):
     assigned_agent: str
 
 
+class TaskResultStatus(enum.Enum):
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
+
 class TaskResult(BaseModel):
     task_id: str
     parent_task_id: str
@@ -151,6 +158,7 @@ class TaskResult(BaseModel):
     result: str
     name: str
     description: str
+    status: TaskResultStatus
 
 
 if __name__ == "__main__":

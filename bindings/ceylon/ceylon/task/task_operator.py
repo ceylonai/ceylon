@@ -6,6 +6,7 @@ from loguru import logger
 from ceylon import Agent, on_message
 from ceylon.static_val import DEFAULT_WORKSPACE_ID, DEFAULT_ADMIN_PORT
 from ceylon.task import TaskAssignment, TaskResult
+from ceylon.task.task_operation import TaskResultStatus
 
 
 class TaskOperator(Agent, abc.ABC):
@@ -21,17 +22,35 @@ class TaskOperator(Agent, abc.ABC):
     async def on_task_assignment(self, data: TaskAssignment):
         if data.assigned_agent == self.details().name and data.task.id not in self.exeuction_history:
             self.exeuction_history.append(data.task.id)
-            logger.info(f"{self.details().name} received subtask: {data.task.description}")
-            result = await self.get_result(data.task)
+            status = TaskResultStatus.IN_PROGRESS
+            result = None
+            try:
+                logger.info(f"{self.details().name} received subtask: {data.task.description}")
+                result = await self.get_result(data.task)
+                status = TaskResultStatus.COMPLETED
+                logger.info(f"{self.details().name} completed subtask: {data.task.description}")
+            except Exception as e:
+                logger.info(f"{self.details().name} failed subtask: {data.task.description}")
+                for idx, task in enumerate(self.exeuction_history):
+                    if task == data.task.id:
+                        del self.exeuction_history[idx]
+                        break
+                logger.exception(e)
+                result = str(e)
+                status = TaskResultStatus.FAILED
+
             result_task = TaskResult(task_id=data.task.id,
                                      name=data.task.name,
                                      description=data.task.description,
                                      agent=self.details().name,
                                      parent_task_id=data.task.parent_task_id,
-                                     result=result)
+                                     result=result,
+                                     status=status)
             # Update task history
-            await self.add_result_to_history(result_task)
+            if status == TaskResultStatus.COMPLETED:
+                await self.add_result_to_history(result_task)
             await self.broadcast_data(result_task)
+            logger.info(f"{self.details().name} sent subtask result: {data.task.description}")
 
     @on_message(type=TaskResult)
     async def on_task_result(self, data: TaskResult):
