@@ -2,6 +2,7 @@ from langchain_openai import ChatOpenAI
 
 from ceylon.llm import LLMTaskOperator, LLMTaskCoordinator
 from ceylon.task import Task
+from ceylon.utils.agent_monitor import AgentMonitor
 
 # Define the main task
 task_management_app = Task(
@@ -48,6 +49,7 @@ agents = [
         tools=[],
         llm=code_llm
     ),
+    AgentMonitor()
 ]
 # enable_log("DEBUG")
 # Initialize TaskManager

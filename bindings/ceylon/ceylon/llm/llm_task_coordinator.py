@@ -5,6 +5,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 
 from ceylon.llm.llm_task_operator import LLMTaskOperator
+from ceylon.static_val import DEFAULT_WORKSPACE_ID, DEFAULT_ADMIN_PORT
 from ceylon.task import TaskResult, Task, SubTask
 from ceylon.task.task_coordinator import TaskCoordinator
 
@@ -36,12 +37,13 @@ class LLMTaskCoordinator(TaskCoordinator):
     agents: List[LLMTaskOperator] = []
     results: Dict[str, List[TaskResult]] = {}
 
-    def __init__(self, tasks: List[Task], agents: List[LLMTaskOperator], llm=None, tool_llm=None):
+    def __init__(self, tasks: List[Task], agents: List[LLMTaskOperator], llm=None, tool_llm=None,
+                 name=DEFAULT_WORKSPACE_ID, port=DEFAULT_ADMIN_PORT):
         self.llm = llm
         self.tool_llm = tool_llm
         self.tasks = tasks
         self.agents = agents
-        super().__init__(name="openai_task_management", port=8000, tasks=tasks, agents=agents)
+        super().__init__(name=name, port=port, tasks=tasks, agents=agents)
 
     async def get_task_executor(self, task: SubTask) -> str:
         return await self.get_best_agent_for_subtask(task)
@@ -62,9 +64,18 @@ class LLMTaskCoordinator(TaskCoordinator):
             task.add_subtask(final_sub_task)
         return task
 
+    @property
+    def get_llm_operators(self) -> List[LLMTaskOperator]:
+        operators = []
+        for agent in self.agents:
+            if isinstance(agent, LLMTaskOperator):
+                operators.append(agent)
+
+        return operators
+
     async def get_best_agent_for_subtask(self, subtask: SubTask) -> str:
         agent_specialties = "\n".join(
-            [f"{agent.details().name}: {agent.details().role} {agent.context}" for agent in self.agents])
+            [f"{agent.details().name}: {agent.details().role} {agent.context}" for agent in self.get_llm_operators])
 
         prompt_template = ChatPromptTemplate.from_template(
             """

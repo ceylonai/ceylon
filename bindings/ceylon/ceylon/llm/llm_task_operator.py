@@ -14,7 +14,9 @@ from ceylon.task.task_operator import TaskOperator
 
 class LLMTaskOperator(TaskOperator):
     def __init__(self, name: str, role: str, context: str, skills: List[str],
-                 tools: List[Any] = None, llm=None, tool_llm=None, verbose=False):
+                 tools: List[Any] = None, llm=None, tool_llm=None, verbose=False,
+                 workspace_id="ceylon_agent_stack",
+                 admin_port=8888, ):
         self.context = context
         self.verbose = verbose
         self.tools = tools if tools else []
@@ -23,7 +25,7 @@ class LLMTaskOperator(TaskOperator):
         self.llm = copy.copy(llm)
         self.tool_llm = copy.copy(tool_llm)
         self.history: Dict[str, List[TaskResult]] = {}
-        super().__init__(name=name, role=role, workspace_id="openai_task_management", admin_port=8000)
+        super().__init__(name=name, role=role, workspace_id=workspace_id, admin_port=admin_port)
 
     async def get_result(self, task):
         return await self.get_llm_response(task)
