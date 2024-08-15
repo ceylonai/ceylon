@@ -6,7 +6,7 @@ on:
       - main
       - master
       - devops
-      - master-update-release
+      - release
     tags:
       - '*'
 
@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   linux:
-#    if: "startsWith(github.ref, 'refs/tags/')"
+    if: "startsWith(github.ref, 'refs/tags/')"
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -49,7 +49,7 @@ jobs:
           path: bindings/ceylon/dist
 
   windows:
-#    if: "startsWith(github.ref, 'refs/tags/')"
+    if: "startsWith(github.ref, 'refs/tags/')"
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -81,7 +81,7 @@ jobs:
           path: bindings/ceylon/dist
 
   macos:
-#    if: "startsWith(github.ref, 'refs/tags/')"
+    if: "startsWith(github.ref, 'refs/tags/')"
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
