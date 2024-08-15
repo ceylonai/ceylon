@@ -1,5 +1,6 @@
 from langchain_openai import ChatOpenAI
 
+from ceylon.ceylon import enable_log
 from ceylon.llm import LLMTaskOperator, LLMTaskCoordinator
 from ceylon.task import Task
 from ceylon.utils.agent_monitor import AgentMonitor
@@ -16,9 +17,9 @@ tasks = [task_management_app]
 
 # Initialize language models
 
-llm = ChatOpenAI(model="gpt-4o")
-tool_llm = ChatOpenAI(model="gpt-4o")
-code_llm = ChatOpenAI(model="gpt-4o")
+llm = ChatOpenAI(model="gpt-4o-mini")
+tool_llm = ChatOpenAI(model="gpt-4o-mini")
+code_llm = ChatOpenAI(model="gpt-4o-mini")
 
 # Create specialized agents
 agents = [

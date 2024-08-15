@@ -5,6 +5,7 @@ from loguru import logger
 from ceylon import CoreAdmin, on_message
 from ceylon.ceylon import AgentDetail
 from ceylon.task import Task, TaskResult, TaskAssignment, SubTask
+from ceylon.task.task_operation import TaskResultStatus
 from ceylon.task.task_operator import TaskOperator
 
 
@@ -55,16 +56,19 @@ class TaskCoordinator(CoreAdmin):
 
     @on_message(type=TaskResult)
     async def on_task_result(self, result: TaskResult):
-        for idx, task in enumerate(self.tasks):
-            sub_task = task.get_next_subtask()
-            if sub_task is None or result.task_id != sub_task[1].id:
-                continue
-            if result.task_id == sub_task[1].id:
-                task.update_subtask_status(sub_task[1].name, result.result)
-                break
+        print(f"Received task result: {result}")
+        if result.status == TaskResultStatus.COMPLETED:
+            for idx, task in enumerate(self.tasks):
+                sub_task = task.get_next_subtask()
+                print(result.task_id, sub_task[1].id, result.task_id == sub_task[1].id)
+                if sub_task is None or result.task_id != sub_task[1].id:
+                    continue
+                if result.task_id == sub_task[1].id:
+                    task.update_subtask_status(sub_task[1].name, result.result)
+                    break
 
-        if self.all_tasks_completed():
-            await self.end_task_management()
+            if self.all_tasks_completed():
+                await self.end_task_management()
 
         await self.run_tasks()
 
