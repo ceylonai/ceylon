@@ -1,0 +1,2 @@
+DEFAULT_WORKSPACE_ID = "ceylon_agent_stack"
+DEFAULT_ADMIN_PORT = 8888

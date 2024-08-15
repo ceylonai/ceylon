@@ -6,11 +6,13 @@ from ceylon.ceylon import WorkerAgent, WorkerAgentConfig, Processor, \
     MessageHandler, EventHandler
 
 from ceylon.ceylon.ceylon import uniffi_set_event_loop
+from ceylon.static_val import DEFAULT_ADMIN_PORT, DEFAULT_WORKSPACE_ID
 
 
 class Worker(WorkerAgent, Processor, MessageHandler, EventHandler):
 
-    def __init__(self, name="admin", workspace_id="admin", admin_peer="", admin_port=8888, role="worker",
+    def __init__(self, name="admin", workspace_id=DEFAULT_WORKSPACE_ID, admin_peer="", admin_port=DEFAULT_ADMIN_PORT,
+                 role="worker",
                  admin_ip="127.0.0.1"):
         super().__init__(config=WorkerAgentConfig(name=name,
                                                   role=role,

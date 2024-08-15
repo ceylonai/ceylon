@@ -11,7 +11,7 @@ from ceylon.core.worker import Worker
 
 from loguru import logger
 
-workspace_id = "llm_unit"
+workspace_id = "ceylon_agent_stack"
 admin_port = 8888
 admin_peer = "admin"
 

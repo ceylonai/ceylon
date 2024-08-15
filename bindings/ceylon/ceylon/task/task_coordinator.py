@@ -13,7 +13,7 @@ class TaskCoordinator(CoreAdmin):
     agents: List[TaskOperator] = []
     results: Dict[str, List[TaskResult]] = {}
 
-    def __init__(self, tasks: List[Task], agents: List[TaskOperator], name="task_management", port=8000, *args,
+    def __init__(self, tasks: List[Task], agents: List[TaskOperator], name="ceylon_agent_stack", port=8888, *args,
                  **kwargs):
         self.tasks = tasks
         self.agents = agents

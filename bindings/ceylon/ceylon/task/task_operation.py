@@ -128,7 +128,7 @@ class Task(BaseModel):
         return self.sub_tasks[-1].result
 
     def __str__(self):
-        return f"Task: {self.name}\nSubtasks:\n" + "\n".join(f"\t{st}" for st in self.subtasks)
+        return f"Task: {self.name}\nSubtasks:\n" + "\n".join(f"\t{st}" for st in self.subtasks.values())
 
     @staticmethod
     def create_task(name: str, description: str, subtasks: List[SubTask] = None) -> 'Task':
