@@ -4,6 +4,7 @@ from ceylon.static_val import DEFAULT_WORKSPACE_ID, DEFAULT_ADMIN_PORT
 
 
 class Agent(Worker, AgentCommon):
+    agent_type = "AGENT"
     history_responses = []
 
     def __init__(self, name="admin",

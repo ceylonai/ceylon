@@ -10,6 +10,7 @@ from ceylon.static_val import DEFAULT_ADMIN_PORT, DEFAULT_WORKSPACE_ID
 
 
 class Worker(WorkerAgent, Processor, MessageHandler, EventHandler):
+    agent_type = "WORKER"
 
     def __init__(self, name="admin", workspace_id=DEFAULT_WORKSPACE_ID, admin_peer="", admin_port=DEFAULT_ADMIN_PORT,
                  role="worker",

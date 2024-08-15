@@ -3,6 +3,7 @@ from typing import Dict, List, Set
 import pydantic.v1
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
+from loguru import logger
 
 from ceylon.llm.llm_task_operator import LLMTaskOperator
 from ceylon.static_val import DEFAULT_WORKSPACE_ID, DEFAULT_ADMIN_PORT
@@ -43,6 +44,7 @@ class LLMTaskCoordinator(TaskCoordinator):
         self.tool_llm = tool_llm
         self.tasks = tasks
         self.agents = agents
+        logger.info(f"LLM Task Coordinator initialized with {len(tasks)} tasks and {len(self.get_llm_operators)} agents {[agent for agent in self.get_llm_operators]}")
         super().__init__(name=name, port=port, tasks=tasks, agents=agents)
 
     async def get_task_executor(self, task: SubTask) -> str:
@@ -68,7 +70,8 @@ class LLMTaskCoordinator(TaskCoordinator):
     def get_llm_operators(self) -> List[LLMTaskOperator]:
         operators = []
         for agent in self.agents:
-            if isinstance(agent, LLMTaskOperator):
+            if isinstance(agent, LLMTaskOperator) and hasattr(agent,
+                                                              "agent_type") and agent.agent_type == LLMTaskOperator.agent_type:
                 operators.append(agent)
 
         return operators

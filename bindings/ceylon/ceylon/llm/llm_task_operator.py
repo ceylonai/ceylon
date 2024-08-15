@@ -13,6 +13,9 @@ from ceylon.task.task_operator import TaskOperator
 
 
 class LLMTaskOperator(TaskOperator):
+    """LLM-based task operator."""
+    agent_type = "LLM_TASK_OPERATOR"
+
     def __init__(self, name: str, role: str, context: str, skills: List[str],
                  tools: List[Any] = None, llm=None, tool_llm=None, verbose=False,
                  workspace_id="ceylon_agent_stack",
