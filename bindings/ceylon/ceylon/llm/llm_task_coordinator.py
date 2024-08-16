@@ -40,15 +40,22 @@ class LLMTaskCoordinator(TaskCoordinator):
     results: Dict[str, List[TaskResult]] = {}
     team_network: nx.Graph = nx.Graph()
 
-    def __init__(self, tasks: List[Task], agents: List[LLMTaskOperator], llm=None, tool_llm=None,
-                 name=DEFAULT_WORKSPACE_ID, port=DEFAULT_ADMIN_PORT):
+    def __init__(self, tasks: List[Task], agents: List[LLMTaskOperator],
+                 context: str,
+                 team_goal: str,
+
+                 llm=None, tool_llm=None,
+                 name=DEFAULT_WORKSPACE_ID,
+                 port=DEFAULT_ADMIN_PORT):
+        self.context = context
+        self.team_goal = team_goal
         self.llm = llm
         self.tool_llm = tool_llm
         self.tasks = tasks
         self.agents = agents
         self.initialize_team_network()
         logger.info(
-            f"LLM Task Coordinator initialized with {len(tasks)} tasks and {len(self.get_llm_operators)} agents {[agent for agent in self.get_llm_operators]}")
+            f"LLM Task Coordinator initialized with {len(tasks)} tasks and {len(self.get_llm_operators)} agents {[agent.details().name for agent in self.get_llm_operators]}")
         super().__init__(name=name, port=port, tasks=tasks, agents=agents)
 
     def initialize_team_network(self):
@@ -115,23 +122,6 @@ class LLMTaskCoordinator(TaskCoordinator):
     async def get_task_executor(self, task: SubTask) -> str:
         return await self.get_best_agent_for_subtask(task)
 
-    async def update_task(self, idx: int, task: Task):
-        if len(task.subtasks) == 0:
-            sub_tasks = await self.generate_tasks_from_description(task)
-            for sub_task in sub_tasks:
-                task.add_subtask(sub_task)
-
-            # depends_on = [sub_task.name for sub_task in sub_tasks]
-            # final_sub_task = SubTask(
-            #     name="Generate Final Answer",
-            #     description=f"Based on all previous sub-tasks, provide a comprehensive final answer to the main task: {task.description}",
-            #     required_specialty="Synthesize information and generate conclusive answers",
-            #     depends_on=depends_on,
-            # )
-            final_sub_task = await self.generate_final_sub_task_from_description(task)
-            task.add_subtask(final_sub_task)
-        return task
-
     @property
     def get_llm_operators(self) -> List[LLMTaskOperator]:
         operators = []
@@ -186,13 +176,13 @@ class LLMTaskCoordinator(TaskCoordinator):
         return get_valid_agent_name()
 
     async def generate_tasks_from_description(self, task: Task) -> List[SubTask]:
-
-        # Prompt template
         prompt = PromptTemplate.from_template(
             """
-            Given the following job description, break it down into a main task and 3-5 key subtasks. Each subtask should have a specific description and required specialty.
+            Given the following job description, context, and team goal, break it down into a main task and 3-5 key subtasks. Each subtask should have a specific description and required specialty.
 
             Job Description: {description}
+            Context: {context}
+            Team Goal: {team_goal}
 
             Respond with the tasks and their subtasks in the following format:
 
@@ -205,6 +195,7 @@ class LLMTaskCoordinator(TaskCoordinator):
             (Add up to 2 more subtasks if necessary)
 
             Additional Considerations:
+            - Ensure the subtasks align with the given context and contribute to the team goal
             - Prioritize the subtasks in order of importance or chronological sequence
             - Ensure each subtask is distinct and contributes uniquely to the main task
             - Use clear, action-oriented language for each description
@@ -212,48 +203,50 @@ class LLMTaskCoordinator(TaskCoordinator):
             """
         )
 
-        # Chain
         structured_llm = self.tool_llm.with_structured_output(SubTaskList)
         chain = prompt | structured_llm
         sub_task_list = chain.invoke(input={
-            "description": task.description
+            "description": task.description,
+            "context": self.context,
+            "team_goal": self.team_goal
         })
-        # Make sure subtasks are valid
         sub_task_list = self.recheck_and_update_subtasks(subtasks=sub_task_list)
         return [t.to_v2(task.id) for t in sub_task_list.sub_task_list]
 
     async def generate_final_sub_task_from_description(self, task: Task) -> SubTask:
-
-        # Prompt template
         prompt = PromptTemplate.from_template(
             """
-                Given the following job description and existing subtasks, add a final delivery step to complete the project.
-                 This final step should focus on  delivering the completed work.
+            Given the following job description, existing subtasks, context, and team goal, add a final delivery step to complete the project.
+            This final step should focus on delivering the completed work and ensuring it aligns with the team goal.
 
-                Job Description: {description}
+            Job Description: {description}
+            Context: {context}
+            Team Goal: {team_goal}
 
-                Existing Subtasks:
-                {existing_subtasks}
+            Existing Subtasks:
+            {existing_subtasks}
 
-                Respond with only the final delivery step in the following format:
+            Respond with only the final delivery step in the following format:
 
-                Final Step:
-                <Specific description of the final delivery step> - Specialty: <Required specialty or skill> - Depends on: <Names of subtasks that must be completed before this one>
+            Final Step:
+            <Specific description of the final delivery step> - Specialty: <Required specialty or skill> - Depends on: <Names of subtasks that must be completed before this one>
 
-                Additional Considerations:
-                - Ensure the final step encompasses presenting or delivering the completed work
-                - Use clear, action-oriented language for the description
-                - Include dependencies on relevant existing subtasks
-                - Focus on delivering the functionality and value of the completed project
-                """
+            Additional Considerations:
+            - Ensure the final step encompasses presenting or delivering the completed work
+            - Make sure the final step aligns with the context and contributes to the team goal
+            - Use clear, action-oriented language for the description
+            - Include dependencies on relevant existing subtasks
+            - Focus on delivering the functionality and value of the completed project
+            """
         )
 
-        # Chain
         structured_llm = self.tool_llm.with_structured_output(SubTaskModel)
         chain = prompt | structured_llm
         sub_task: SubTaskModel = chain.invoke(input={
             "description": task.description,
-            "existing_subtasks": "\n".join([f"{t.name}- {t.description}" for t in task.subtasks.values()])
+            "existing_subtasks": "\n".join([f"{t.name}- {t.description}" for t in task.subtasks.values()]),
+            "context": self.context,
+            "team_goal": self.team_goal
         })
         return sub_task.to_v2(task.id)
 

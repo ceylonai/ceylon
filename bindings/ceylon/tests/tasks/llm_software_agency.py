@@ -55,8 +55,11 @@ agents = [
 ]
 # enable_log("INFO")
 # Initialize TaskManager
-task_manager = LLMTaskCoordinator(tasks, agents, tool_llm=tool_llm, llm=llm)
-
+task_manager = LLMTaskCoordinator(tasks, agents, tool_llm=tool_llm, llm=llm,
+                                  team_goal="Develop and deliver innovative, secure, and scalable software solutions that drive business value, achieve 95% client satisfaction, and are completed on time and within budget",
+                                  context="Utilize agile methodologies to gather and analyze client requirements, architect robust solutions, implement clean and efficient code, conduct thorough testing (including unit, integration, and user acceptance), and deploy using CI/CD practices. Emphasize code quality, performance optimization, and adherence to industry standards throughout the development lifecycle.",
+                                  )
+# task_manager.visualize_team_network(output_file=None)
 # Execute tasks
 completed_tasks = asyncio.run(task_manager.async_do(inputs=b""))
 
