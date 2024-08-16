@@ -1,5 +1,6 @@
 from typing import Dict, List, Set
 
+import networkx as nx
 import pydantic.v1
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
@@ -37,6 +38,7 @@ class LLMTaskCoordinator(TaskCoordinator):
     tasks: List[Task] = []
     agents: List[LLMTaskOperator] = []
     results: Dict[str, List[TaskResult]] = {}
+    team_network: nx.Graph = nx.Graph()
 
     def __init__(self, tasks: List[Task], agents: List[LLMTaskOperator], llm=None, tool_llm=None,
                  name=DEFAULT_WORKSPACE_ID, port=DEFAULT_ADMIN_PORT):
@@ -44,9 +46,71 @@ class LLMTaskCoordinator(TaskCoordinator):
         self.tool_llm = tool_llm
         self.tasks = tasks
         self.agents = agents
+        self.initialize_team_network()
         logger.info(
             f"LLM Task Coordinator initialized with {len(tasks)} tasks and {len(self.get_llm_operators)} agents {[agent for agent in self.get_llm_operators]}")
         super().__init__(name=name, port=port, tasks=tasks, agents=agents)
+
+    def initialize_team_network(self):
+        for agent in self.get_llm_operators:
+            self.team_network.add_node(agent.details().name, role=agent.details().role)
+
+    async def update_task(self, idx: int, task: Task):
+        if len(task.subtasks) == 0:
+            sub_tasks = await self.generate_tasks_from_description(task)
+            for sub_task in sub_tasks:
+                task.add_subtask(sub_task)
+
+            final_sub_task = await self.generate_final_sub_task_from_description(task)
+            task.add_subtask(final_sub_task)
+
+        await self.update_team_network(task)
+        return task
+
+    async def update_team_network(self, task: Task):
+        for subtask in task.subtasks.values():
+            agent_name = await self.get_best_agent_for_subtask(subtask)
+            for dependency in subtask.depends_on:
+                dependency_agent = await self.get_best_agent_for_subtask(task.subtasks[dependency])
+                self.team_network.add_edge(agent_name, dependency_agent, task=task.id, subtask=subtask.name)
+
+    async def analyze_team_dynamics(self) -> str:
+        prompt = PromptTemplate.from_template(
+            """
+            Analyze the following team network and provide insights on team dynamics:
+
+            Nodes (Agents): {nodes}
+            Edges (Collaborations): {edges}
+
+            Please provide a brief analysis covering:
+            1. Key collaborators
+            2. Potential bottlenecks
+            3. Suggestions for improving team efficiency
+
+            Respond in a concise paragraph.
+            """
+        )
+
+        nodes = [f"{node}: {data}" for node, data in self.team_network.nodes(data=True)]
+        edges = [f"{u} - {v}: {data}" for u, v, data in self.team_network.edges(data=True)]
+
+        chain = prompt | self.llm | StrOutputParser()
+        analysis = chain.invoke({"nodes": nodes, "edges": edges})
+        return analysis
+
+    def visualize_team_network(self, output_file: str = None):
+        import matplotlib.pyplot as plt
+        plt.figure(figsize=(12, 8))
+        pos = nx.spring_layout(self.team_network)
+        nx.draw(self.team_network, pos, with_labels=True, node_color='lightblue', node_size=1000, font_size=8)
+        edge_labels = nx.get_edge_attributes(self.team_network, 'task')
+        nx.draw_networkx_edge_labels(self.team_network, pos, edge_labels=edge_labels)
+        if output_file is not None:
+            plt.title("Team Collaboration Network")
+            plt.savefig(output_file)
+            plt.close()
+        else:
+            plt.show()
 
     async def get_task_executor(self, task: SubTask) -> str:
         return await self.get_best_agent_for_subtask(task)
