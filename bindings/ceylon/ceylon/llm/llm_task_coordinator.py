@@ -85,9 +85,9 @@ class LLMTaskCoordinator(TaskCoordinator):
             self.team_network.add_node(agent.details().name, role=agent.details().role)
 
     async def update_task(self, idx: int, task: Task):
-
-        task_deliverable = await self.build_task_deliverable(task)
-        task.set_deliverable(task_deliverable)
+        if task.task_deliverable is None:
+            task_deliverable = await self.build_task_deliverable(task)
+            task.set_deliverable(task_deliverable)
 
         if len(task.subtasks) == 0:
             sub_tasks = await self.generate_tasks_from_description(task)
