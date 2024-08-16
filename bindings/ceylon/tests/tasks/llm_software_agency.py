@@ -1,4 +1,5 @@
 import asyncio
+from textwrap import dedent
 
 from langchain_openai import ChatOpenAI
 
@@ -9,9 +10,11 @@ from ceylon.utils.agent_monitor import AgentMonitor
 # Define the main task
 task_management_app = Task(
     name="Create Task Management App",
-    description="Develop a advanced task management application with features for adding, "
-                "listing, and completing tasks. and with priority from list.also need to download list of tasks by date.and need to check finished tasks"
-                " no need to use DB. only UI base output is enough"
+    description=dedent("""
+    Develop a advanced task management application with features for adding,  listing, and completing tasks. 
+    and with priority from list.also need to download list of tasks by date.and need to check finished tasks 
+     no need to use DB. only UI base output is enough. final output must be python script.
+    """)
 )
 
 tasks = [task_management_app]
@@ -30,10 +33,6 @@ agents = [
         context="Experienced in developing backend systems, API design, and database integration.",
         skills=[
             "Python Programming",
-            "API Development",
-            "Database Design",
-            "Backend Architecture",
-            "Data Modeling"
         ],
         tools=[],
         llm=code_llm
@@ -45,8 +44,7 @@ agents = [
         skills=[
             "UI Design",
             "User Experience",
-            "Frontend Development",
-            "Python GUI Frameworks"
+            "Python GUI Frameworks like Tkinter",
         ],
         tools=[],
         llm=code_llm
@@ -56,8 +54,19 @@ agents = [
 # enable_log("INFO")
 # Initialize TaskManager
 task_manager = LLMTaskCoordinator(tasks, agents, tool_llm=tool_llm, llm=llm,
-                                  team_goal="Develop and deliver innovative, secure, and scalable software solutions that drive business value, achieve 95% client satisfaction, and are completed on time and within budget",
-                                  context="Utilize agile methodologies to gather and analyze client requirements, architect robust solutions, implement clean and efficient code, conduct thorough testing (including unit, integration, and user acceptance), and deploy using CI/CD practices. Emphasize code quality, performance optimization, and adherence to industry standards throughout the development lifecycle.",
+                                  team_goal=dedent("""
+                                  Develop and deliver straightforward, secure, and efficient Python-based 
+                                  software solutions that provide clear business value, 
+                                  achieve 95% client satisfaction, and are completed on time and within budget
+                                  """),
+                                  context=dedent("""
+                                  Employ agile methodologies to gather and analyze client requirements, design simple yet 
+                                  robust solutions, implement clean and readable Python code, conduct thorough testing,
+                                   and deploy using streamlined CI/CD practices. Prioritize code simplicity, 
+                                  maintainability, and adherence to Python best practices 
+                                  throughout the development lifecycle, following the principle that
+                                   'simple is better than complex'.
+                                  """),
                                   )
 # task_manager.visualize_team_network(output_file=None)
 # Execute tasks
