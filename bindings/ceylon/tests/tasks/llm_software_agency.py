@@ -1,6 +1,7 @@
+import asyncio
+
 from langchain_openai import ChatOpenAI
 
-from ceylon.ceylon import enable_log
 from ceylon.llm import LLMTaskOperator, LLMTaskCoordinator
 from ceylon.task import Task
 from ceylon.utils.agent_monitor import AgentMonitor
@@ -57,7 +58,7 @@ agents = [
 task_manager = LLMTaskCoordinator(tasks, agents, tool_llm=tool_llm, llm=llm)
 
 # Execute tasks
-completed_tasks = task_manager.do(inputs=b"")
+completed_tasks = asyncio.run(task_manager.async_do(inputs=b""))
 
 # Print results
 for task in completed_tasks:
