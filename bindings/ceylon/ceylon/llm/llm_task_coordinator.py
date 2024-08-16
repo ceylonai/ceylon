@@ -1,3 +1,4 @@
+from textwrap import dedent
 from typing import Dict, List, Set
 
 import networkx as nx
@@ -10,6 +11,27 @@ from ceylon.llm.llm_task_operator import LLMTaskOperator
 from ceylon.static_val import DEFAULT_WORKSPACE_ID, DEFAULT_ADMIN_PORT
 from ceylon.task import TaskResult, Task, SubTask
 from ceylon.task.task_coordinator import TaskCoordinator
+from ceylon.task.task_operation import TaskDeliverable
+
+
+class TaskDeliverableModel(pydantic.v1.BaseModel):
+    objectives: List[str] = pydantic.v1.Field(
+        description="the objectives of the task, Explains the task in detail",
+        default=[]
+    )
+    final_output: str = pydantic.v1.Field(
+        description="the final output of the task",
+        default="")
+    final_output_type: str = pydantic.v1.Field(
+        description="the type of the final output of the task",
+        default="")
+
+    def to_v2(self) -> TaskDeliverable:
+        return TaskDeliverable(
+            objectives=self.objectives,
+            final_output=self.final_output,
+            final_output_type=self.final_output_type
+        )
 
 
 class SubTaskModel(pydantic.v1.BaseModel):
@@ -63,6 +85,10 @@ class LLMTaskCoordinator(TaskCoordinator):
             self.team_network.add_node(agent.details().name, role=agent.details().role)
 
     async def update_task(self, idx: int, task: Task):
+
+        task_deliverable = await self.build_task_deliverable(task)
+        task.set_deliverable(task_deliverable)
+
         if len(task.subtasks) == 0:
             sub_tasks = await self.generate_tasks_from_description(task)
             for sub_task in sub_tasks:
@@ -83,7 +109,7 @@ class LLMTaskCoordinator(TaskCoordinator):
 
     async def analyze_team_dynamics(self) -> str:
         prompt = PromptTemplate.from_template(
-            """
+            dedent("""
             Analyze the following team network and provide insights on team dynamics:
 
             Nodes (Agents): {nodes}
@@ -96,7 +122,7 @@ class LLMTaskCoordinator(TaskCoordinator):
 
             Respond in a concise paragraph.
             """
-        )
+                   ))
 
         nodes = [f"{node}: {data}" for node, data in self.team_network.nodes(data=True)]
         edges = [f"{u} - {v}: {data}" for u, v, data in self.team_network.edges(data=True)]
@@ -139,15 +165,15 @@ class LLMTaskCoordinator(TaskCoordinator):
         prompt_template = ChatPromptTemplate.from_template(
             """
             Select the most suitable agent for this subtask:
-        
+
             Subtask: {subtask_description}
             Required specialty: {required_specialty}
-        
+
             Agent specialties:
             {agent_specialties}
-        
+
             Available agents: {agent_names}
-        
+
             Important: Respond ONLY with the exact name of the single most suitable agent from the available agents list.
             If no agent perfectly matches, choose the closest fit.
             """
@@ -175,114 +201,144 @@ class LLMTaskCoordinator(TaskCoordinator):
 
         return get_valid_agent_name()
 
-    async def generate_tasks_from_description(self, task: Task) -> List[SubTask]:
+    async def generate_final_sub_task_from_description(self, task: Task) -> SubTask:
         prompt = PromptTemplate.from_template(
-            """
-            Given the following job description, context, and team goal, break it down into a main task and 3-5 key subtasks. Each subtask should have a specific description and required specialty.
+            dedent("""
+                Given the following job description and existing subtasks, add a final delivery step to complete the project.
+                 This final step should focus on  delivering the completed work.
+
+                Job Description: {description}
+                Job Deliverable Data : {task_deliverable}
+
+                Existing Subtasks:
+                {existing_subtasks}
+
+                Respond with only the final delivery step in the following format:
+
+                Final Step:
+                <Specific description of the final delivery step> - Specialty: <Required specialty or skill> - Depends on: <Names of subtasks that must be completed before this one>
+
+                Additional Considerations:
+                - Ensure the final step encompasses presenting or delivering the completed work
+                - Use clear, action-oriented language for the description
+                - Include dependencies on relevant existing subtasks
+                - Focus on delivering the functionality and value of the completed project
+                """)
+        )
+
+        # Chain
+        structured_llm = self.tool_llm.with_structured_output(SubTaskModel)
+        chain = prompt | structured_llm
+        sub_task: SubTaskModel = chain.invoke(input={
+            "description": task.description,
+            "task_deliverable": task.task_deliverable,
+            "existing_subtasks": "\n".join([f"{t.name}- {t.description}" for t in task.subtasks.values()])
+        })
+        print(sub_task)
+        return sub_task.to_v2(task.id)
+
+    async def generate_tasks_from_description(self, task: Task) -> List[SubTask]:
+
+        # Prompt template
+        prompt = PromptTemplate.from_template(
+            dedent(
+                """
+            Given the following job description, break it down into a main task and 3-5 key subtasks. Each subtask should have a specific description and required specialty.
 
             Job Description: {description}
-            Context: {context}
-            Team Goal: {team_goal}
+            Job Deliverable Data : {task_deliverable}
 
             Respond with the tasks and their subtasks in the following format:
 
             Main Task: <Concise description of the overall task>
 
             Subtasks:
-            1. <Specific subtask description> - Specialty: <Required specialty or skill> - Depends on: <Subtasks name that must be completed before this one>
-            2. <Specific subtask description> - Specialty: <Required specialty or skill> - Depends on: <Subtasks name that must be completed before this one>
-            3. <Specific subtask description> - Specialty: <Required specialty or skill> - Depends on: <Subtasks name that must be completed before this one>
+            1. <Describe the first action item needed to progress towards the objective.> - Specialty: <Required specialty or skill> - Depends on: <Subtasks name that must be completed before this one>
+            2. <Describe the second action item needed to progress towards the objective.> - Specialty: <Required specialty or skill> - Depends on: <Subtasks name that must be completed before this one>
+            3. <Describe the third action item needed to progress towards the objective.> - Specialty: <Required specialty or skill> - Depends on: <Subtasks name that must be completed before this one>
             (Add up to 2 more subtasks if necessary)
 
             Additional Considerations:
-            - Ensure the subtasks align with the given context and contribute to the team goal
             - Prioritize the subtasks in order of importance or chronological sequence
             - Ensure each subtask is distinct and contributes uniquely to the main task
             - Use clear, action-oriented language for each description
             - If applicable, include any interdependencies between subtasks
-            """
+            """)
         )
 
+        # Chain
         structured_llm = self.tool_llm.with_structured_output(SubTaskList)
         chain = prompt | structured_llm
         sub_task_list = chain.invoke(input={
             "description": task.description,
-            "context": self.context,
-            "team_goal": self.team_goal
+            "metadata": task.metadata,
+            "task_deliverable": task.task_deliverable,
         })
+        # Make sure subtasks are valid
         sub_task_list = self.recheck_and_update_subtasks(subtasks=sub_task_list)
         return [t.to_v2(task.id) for t in sub_task_list.sub_task_list]
 
-    async def generate_final_sub_task_from_description(self, task: Task) -> SubTask:
-        prompt = PromptTemplate.from_template(
-            """
-            Given the following job description, existing subtasks, context, and team goal, add a final delivery step to complete the project.
-            This final step should focus on delivering the completed work and ensuring it aligns with the team goal.
-
-            Job Description: {description}
-            Context: {context}
-            Team Goal: {team_goal}
-
-            Existing Subtasks:
-            {existing_subtasks}
-
-            Respond with only the final delivery step in the following format:
-
-            Final Step:
-            <Specific description of the final delivery step> - Specialty: <Required specialty or skill> - Depends on: <Names of subtasks that must be completed before this one>
-
-            Additional Considerations:
-            - Ensure the final step encompasses presenting or delivering the completed work
-            - Make sure the final step aligns with the context and contributes to the team goal
-            - Use clear, action-oriented language for the description
-            - Include dependencies on relevant existing subtasks
-            - Focus on delivering the functionality and value of the completed project
-            """
-        )
-
-        structured_llm = self.tool_llm.with_structured_output(SubTaskModel)
-        chain = prompt | structured_llm
-        sub_task: SubTaskModel = chain.invoke(input={
-            "description": task.description,
-            "existing_subtasks": "\n".join([f"{t.name}- {t.description}" for t in task.subtasks.values()]),
-            "context": self.context,
-            "team_goal": self.team_goal
-        })
-        return sub_task.to_v2(task.id)
-
     def recheck_and_update_subtasks(self, subtasks):
-        subtask_validation_template = PromptTemplate.from_template("""
+        subtask_validation_template = PromptTemplate.from_template(
+            dedent("""
                 You are tasked with reviewing and modifying a list of SubTasks. Please process the following list of SubTasks according to these criteria:
-                
+
                 1. Name Format:
                    - Convert all SubTask names to snake_case format.
                    - Ensure each word is lowercase and separated by underscores.
                    - Example: "draftArticleOutline" should become "draft_article_outline"
-                
+
                 2. Dependency Validation:
                    - Check that all dependencies listed in the 'depends_on' field are valid SubTask names within the list.
                    - Ensure that the dependency names are also in snake_case format.
                    - Remove any dependencies that do not correspond to existing SubTask names.
-                
+
                 3. Circular Dependency Check:
                    - Verify that there are no circular dependencies among the SubTasks.
                    - A circular dependency occurs when Task A depends on Task B, and Task B directly or indirectly depends on Task A.
-                
+
                 4. Consistency:
                    - Ensure all other fields (id, parent_task_id, description, required_specialty, completed, completed_at, result) remain unchanged.
-                
+
                 5. Output Format:
                    - Return the modified list of SubTasks in the same structure as the input.
-                
+
                 Here is the list of SubTasks to process:
-                
+
                 {subtasks}
-                
+
                 Please provide the updated list of SubTasks with all the above modifications and validations applied.
-        """)
+        """))
         structured_llm = self.tool_llm.with_structured_output(SubTaskList)
         chain = subtask_validation_template | structured_llm
         sub_task_list = chain.invoke(input={
             "subtasks": subtasks
         })
         return sub_task_list
+
+    async def build_task_deliverable(self, task: Task):
+        build_task_deliverable_template = PromptTemplate.from_template(dedent("""
+        Context: {context}
+
+        Team Objectives: {objectives}
+
+        Task Description: {task_description}
+
+        Based on the given context, team objectives, and task description, please provide:
+
+        1. Clear goals for the task management application project
+        2. A list of specific deliverables
+        3. Key features to be implemented
+        4. Any considerations or constraints based on the team's objectives
+
+        Please format your response in a structured manner, using bullet points or numbered lists where appropriate.
+        """))
+
+        structured_llm = self.tool_llm.with_structured_output(TaskDeliverableModel)
+        chain = build_task_deliverable_template | structured_llm
+        task_deliverable: TaskDeliverableModel = chain.invoke(input={
+            "context": self.context,
+            "objectives": self.team_goal,
+            "task_description": task.description
+        })
+        return task_deliverable.to_v2()
