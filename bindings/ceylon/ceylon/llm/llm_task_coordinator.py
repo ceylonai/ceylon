@@ -100,7 +100,7 @@ class LLMTaskCoordinator(TaskCoordinator):
         runnable = prompt_template | self.llm | StrOutputParser()
 
         def get_valid_agent_name(max_attempts=3):
-            agent_names = [agent.details().name for agent in self.agents]
+            agent_names = [agent.details().name for agent in self.get_llm_operators]
 
             for attempt in range(max_attempts):
                 response = runnable.invoke({
