@@ -44,7 +44,8 @@ class LLMTaskCoordinator(TaskCoordinator):
         self.tool_llm = tool_llm
         self.tasks = tasks
         self.agents = agents
-        logger.info(f"LLM Task Coordinator initialized with {len(tasks)} tasks and {len(self.get_llm_operators)} agents {[agent for agent in self.get_llm_operators]}")
+        logger.info(
+            f"LLM Task Coordinator initialized with {len(tasks)} tasks and {len(self.get_llm_operators)} agents {[agent for agent in self.get_llm_operators]}")
         super().__init__(name=name, port=port, tasks=tasks, agents=agents)
 
     async def get_task_executor(self, task: SubTask) -> str:
@@ -56,13 +57,14 @@ class LLMTaskCoordinator(TaskCoordinator):
             for sub_task in sub_tasks:
                 task.add_subtask(sub_task)
 
-            depends_on = [sub_task.name for sub_task in sub_tasks]
-            final_sub_task = SubTask(
-                name="Generate Final Answer",
-                description=f"Based on all previous sub-tasks, provide a comprehensive final answer to the main task: {task.description}",
-                required_specialty="Synthesize information and generate conclusive answers",
-                depends_on=depends_on,
-            )
+            # depends_on = [sub_task.name for sub_task in sub_tasks]
+            # final_sub_task = SubTask(
+            #     name="Generate Final Answer",
+            #     description=f"Based on all previous sub-tasks, provide a comprehensive final answer to the main task: {task.description}",
+            #     required_specialty="Synthesize information and generate conclusive answers",
+            #     depends_on=depends_on,
+            # )
+            final_sub_task = await self.generate_final_sub_task_from_description(task)
             task.add_subtask(final_sub_task)
         return task
 
@@ -155,6 +157,41 @@ class LLMTaskCoordinator(TaskCoordinator):
         # Make sure subtasks are valid
         sub_task_list = self.recheck_and_update_subtasks(subtasks=sub_task_list)
         return [t.to_v2(task.id) for t in sub_task_list.sub_task_list]
+
+    async def generate_final_sub_task_from_description(self, task: Task) -> SubTask:
+
+        # Prompt template
+        prompt = PromptTemplate.from_template(
+            """
+                Given the following job description and existing subtasks, add a final delivery step to complete the project.
+                 This final step should focus on  delivering the completed work.
+
+                Job Description: {description}
+
+                Existing Subtasks:
+                {existing_subtasks}
+
+                Respond with only the final delivery step in the following format:
+
+                Final Step:
+                <Specific description of the final delivery step> - Specialty: <Required specialty or skill> - Depends on: <Names of subtasks that must be completed before this one>
+
+                Additional Considerations:
+                - Ensure the final step encompasses presenting or delivering the completed work
+                - Use clear, action-oriented language for the description
+                - Include dependencies on relevant existing subtasks
+                - Focus on delivering the functionality and value of the completed project
+                """
+        )
+
+        # Chain
+        structured_llm = self.tool_llm.with_structured_output(SubTaskModel)
+        chain = prompt | structured_llm
+        sub_task: SubTaskModel = chain.invoke(input={
+            "description": task.description,
+            "existing_subtasks": "\n".join([f"{t.name}- {t.description}" for t in task.subtasks.values()])
+        })
+        return sub_task.to_v2(task.id)
 
     def recheck_and_update_subtasks(self, subtasks):
         subtask_validation_template = PromptTemplate.from_template("""
