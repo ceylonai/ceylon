@@ -1,193 +1,173 @@
+import tkinter as tk
+from tkinter import messagebox, END, filedialog
+import csv
 from datetime import datetime
 
 
 class Task:
-    def __init__(self, title, due_date, description, priority='Medium'):
-        self.title = title
-        self.due_date = due_date
+    def __init__(self, description, date):
         self.description = description
-        self.priority = priority
         self.completed = False
-
-    def __repr__(self):
-        status = "Completed" if self.completed else "Pending"
-        return f"Task(title={self.title}, due_date={self.due_date}, description={self.description}, priority={self.priority}, status={status})"
-
-
-import csv
+        self.date = date  # New date attribute
 
 
 class TaskManager:
     def __init__(self):
         self.tasks = []
 
-    def add_task(self, title, due_date, description, priority='Medium'):
-        new_task = Task(title, due_date, description, priority)
-        self.tasks.append(new_task)
-        print(f"Task '{title}' added successfully.")
+    def add_task(self, description, date):
+        task = Task(description, date)
+        self.tasks.append(task)
 
-    def list_tasks(self, completed=None):
-        if completed is None:
-            return self.tasks
-        elif completed:
-            return [task for task in self.tasks if task.completed]
-        else:
-            return [task for task in self.tasks if not task.completed]
+    def complete_task(self, index):
+        if 0 <= index < len(self.tasks):
+            self.tasks[index].completed = True
+            return self.tasks[index].description
+        return None
 
-    def complete_task(self, title):
-        for task in self.tasks:
-            if task.title == title and not task.completed:
-                task.completed = True
-                print(f"Task '{title}' marked as completed.")
-                return
-        print(f"Task '{title}' not found or already completed.")
+    def delete_task(self, index):
+        if 0 <= index < len(self.tasks):
+            return self.tasks.pop(index).description
+        return None
 
-    def delete_task(self, title):
-        for task in self.tasks:
-            if task.title == title:
-                self.tasks.remove(task)
-                print(f"Task '{title}' deleted successfully.")
-                return
-        print(f"Task '{title}' not found.")
+    def get_task_list(self):
+        return [(task.description, task.completed, task.date) for task in self.tasks]
 
-    def set_task_priority(self, title, new_priority):
-        for task in self.tasks:
-            if task.title == title:
-                task.priority = new_priority
-                print(f"Priority for task '{title}' set to '{new_priority}'.")
-                return
-        print(f"Task '{title}' not found.")
+    def get_finished_tasks(self):
+        return [(task.description, task.completed, task.date) for task in self.tasks if task.completed]
 
-    def filter_tasks_by_date(self, date):
-        return [task for task in self.tasks if task.due_date.date() == date]
-
-    def export_tasks_to_csv(self, tasks, filename):
-        with open(filename, 'w', newline='') as csvfile:
-            fieldnames = ['title', 'due_date', 'description', 'priority', 'status']
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-
-            writer.writeheader()
-            for task in tasks:
-                writer.writerow({
-                    'title': task.title,
-                    'due_date': task.due_date.strftime('%Y-%m-%d %H:%M:%S'),
-                    'description': task.description,
-                    'priority': task.priority,
-                    'status': 'Completed' if task.completed else 'Pending'
-                })
-        print(f"Tasks exported to {filename} successfully.")
+    def get_tasks_filtered_by_date(self, filter_date):
+        return [(task.description, task.completed, task.date) for task in self.tasks if task.date == filter_date]
 
 
-def download_tasks_by_date(manager, date, filename):
-    tasks = manager.filter_tasks_by_date(date)
-    manager.export_tasks_to_csv(tasks, filename)
+class TaskManagerApp:
+    def __init__(self, master):
+        self.master = master
+        self.task_manager = TaskManager()
+        master.title("Task Management Application")
 
+        # Task Entry Section
+        self.task_label = tk.Label(master, text="Enter Task:")
+        self.task_label.pack()
 
-import tkinter as tk
-from tkinter import ttk, filedialog, simpledialog
+        self.task_entry = tk.Entry(master, width=50)
+        self.task_entry.pack()
 
+        self.date_label = tk.Label(master, text="Enter Date (YYYY-MM-DD):")
+        self.date_label.pack()
 
-class TaskApp:
-    def __init__(self, root, task_manager):
-        self.root = root
-        self.task_manager = task_manager
-        self.root.title("Task Manager")
+        self.date_entry = tk.Entry(master, width=50)
+        self.date_entry.pack()
 
-        self.create_widgets()
-        self.update_task_list()
-
-    def create_widgets(self):
-        self.frame = tk.Frame(self.root)
-        self.frame.pack()
-
-        self.task_listbox = tk.Listbox(self.frame, width=100, height=20)
-        self.task_listbox.pack(side=tk.LEFT)
-
-        self.scrollbar = tk.Scrollbar(self.frame)
-        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self.task_listbox.config(yscrollcommand=self.scrollbar.set)
-        self.scrollbar.config(command=self.task_listbox.yview)
-
-        self.add_task_button = tk.Button(self.root, text="Add Task", command=self.add_task)
+        self.add_task_button = tk.Button(master, text="Add Task", command=self.add_task)
         self.add_task_button.pack()
 
-        self.complete_task_button = tk.Button(self.root, text="Complete Task", command=self.complete_task)
+        # Task List Section
+        self.task_listbox = tk.Listbox(master, width=50, height=10)
+        self.task_listbox.pack()
+
+        self.complete_task_button = tk.Button(master, text="Complete Task", command=self.complete_task)
         self.complete_task_button.pack()
 
-        self.show_finished_tasks_button = tk.Button(self.root, text="Show Finished Tasks",
-                                                    command=self.show_finished_tasks)
-        self.show_finished_tasks_button.pack()
+        self.delete_task_button = tk.Button(master, text="Delete Task", command=self.delete_task)
+        self.delete_task_button.pack()
 
-        self.show_pending_tasks_button = tk.Button(self.root, text="Show Pending Tasks",
-                                                   command=self.show_pending_tasks)
-        self.show_pending_tasks_button.pack()
+        # Download Section
+        self.download_button = tk.Button(master, text="Download Tasks", command=self.download_tasks)
+        self.download_button.pack()
 
-        self.show_all_tasks_button = tk.Button(self.root, text="Show All Tasks", command=self.show_all_tasks)
-        self.show_all_tasks_button.pack()
+        # Finished Tasks Section
+        self.view_finished_tasks_button = tk.Button(master, text="View Finished Tasks",
+                                                    command=self.view_finished_tasks)
+        self.view_finished_tasks_button.pack()
 
-        self.download_tasks_button = tk.Button(self.root, text="Download Tasks by Date", command=self.download_tasks)
-        self.download_tasks_button.pack()
+        # Status Section
+        self.status_label = tk.Label(master, text="", fg="green")
+        self.status_label.pack()
 
     def add_task(self):
-        title = simpledialog.askstring("Task Title", "Enter task title:")
-        due_date = simpledialog.askstring("Due Date", "Enter due date (YYYY-MM-DD):")
-        description = simpledialog.askstring("Description", "Enter task description:")
-        priority = simpledialog.askstring("Priority", "Enter task priority (Low, Medium, High):", initialvalue="Medium")
-
-        if title and due_date and description and priority:
-            try:
-                due_date = datetime.strptime(due_date, "%Y-%m-%d")
-                self.task_manager.add_task(title, due_date, description, priority)
-                self.update_task_list()
-            except ValueError:
-                print("Invalid date format. Please enter date in YYYY-MM-DD format.")
+        task = self.task_entry.get()
+        date_str = self.date_entry.get()
+        if task and self.validate_date(date_str):
+            self.task_manager.add_task(task, date_str)
+            self.task_entry.delete(0, END)
+            self.date_entry.delete(0, END)
+            self.update_task_listbox()
+            self.update_status("Task added!")
+        else:
+            self.update_status("Please enter a valid task and date.")
 
     def complete_task(self):
-        selected_task = self.task_listbox.get(tk.ACTIVE)
-        if selected_task:
-            title = selected_task.split(",")[0].split("=")[1].strip()
-            self.task_manager.complete_task(title)
-            self.update_task_list()
+        try:
+            selected_task_index = self.task_listbox.curselection()[0]
+            completed_task = self.task_manager.complete_task(selected_task_index)
+            if completed_task:
+                self.update_task_listbox()
+                self.update_status(f"Task '{completed_task}' completed!")
+            else:
+                self.update_status("Error completing task.")
+        except IndexError:
+            self.update_status("Please select a task to complete.")
 
-    def show_finished_tasks(self):
-        self.task_listbox.delete(0, tk.END)
-        for task in self.task_manager.list_tasks(completed=True):
-            self.task_listbox.insert(tk.END, task)
-
-    def show_pending_tasks(self):
-        self.task_listbox.delete(0, tk.END)
-        for task in self.task_manager.list_tasks(completed=False):
-            self.task_listbox.insert(tk.END, task)
-
-    def show_all_tasks(self):
-        self.task_listbox.delete(0, tk.END)
-        for task in self.task_manager.list_tasks():
-            self.task_listbox.insert(tk.END, task)
+    def delete_task(self):
+        try:
+            selected_task_index = self.task_listbox.curselection()[0]
+            deleted_task = self.task_manager.delete_task(selected_task_index)
+            if deleted_task:
+                self.update_task_listbox()
+                self.update_status(f"Task '{deleted_task}' deleted!")
+            else:
+                self.update_status("Error deleting task.")
+        except IndexError:
+            self.update_status("Please select a task to delete.")
 
     def download_tasks(self):
-        date_str = simpledialog.askstring("Task Date", "Enter date (YYYY-MM-DD):")
-        if date_str:
-            try:
-                date = datetime.strptime(date_str, '%Y-%m-%d').date()
-                filename = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")])
-                if filename:
-                    download_tasks_by_date(self.task_manager, date, filename)
-            except ValueError:
-                print("Invalid date format. Please enter date in YYYY-MM-DD format.")
+        filter_date = self.date_entry.get()
+        if self.validate_date(filter_date):
+            tasks_to_download = self.task_manager.get_tasks_filtered_by_date(filter_date)
+            if tasks_to_download:
+                file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")])
+                if file_path:
+                    with open(file_path, mode='w', newline='') as file:
+                        writer = csv.writer(file)
+                        writer.writerow(["Task Description", "Completed", "Date"])
+                        for task_desc, completed, date in tasks_to_download:
+                            writer.writerow([task_desc, completed, date])
+                    self.update_status("Tasks downloaded successfully!")
+                else:
+                    self.update_status("Download cancelled.")
+            else:
+                self.update_status("No tasks found for this date.")
+        else:
+            self.update_status("Please enter a valid date (YYYY-MM-DD).")
 
-    def update_task_list(self):
-        self.task_listbox.delete(0, tk.END)
-        for task in self.task_manager.list_tasks():
-            self.task_listbox.insert(tk.END, task)
+    def view_finished_tasks(self):
+        finished_tasks = self.task_manager.get_finished_tasks()
+        self.task_listbox.delete(0, END)
+        if finished_tasks:
+            for task_description, completed, date in finished_tasks:
+                self.task_listbox.insert(END, f"✔️ {task_description} (Date: {date})")
+        else:
+            self.task_listbox.insert(END, "No finished tasks.")
+
+    def validate_date(self, date_str):
+        try:
+            datetime.strptime(date_str, '%Y-%m-%d')
+            return True
+        except ValueError:
+            return False
+
+    def update_task_listbox(self):
+        self.task_listbox.delete(0, END)
+        for task_description, completed, date in self.task_manager.get_task_list():
+            status = "✔️" if completed else "❌"
+            self.task_listbox.insert(END, f"{status} {task_description} (Date: {date})")
+
+    def update_status(self, message):
+        self.status_label.config(text=message)
 
 
 if __name__ == "__main__":
     root = tk.Tk()
-    manager = TaskManager()
-
-    # Add some sample tasks for testing
-    manager.add_task("Task 1", datetime(2023, 10, 15), "Description for Task 1", priority='High')
-    manager.add_task("Task 2", datetime(2023, 10, 20), "Description for Task 2", priority='Low')
-
-    app = TaskApp(root, manager)
+    app = TaskManagerApp(root)
     root.mainloop()
