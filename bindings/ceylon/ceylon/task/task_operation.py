@@ -31,6 +31,22 @@ class SubTask(BaseModel):
         return f"SubTask: {self.name} (ID: {self.id}) - {status} - Dependencies: {self.depends_on}"
 
 
+class TaskDeliverable(BaseModel):
+    objectives: List[str] = Field(
+        description="the objectives of the task, Explains the task in detail",
+        default=[]
+    )
+    final_output: str = Field(
+        description="the final output of the task",
+        default="")
+    final_output_type: str = Field(
+        description="the type of the final output of the task",
+        default="")
+
+    def __str__(self):
+        return f"Objectives: {self.objectives} - Final Output: {self.final_output} - Final Output Type: {self.final_output_type}"
+
+
 class Task(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     name: str
@@ -39,11 +55,17 @@ class Task(BaseModel):
 
     execution_order: List[str] = Field(default_factory=list)
 
+    metadata: Dict[str, str] = Field(default_factory=dict, alias="metadata", description="metadata")
+    task_deliverable: TaskDeliverable = Field(default=None)
+
     def add_subtask(self, subtask: SubTask):
         subtask.parent_task_id = self.id
         self.subtasks[subtask.name] = subtask
         self._validate_dependencies()
         self.execution_order = self.get_execution_order()
+
+    def set_deliverable(self, task_deliverable: TaskDeliverable):
+        self.task_deliverable = task_deliverable
 
     def _validate_dependencies(self):
         graph = self._create_dependency_graph()
