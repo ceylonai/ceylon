@@ -5,7 +5,7 @@ from loguru import logger
 
 from ceylon import Agent, on_message
 from ceylon.static_val import DEFAULT_WORKSPACE_ID, DEFAULT_ADMIN_PORT
-from ceylon.task import TaskAssignment, TaskResult
+from ceylon.task import TaskAssignment, SubTaskResult
 from ceylon.task.task_operation import TaskResultStatus
 
 
@@ -17,7 +17,7 @@ class TaskOperator(Agent, abc.ABC):
                  **kwargs):
         self.task_history = []
         self.exeuction_history = []
-        self.history: Dict[str, List[TaskResult]] = {}
+        self.history: Dict[str, List[SubTaskResult]] = {}
         super().__init__(name=name, role=role, workspace_id=workspace_id, admin_port=admin_port, *args, **kwargs)
 
     @on_message(type=TaskAssignment)
@@ -41,24 +41,24 @@ class TaskOperator(Agent, abc.ABC):
                 result = str(e)
                 status = TaskResultStatus.FAILED
 
-            result_task = TaskResult(task_id=data.task.id,
-                                     name=data.task.name,
-                                     description=data.task.description,
-                                     agent=self.details().name,
-                                     parent_task_id=data.task.parent_task_id,
-                                     result=result,
-                                     status=status)
+            result_task = SubTaskResult(task_id=data.task.id,
+                                        name=data.task.name,
+                                        description=data.task.description,
+                                        agent=self.details().name,
+                                        parent_task_id=data.task.parent_task_id,
+                                        result=result,
+                                        status=status)
             # Update task history
             if status == TaskResultStatus.COMPLETED:
                 await self.add_result_to_history(result_task)
             await self.broadcast_data(result_task)
             logger.info(f"{self.details().name} sent subtask result: {data.task.description}")
 
-    @on_message(type=TaskResult)
-    async def on_task_result(self, data: TaskResult):
+    @on_message(type=SubTaskResult)
+    async def on_task_result(self, data: SubTaskResult):
         await self.add_result_to_history(data)
 
-    async def add_result_to_history(self, data: TaskResult):
+    async def add_result_to_history(self, data: SubTaskResult):
         if data.parent_task_id in self.history:
             # If the task result already exists, replace it
             for idx, result in enumerate(self.history[data.parent_task_id]):

@@ -4,15 +4,15 @@ from loguru import logger
 
 from ceylon import CoreAdmin, on_message
 from ceylon.ceylon import AgentDetail
-from ceylon.task import Task, TaskResult, TaskAssignment, SubTask
-from ceylon.task.task_operation import TaskResultStatus
+from ceylon.task import Task, SubTaskResult, TaskAssignment, SubTask
+from ceylon.task.task_operation import TaskResultStatus, TaskResult
 from ceylon.task.task_operator import TaskOperator
 
 
 class TaskCoordinator(CoreAdmin):
     tasks: List[Task] = []
     agents: List[TaskOperator] = []
-    results: Dict[str, List[TaskResult]] = {}
+    results: Dict[str, List[SubTaskResult]] = {}
 
     def __init__(self, tasks: List[Task], agents: List[TaskOperator], name="ceylon_agent_stack", port=8888, *args,
                  **kwargs):
@@ -29,7 +29,7 @@ class TaskCoordinator(CoreAdmin):
     async def run(self, inputs: bytes):
         for idx, task in enumerate(self.tasks):
             task = await self.update_task(idx, task)
-            print(task)
+            logger.info(f"Validating task {task.name}")
             if task.validate_sub_tasks():
                 logger.info(f"Task {task.name} is valid")
             else:
@@ -54,9 +54,9 @@ class TaskCoordinator(CoreAdmin):
             await self.broadcast_data(
                 TaskAssignment(task=subtask_, assigned_agent=subtask_.executor))
 
-    @on_message(type=TaskResult)
-    async def on_task_result(self, result: TaskResult):
-        print(f"Received task result: {result}")
+    @on_message(type=SubTaskResult)
+    async def on_task_result(self, result: SubTaskResult):
+        logger.info(f"Received task result: {result}")
         if result.status == TaskResultStatus.COMPLETED:
             for idx, task in enumerate(self.tasks):
                 sub_task = task.get_next_subtask()
@@ -66,6 +66,12 @@ class TaskCoordinator(CoreAdmin):
                 if result.task_id == sub_task[1].id:
                     task.update_subtask_status(sub_task[1].name, result.result)
                     break
+
+            # Task is completed
+            for task in self.tasks:
+                if task.is_completed():
+                    if task.id == result.task_id:
+                        await self.broadcast_data(TaskResult(task_id=task.id, result=result.result))
 
             if self.all_tasks_completed():
                 await self.end_task_management()

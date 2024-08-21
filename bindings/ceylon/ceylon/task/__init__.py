@@ -1,1 +1,1 @@
-from .task_operation import SubTask, TaskResult, TaskAssignment, Task
+from .task_operation import SubTask, SubTaskResult, TaskAssignment, Task

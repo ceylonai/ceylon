@@ -7,7 +7,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
 from loguru import logger
 
-from ceylon.task import TaskResult
+from ceylon.task import SubTaskResult
 from ceylon.task.task_operation import SubTask
 from ceylon.task.task_operator import TaskOperator
 
@@ -27,7 +27,7 @@ class LLMTaskOperator(TaskOperator):
         self.skills = skills
         self.llm = copy.copy(llm)
         self.tool_llm = copy.copy(tool_llm)
-        self.history: Dict[str, List[TaskResult]] = {}
+        self.history: Dict[str, List[SubTaskResult]] = {}
         super().__init__(name=name, role=role, workspace_id=workspace_id, admin_port=admin_port)
 
     async def get_result(self, task):

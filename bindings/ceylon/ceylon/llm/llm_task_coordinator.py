@@ -1,3 +1,4 @@
+import copy
 from textwrap import dedent
 from typing import Dict, List, Set
 
@@ -9,7 +10,7 @@ from loguru import logger
 
 from ceylon.llm.llm_task_operator import LLMTaskOperator
 from ceylon.static_val import DEFAULT_WORKSPACE_ID, DEFAULT_ADMIN_PORT
-from ceylon.task import TaskResult, Task, SubTask
+from ceylon.task import SubTaskResult, Task, SubTask
 from ceylon.task.task_coordinator import TaskCoordinator
 from ceylon.task.task_operation import TaskDeliverable
 
@@ -59,7 +60,7 @@ class SubTaskList(pydantic.v1.BaseModel):
 class LLMTaskCoordinator(TaskCoordinator):
     tasks: List[Task] = []
     agents: List[LLMTaskOperator] = []
-    results: Dict[str, List[TaskResult]] = {}
+    results: Dict[str, List[SubTaskResult]] = {}
     team_network: nx.Graph = nx.Graph()
 
     def __init__(self, tasks: List[Task], agents: List[LLMTaskOperator],
@@ -71,8 +72,8 @@ class LLMTaskCoordinator(TaskCoordinator):
                  port=DEFAULT_ADMIN_PORT):
         self.context = context
         self.team_goal = team_goal
-        self.llm = llm
-        self.tool_llm = tool_llm
+        self.llm = copy.copy(llm)
+        self.tool_llm = copy.copy(tool_llm) if tool_llm is not None else copy.copy(llm)
         self.tasks = tasks
         self.agents = agents
         self.initialize_team_network()
@@ -194,8 +195,8 @@ class LLMTaskCoordinator(TaskCoordinator):
 
                 if response in agent_names:
                     return response
-                print(response)
-                print(f"Attempt {attempt + 1}: Invalid agent name received: {response} {subtask}. Retrying...")
+                # print(response)
+                logger.info(f"Attempt {attempt + 1}: Invalid agent name received: {response} {subtask}. Retrying...")
 
             raise Exception(f"Failed to get a valid agent name after {max_attempts} attempts.")
 
@@ -234,7 +235,7 @@ class LLMTaskCoordinator(TaskCoordinator):
             "task_deliverable": task.task_deliverable,
             "existing_subtasks": "\n".join([f"{t.name}- {t.description}" for t in task.subtasks.values()])
         })
-        print(sub_task)
+        # print(sub_task)
         return sub_task.to_v2(task.id)
 
     async def generate_tasks_from_description(self, task: Task) -> List[SubTask]:
@@ -330,8 +331,15 @@ class LLMTaskCoordinator(TaskCoordinator):
         2. A list of specific deliverables
         3. Key features to be implemented
         4. Any considerations or constraints based on the team's objectives
-
-        Please format your response in a structured manner, using bullet points or numbered lists where appropriate.
+        
+        Please format your response as a JSON object with the following structure:
+            {{
+              "objectives": ["objective1", "objective2", ...],
+              "final_output": "Description of the final output",
+              "final_output_type": "Type of the final output"
+            }}
+        
+        
         """))
 
         structured_llm = self.tool_llm.with_structured_output(TaskDeliverableModel)
@@ -341,4 +349,12 @@ class LLMTaskCoordinator(TaskCoordinator):
             "objectives": self.team_goal,
             "task_description": task.description
         })
+        if task_deliverable is None:
+            return TaskDeliverable(
+                objectives=[
+                    "Finish the required deliverable",
+                ],
+                final_output=f"{task.description}",
+                final_output_type="text"
+            )
         return task_deliverable.to_v2()

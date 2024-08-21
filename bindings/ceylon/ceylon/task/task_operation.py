@@ -4,6 +4,7 @@ from typing import List, Optional, Tuple, Set, Dict
 from uuid import uuid4
 
 import networkx as nx
+from loguru import logger
 from pydantic import BaseModel
 from pydantic import Field
 
@@ -76,6 +77,9 @@ class Task(BaseModel):
         graph = nx.DiGraph()
         for subtask in self.subtasks.values():
             graph.add_node(subtask.name)
+            for dep in subtask.depends_on:
+                if dep in self.subtasks:
+                    graph.add_edge(dep, subtask.name)
         return graph
 
     def validate_sub_tasks(self) -> bool:
@@ -85,7 +89,7 @@ class Task(BaseModel):
         for subtask in self.subtasks.values():
             if not subtask.depends_on.issubset(subtask_names):
                 missing_deps = subtask.depends_on - subtask_names
-                print(f"Subtask '{subtask.name}' has missing dependencies: {missing_deps}")
+                logger.info(f"Subtask '{subtask.name}' has missing dependencies: {missing_deps}")
                 return False
 
         # Check for circular dependencies
@@ -170,7 +174,7 @@ class TaskResultStatus(enum.Enum):
     FAILED = "FAILED"
 
 
-class TaskResult(BaseModel):
+class SubTaskResult(BaseModel):
     task_id: str
     parent_task_id: str
     agent: str
@@ -178,6 +182,11 @@ class TaskResult(BaseModel):
     name: str
     description: str
     status: TaskResultStatus
+
+
+class TaskResult(BaseModel):
+    task_id: str
+    final_answer: str
 
 
 if __name__ == "__main__":
@@ -198,7 +207,7 @@ if __name__ == "__main__":
             print(f"Simulating execution of {subtask_name}")
 
             # Simulate a result (in a real scenario, this would be the outcome of the subtask execution)
-            result = True
+            result = "Success"
 
             # Update the subtask status
             task.update_subtask_status(subtask_name, result)
