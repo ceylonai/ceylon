@@ -1,7 +1,8 @@
 from langchain_community.chat_models import ChatOllama
+from langchain_openai import ChatOpenAI
 
 from ceylon.task import Task, SubTask
-from ceylon.llm import  LLMTaskOperator,LLMTaskCoordinator
+from ceylon.llm import LLMTaskOperator, LLMTaskCoordinator
 
 # Example usage
 if __name__ == "__main__":
@@ -26,7 +27,11 @@ if __name__ == "__main__":
         article_task
     ]
 
-    llm = ChatOllama(model="llama3.1:latest", temperature=0)
+    llm = ChatOpenAI(
+        base_url='http://localhost:11434/v1',
+        api_key='ollama',  # required, but unused
+        model_name='llama3.1:latest'
+    )
 
     # Create specialized agents
     agents = [
@@ -63,7 +68,8 @@ if __name__ == "__main__":
         )
     ]
 
-    task_manager = LLMTaskCoordinator(tasks, agents, llm=llm)
+    task_manager = LLMTaskCoordinator(tasks, agents, llm=llm, context="You team is working to write an article",
+                                      team_goal="Write quickly and accurately")
     tasks = task_manager.do(inputs=b"")
 
     for t in tasks:
