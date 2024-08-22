@@ -1,6 +1,6 @@
 from ceylon.agent.common import AgentCommon
 from ceylon.core.worker import Worker
-from ceylon.static_val import DEFAULT_WORKSPACE_ID, DEFAULT_ADMIN_PORT
+from ceylon.static_val import DEFAULT_WORKSPACE_ID, DEFAULT_WORKSPACE_PORT
 
 
 class Agent(Worker, AgentCommon):
@@ -9,7 +9,7 @@ class Agent(Worker, AgentCommon):
 
     def __init__(self, name="admin",
                  workspace_id=DEFAULT_WORKSPACE_ID,
-                 admin_port=DEFAULT_ADMIN_PORT,
+                 admin_port=DEFAULT_WORKSPACE_PORT,
                  admin_peer="",
                  role="worker"):
         super().__init__(

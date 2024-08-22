@@ -4,7 +4,7 @@ from typing import Dict, List, Any
 from loguru import logger
 
 from ceylon import Agent, on_message
-from ceylon.static_val import DEFAULT_WORKSPACE_ID, DEFAULT_ADMIN_PORT
+from ceylon.static_val import DEFAULT_WORKSPACE_ID, DEFAULT_WORKSPACE_PORT
 from ceylon.task import TaskAssignment, SubTaskResult
 from ceylon.task.task_operation import TaskResultStatus
 
@@ -13,7 +13,7 @@ class TaskOperator(Agent, abc.ABC):
     agent_type = "TASK_OPERATOR"
 
     def __init__(self, name: str, role: str, workspace_id: str = DEFAULT_WORKSPACE_ID,
-                 admin_port: int = DEFAULT_ADMIN_PORT, *args,
+                 admin_port: int = DEFAULT_WORKSPACE_PORT, *args,
                  **kwargs):
         self.task_history = []
         self.exeuction_history = []

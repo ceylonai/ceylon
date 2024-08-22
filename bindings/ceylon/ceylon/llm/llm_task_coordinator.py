@@ -9,7 +9,7 @@ from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from loguru import logger
 
 from ceylon.llm.llm_task_operator import LLMTaskOperator
-from ceylon.static_val import DEFAULT_WORKSPACE_ID, DEFAULT_ADMIN_PORT
+from ceylon.static_val import DEFAULT_WORKSPACE_ID, DEFAULT_WORKSPACE_PORT
 from ceylon.task import SubTaskResult, Task, SubTask
 from ceylon.task.task_coordinator import TaskCoordinator
 from ceylon.task.task_operation import TaskDeliverable
@@ -69,17 +69,19 @@ class LLMTaskCoordinator(TaskCoordinator):
 
                  llm=None, tool_llm=None,
                  name=DEFAULT_WORKSPACE_ID,
-                 port=DEFAULT_ADMIN_PORT):
+                 port=DEFAULT_WORKSPACE_PORT):
         self.context = context
         self.team_goal = team_goal
         self.llm = copy.copy(llm)
         self.tool_llm = copy.copy(tool_llm) if tool_llm is not None else copy.copy(llm)
         self.tasks = tasks
         self.agents = agents
-        self.initialize_team_network()
         logger.info(
             f"LLM Task Coordinator initialized with {len(tasks)} tasks and {len(self.get_llm_operators)} agents {[agent.details().name for agent in self.get_llm_operators]}")
         super().__init__(name=name, port=port, tasks=tasks, agents=agents)
+
+    def on_init(self):
+        self.initialize_team_network()
 
     def initialize_team_network(self):
         for agent in self.get_llm_operators:

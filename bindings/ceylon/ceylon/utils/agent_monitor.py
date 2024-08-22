@@ -3,14 +3,14 @@ import pickle
 from loguru import logger
 
 from ceylon import Agent
-from ceylon.static_val import DEFAULT_WORKSPACE_ID, DEFAULT_ADMIN_PORT
+from ceylon.static_val import DEFAULT_WORKSPACE_ID, DEFAULT_WORKSPACE_PORT
 
 
 class AgentMonitor(Agent):
 
     def __init__(self, name="monitor",
                  workspace_id=DEFAULT_WORKSPACE_ID,
-                 admin_port=DEFAULT_ADMIN_PORT,
+                 admin_port=DEFAULT_WORKSPACE_PORT,
                  admin_peer="",
                  role="worker"):
         super().__init__(

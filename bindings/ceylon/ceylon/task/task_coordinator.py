@@ -4,6 +4,7 @@ from loguru import logger
 
 from ceylon import CoreAdmin, on_message
 from ceylon.ceylon import AgentDetail
+from ceylon.static_val import DEFAULT_WORKSPACE_ID, DEFAULT_WORKSPACE_PORT
 from ceylon.task import Task, SubTaskResult, TaskAssignment, SubTask
 from ceylon.task.task_operation import TaskResultStatus, TaskResult
 from ceylon.task.task_operator import TaskOperator
@@ -14,11 +15,17 @@ class TaskCoordinator(CoreAdmin):
     agents: List[TaskOperator] = []
     results: Dict[str, List[SubTaskResult]] = {}
 
-    def __init__(self, tasks: List[Task], agents: List[TaskOperator], name="ceylon_agent_stack", port=8888, *args,
+    def __init__(self, tasks: List[Task] = None, agents: List[TaskOperator] = None, name=DEFAULT_WORKSPACE_ID,
+                 port=DEFAULT_WORKSPACE_PORT,
+                 *args,
                  **kwargs):
-        self.tasks = tasks
-        self.agents = agents
+        self.tasks = tasks if tasks is not None else []
+        self.agents = agents if agents is not None else []
+        self.on_init()
         super().__init__(name=name, port=port, *args, **kwargs)
+
+    def on_init(self):
+        pass
 
     async def update_task(self, idx: int, task: Task) -> Task:
         return task
@@ -93,11 +100,11 @@ class TaskCoordinator(CoreAdmin):
                 logger.info(f"  Subtask {result.subtask_id}: {result.result}")
         await self.stop()
 
-    def do(self, inputs: bytes) -> List[Task]:
+    def do(self, inputs: bytes = b'') -> List[Task]:
         self.run_admin(inputs, self.agents)
         return self.tasks
 
-    async def async_do(self, inputs: bytes) -> List[Task]:
+    async def async_do(self, inputs: bytes = b'') -> List[Task]:
         await self.arun_admin(inputs, self.agents)
         return self.tasks
 
@@ -105,3 +112,11 @@ class TaskCoordinator(CoreAdmin):
         await super().on_agent_connected(topic, agent)
         logger.info(f"Agent connected: {agent}")
         await self.run_tasks()
+
+    def add_tasks(self, tasks: List[Task]):
+        self.tasks.extend(tasks)
+        self.on_init()
+
+    def add_agents(self, agents: List[TaskOperator]):
+        self.agents.extend(agents)
+        self.on_init()
