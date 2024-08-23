@@ -4,6 +4,7 @@ from typing import Dict, List, Set
 
 import networkx as nx
 import pydantic.v1
+from langchain.output_parsers import ResponseSchema, StructuredOutputParser
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from loguru import logger
@@ -16,32 +17,46 @@ from ceylon.task.task_operation import TaskDeliverable
 
 
 class TaskDeliverableModel(pydantic.v1.BaseModel):
-    objectives: List[str] = pydantic.v1.Field(
-        description="the objectives of the task, Explains the task in detail",
+    objective: str = pydantic.v1.Field(
+        description="The main objective of the task",
+        default=""
+    )
+    deliverable: str = pydantic.v1.Field(
+        description="The single, primary deliverable for the task",
+        default=""
+    )
+    key_features: List[str] = pydantic.v1.Field(
+        description="Key features of the deliverable",
         default=[]
     )
-    final_output: str = pydantic.v1.Field(
-        description="the final output of the task",
-        default="")
-    final_output_type: str = pydantic.v1.Field(
-        description="the type of the final output of the task",
-        default="")
+    considerations: List[str] = pydantic.v1.Field(
+        description="Important considerations or constraints for the deliverable",
+        default=[]
+    )
 
     def to_v2(self) -> TaskDeliverable:
         return TaskDeliverable(
-            objectives=self.objectives,
-            final_output=self.final_output,
-            final_output_type=self.final_output_type
+            objective=self.objective,
+            deliverable=self.deliverable,
+            key_features=self.key_features,
+            considerations=self.considerations
+        )
+
+    @staticmethod
+    def create_default_task_deliverable(task):
+        return TaskDeliverableModel(
+            objective="Complete the assigned task",
+            deliverable=task.description,
+            key_features=["Basic functionality"],
+            considerations=["Meet minimum requirements"]
         )
 
 
 class SubTaskModel(pydantic.v1.BaseModel):
-    name: str = pydantic.v1.Field(description="the name of the subtask write in snake_case")
-    description: str = pydantic.v1.Field(
-        description="the description of the subtask, Explains the task in detail")
-    required_specialty: str = pydantic.v1.Field(description="the required specialty of the subtask")
-    depends_on: Set[str] = pydantic.v1.Field(description="the subtasks that must be completed before this one",
-                                             default=[])
+    name: str = pydantic.v1.Field(description="Subtask name (snake_case)")
+    description: str = pydantic.v1.Field(description="Detailed subtask explanation", default="")
+    required_specialty: str = pydantic.v1.Field(description="Required skill or expertise", default="")
+    depends_on: Set[str] = pydantic.v1.Field(description="Names of prerequisite subtasks", default=[])
 
     def to_v2(self, parent_task_id) -> SubTask:
         return SubTask(
@@ -53,8 +68,8 @@ class SubTaskModel(pydantic.v1.BaseModel):
         )
 
 
-class SubTaskList(pydantic.v1.BaseModel):
-    sub_task_list: List[SubTaskModel] = pydantic.v1.Field(description="the subtasks of the task", default=[])
+class SubTaskListSchema(pydantic.v1.BaseModel):
+    sub_task_list: List[SubTaskModel] = pydantic.v1.Field(description="The subtasks of the task", default_factory=list)
 
 
 class LLMTaskCoordinator(TaskCoordinator):
@@ -63,9 +78,9 @@ class LLMTaskCoordinator(TaskCoordinator):
     results: Dict[str, List[SubTaskResult]] = {}
     team_network: nx.Graph = nx.Graph()
 
-    def __init__(self, tasks: List[Task], agents: List[LLMTaskOperator],
-                 context: str,
-                 team_goal: str,
+    def __init__(self, tasks: List[Task] = None, agents: List[LLMTaskOperator] = None,
+                 context: str = "",
+                 team_goal: str = "",
 
                  llm=None, tool_llm=None,
                  name=DEFAULT_WORKSPACE_ID,
@@ -74,13 +89,15 @@ class LLMTaskCoordinator(TaskCoordinator):
         self.team_goal = team_goal
         self.llm = copy.copy(llm)
         self.tool_llm = copy.copy(tool_llm) if tool_llm is not None else copy.copy(llm)
-        self.tasks = tasks
-        self.agents = agents
-        logger.info(
-            f"LLM Task Coordinator initialized with {len(tasks)} tasks and {len(self.get_llm_operators)} agents {[agent.details().name for agent in self.get_llm_operators]}")
+        self.tasks = tasks if tasks is not None else []
+        self.agents = agents if agents is not None else []
         super().__init__(name=name, port=port, tasks=tasks, agents=agents)
 
     def on_init(self):
+        if len(self.agents) > 0:
+            logger.info(
+                f"LLM Task Coordinator initialized with {len(self.tasks)} "
+                f"tasks and {len(self.get_llm_operators)} agents {[agent.details().name for agent in self.get_llm_operators]}")
         self.initialize_team_network()
 
     def initialize_team_network(self):
@@ -162,6 +179,7 @@ class LLMTaskCoordinator(TaskCoordinator):
         return operators
 
     async def get_best_agent_for_subtask(self, subtask: SubTask) -> str:
+        logger.debug(f"Getting best agent for subtask '{subtask.name}'")
         agent_specialties = "\n".join(
             [f"{agent.details().name}: {agent.details().role} {agent.context}" for agent in self.get_llm_operators])
 
@@ -197,7 +215,6 @@ class LLMTaskCoordinator(TaskCoordinator):
 
                 if response in agent_names:
                     return response
-                # print(response)
                 logger.info(f"Attempt {attempt + 1}: Invalid agent name received: {response} {subtask}. Retrying...")
 
             raise Exception(f"Failed to get a valid agent name after {max_attempts} attempts.")
@@ -205,86 +222,130 @@ class LLMTaskCoordinator(TaskCoordinator):
         return get_valid_agent_name()
 
     async def generate_final_sub_task_from_description(self, task: Task) -> SubTask:
-        prompt = PromptTemplate.from_template(
-            dedent("""
+        response_schemas = [
+            ResponseSchema(
+                name="final_subtask",
+                description="The final subtask for the main task",
+                schema=SubTaskModel,
+                type="json"
+            )
+        ]
+        output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
+        format_instructions = output_parser.get_format_instructions()
+
+        # Prompt template
+        prompt = PromptTemplate(
+            template=dedent(
+                """
                 Given the following job description and existing subtasks, add a final delivery step to complete the project.
-                 This final step should focus on  delivering the completed work.
+                This final step should focus on delivering the completed work.
 
                 Job Description: {description}
-                Job Deliverable Data : {task_deliverable}
+                Job Deliverable Data: {task_deliverable}
 
                 Existing Subtasks:
                 {existing_subtasks}
 
-                Respond with only the final delivery step in the following format:
+                Respond with the final delivery step in the following JSON format:
 
-                Final Step:
-                <Specific description of the final delivery step> - Specialty: <Required specialty or skill> - Depends on: <Names of subtasks that must be completed before this one>
+                {format_instructions}
 
                 Additional Considerations:
                 - Ensure the final step encompasses presenting or delivering the completed work
                 - Use clear, action-oriented language for the description
                 - Include dependencies on relevant existing subtasks
                 - Focus on delivering the functionality and value of the completed project
-                """)
+                """
+            ),
+            input_variables=["description", "task_deliverable", "existing_subtasks"],
+            partial_variables={"format_instructions": format_instructions},
         )
 
-        # Chain
-        structured_llm = self.tool_llm.with_structured_output(SubTaskModel)
-        chain = prompt | structured_llm
-        sub_task: SubTaskModel = chain.invoke(input={
+        chain = prompt | self.tool_llm | output_parser
+        final_subtask = chain.invoke(input={
             "description": task.description,
             "task_deliverable": task.task_deliverable,
             "existing_subtasks": "\n".join([f"{t.name}- {t.description}" for t in task.subtasks.values()])
         })
-        # print(sub_task)
-        return sub_task.to_v2(task.id)
+        final_subtask_model = SubTaskModel.parse_obj(final_subtask["final_subtask"])
+        return final_subtask_model.to_v2(task.id)
 
     async def generate_tasks_from_description(self, task: Task) -> List[SubTask]:
 
+        response_schemas = [
+            ResponseSchema(
+                name="subtask_list",
+                description="A list of subtasks for the main task",
+                schema=SubTaskListSchema,
+                type="json"
+            ),
+            ResponseSchema(
+                name="explanation",
+                description="An explanation of the subtask list and its structure"
+            )
+        ]
+        output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
+        format_instructions = output_parser.get_format_instructions()
+
         # Prompt template
-        prompt = PromptTemplate.from_template(
-            dedent(
+        prompt = PromptTemplate(
+            template=dedent(
                 """
-            Given the following job description, break it down into a main task and 3-5 key subtasks. Each subtask should have a specific description and required specialty.
+                Analyze the following job description and break it down into a main task and 3-5 key subtasks:
 
-            Job Description: {description}
-            Job Deliverable Data : {task_deliverable}
+                Job Description: {description}
+                Job Deliverable: {task_deliverable}
 
-            Respond with the tasks and their subtasks in the following format:
+                {format_instructions}
 
-            Main Task: <Concise description of the overall task>
-
-            Subtasks:
-            1. <Describe the first action item needed to progress towards the objective.> - Specialty: <Required specialty or skill> - Depends on: <Subtasks name that must be completed before this one>
-            2. <Describe the second action item needed to progress towards the objective.> - Specialty: <Required specialty or skill> - Depends on: <Subtasks name that must be completed before this one>
-            3. <Describe the third action item needed to progress towards the objective.> - Specialty: <Required specialty or skill> - Depends on: <Subtasks name that must be completed before this one>
-            (Add up to 2 more subtasks if necessary)
-
-            Additional Considerations:
-            - Prioritize the subtasks in order of importance or chronological sequence
-            - Ensure each subtask is distinct and contributes uniquely to the main task
-            - Use clear, action-oriented language for each description
-            - If applicable, include any interdependencies between subtasks
-            """)
+                Guidelines:
+                - Name must be in snake_case
+                - Description must be in clear, action-oriented language
+                - Prioritize subtasks by importance or sequence
+                - Ensure each subtask is distinct and essential
+                - Use clear, action-oriented language
+                - Include subtask interdependencies where relevant
+                - Strictly adhere to the JSON format provided above
+                """
+            ),
+            input_variables=["description", "task_deliverable"],
+            partial_variables={"format_instructions": format_instructions},
         )
-
-        # Chain
-        structured_llm = self.tool_llm.with_structured_output(SubTaskList)
-        chain = prompt | structured_llm
+        chain = prompt | self.tool_llm | output_parser
         sub_task_list = chain.invoke(input={
             "description": task.description,
             "metadata": task.metadata,
             "task_deliverable": task.task_deliverable,
         })
+
+        logger.info(sub_task_list)
         # Make sure subtasks are valid
         sub_task_list = self.recheck_and_update_subtasks(subtasks=sub_task_list)
-        return [t.to_v2(task.id) for t in sub_task_list.sub_task_list]
+        if len(sub_task_list) == 0:
+            return []
+        return [t.to_v2(task.id) for t in sub_task_list]
 
     def recheck_and_update_subtasks(self, subtasks):
-        subtask_validation_template = PromptTemplate.from_template(
-            dedent("""
-                You are tasked with reviewing and modifying a list of SubTasks. Please process the following list of SubTasks according to these criteria:
+        response_schemas = [
+            ResponseSchema(
+                name="subtask_list",
+                description="A list of subtasks for the main task",
+                schema=SubTaskListSchema,
+                type="json"
+            ),
+            ResponseSchema(
+                name="explanation",
+                description="An explanation of the subtask list and its structure"
+            )
+        ]
+        output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
+        format_instructions = output_parser.get_format_instructions()
+
+        # Prompt template
+        prompt = PromptTemplate(
+            template=dedent(
+                """
+                 You are tasked with reviewing and modifying a list of SubTasks. Please process the following list of SubTasks according to these criteria:
 
                 1. Name Format:
                    - Convert all SubTask names to snake_case format.
@@ -311,52 +372,61 @@ class LLMTaskCoordinator(TaskCoordinator):
                 {subtasks}
 
                 Please provide the updated list of SubTasks with all the above modifications and validations applied.
-        """))
-        structured_llm = self.tool_llm.with_structured_output(SubTaskList)
-        chain = subtask_validation_template | structured_llm
-        sub_task_list = chain.invoke(input={
+                Output in JSON format:
+
+                {format_instructions}
+
+                Guidelines:
+                - Name must be in snake_case
+                - Description must be in clear, action-oriented language
+                - Prioritize subtasks by importance or sequence
+                - Ensure each subtask is distinct and essential
+                - Use clear, action-oriented language
+                - Include subtask interdependencies where relevant
+                - Strictly adhere to the JSON format provided above
+                """
+            ),
+            input_variables=["subtasks"],
+            partial_variables={"format_instructions": format_instructions},
+        )
+        chain = prompt | self.tool_llm | output_parser
+        result = chain.invoke(input={
             "subtasks": subtasks
         })
-        return sub_task_list
+        if len(result) == 0:
+            return []
+        return [SubTaskModel.parse_obj(t) for t in result["subtask_list"]]
 
     async def build_task_deliverable(self, task: Task):
         build_task_deliverable_template = PromptTemplate.from_template(dedent("""
-        Context: {context}
-
-        Team Objectives: {objectives}
-
-        Task Description: {task_description}
-
-        Based on the given context, team objectives, and task description, please provide:
-
-        1. Clear goals for the task management application project
-        2. A list of specific deliverables
-        3. Key features to be implemented
-        4. Any considerations or constraints based on the team's objectives
-        
-        Please format your response as a JSON object with the following structure:
+            Given:
+            Context: {context}
+            Team Objectives: {objectives}
+            Task Description: {task_description}
+    
+            Analyze the above information and provide:
+            1. The main objective of the task
+            2. A single, primary deliverable
+            3. Key features of the deliverable
+            4. Important considerations based on team objectives
+    
+            Respond in JSON format:
             {{
-              "objectives": ["objective1", "objective2", ...],
-              "final_output": "Description of the final output",
-              "final_output_type": "Type of the final output"
+                "objective": "Main objective of the task",
+                "deliverable": "Description of the primary deliverable",
+                "key_features": ["feature1", "feature2", ...],
+                "considerations": ["consideration1", "consideration2", ...]
             }}
-        
-        
         """))
 
         structured_llm = self.tool_llm.with_structured_output(TaskDeliverableModel)
         chain = build_task_deliverable_template | structured_llm
+
         task_deliverable: TaskDeliverableModel = chain.invoke(input={
             "context": self.context,
             "objectives": self.team_goal,
             "task_description": task.description
         })
         if task_deliverable is None:
-            return TaskDeliverable(
-                objectives=[
-                    "Finish the required deliverable",
-                ],
-                final_output=f"{task.description}",
-                final_output_type="text"
-            )
+            return TaskDeliverableModel.create_default_task_deliverable(task).to_v2()
         return task_deliverable.to_v2()

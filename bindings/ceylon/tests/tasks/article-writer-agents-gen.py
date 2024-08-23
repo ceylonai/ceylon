@@ -1,5 +1,4 @@
-from langchain_community.chat_models import ChatOllama
-from langchain_experimental.llms.ollama_functions import OllamaFunctions
+from langchain_ollama import ChatOllama
 
 from ceylon.llm import LLMTaskOperator, LLMTaskCoordinator
 from ceylon.task import Task
@@ -14,8 +13,8 @@ if __name__ == "__main__":
         article_task
     ]
 
-    llm = ChatOllama(model="llama3.1:latest", temperature=0)
-    tool_llm = OllamaFunctions(model="llama3.1:latest", format="json", temperature=0.7)
+    llm = ChatOllama(model="mistral-nemo:latest", temperature=0)
+    tool_llm = ChatOllama(model="mistral-nemo:latest", format="json", temperature=0)
 
     # Create specialized agents
     agents = [
