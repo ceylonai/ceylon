@@ -338,20 +338,6 @@ class LLMTaskCoordinator(TaskCoordinator):
         return [t.to_v2(task.id) for t in sub_task_list]
 
     def recheck_and_update_subtasks(self, subtasks):
-        # response_schemas = [
-        #     ResponseSchema(
-        #         name="subtask_list",
-        #         description="A list of subtasks for the main task",
-        #         schema=SubTaskListSchema,
-        #         type="json"
-        #     ),
-        #     ResponseSchema(
-        #         name="explanation",
-        #         description="An explanation of the subtask list and its structure"
-        #     )
-        # ]
-        # output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
-        # format_instructions = output_parser.get_format_instructions()
 
         pydantic_parser = PydanticOutputParser(pydantic_object=SubTaskListSchema)
         format_instructions = pydantic_parser.get_format_instructions()
@@ -420,7 +406,12 @@ class LLMTaskCoordinator(TaskCoordinator):
         return result.sub_task_list
 
     async def build_task_deliverable(self, task: Task):
-        build_task_deliverable_template = PromptTemplate.from_template(dedent("""
+
+        pydantic_parser = PydanticOutputParser(pydantic_object=TaskDeliverableModel)
+        format_instructions = pydantic_parser.get_format_instructions()
+
+        prompt = PromptTemplate(
+            template=dedent("""
             Given:
             Context: {context}
             Team Objectives: {objectives}
@@ -433,17 +424,22 @@ class LLMTaskCoordinator(TaskCoordinator):
             4. Important considerations based on team objectives
     
             Respond in JSON format:
-            {{
-                "objective": "Main objective of the task",
-                "deliverable": "Description of the primary deliverable",
-                "key_features": ["feature1", "feature2", ...],
-                "considerations": ["consideration1", "consideration2", ...]
-            }}
-        """))
+    
+            {format_instructions}
+        """),
+            input_variables=["context", "objectives", "task_description"],
+            partial_variables={"format_instructions": format_instructions},
+        )
 
-        structured_llm = self.tool_llm.with_structured_output(TaskDeliverableModel)
-        chain = build_task_deliverable_template | structured_llm
+        # Chain
+        prompt_str = prompt.format(**{
+            "context": self.context,
+            "objectives": self.team_goal,
+            "task_description": task.description
+        })
+        logger.debug(f"Prompt: {prompt_str}")
 
+        chain = prompt | self.tool_llm | pydantic_parser
         task_deliverable: TaskDeliverableModel = chain.invoke(input={
             "context": self.context,
             "objectives": self.team_goal,
