@@ -1,10 +1,11 @@
 import copy
+import logging
+import sys
 from textwrap import dedent
 from typing import Dict, List, Set
 
 import networkx as nx
 import pydantic.v1
-from langchain.output_parsers import ResponseSchema, StructuredOutputParser
 from langchain_core.output_parsers import StrOutputParser, PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from loguru import logger
@@ -14,6 +15,9 @@ from ceylon.static_val import DEFAULT_WORKSPACE_ID, DEFAULT_WORKSPACE_PORT
 from ceylon.task import SubTaskResult, Task, SubTask
 from ceylon.task.task_coordinator import TaskCoordinator
 from ceylon.task.task_operation import TaskDeliverable
+
+logger.remove()
+logger.add(sys.stderr, level="INFO")
 
 
 class TaskDeliverableModel(pydantic.v1.BaseModel):
@@ -106,6 +110,7 @@ class LLMTaskCoordinator(TaskCoordinator):
     #         self.team_network.add_node(agent.details().name, role=agent.details().role)
 
     async def update_task(self, idx: int, task: Task):
+        logger.info(f"Updating task {task.name} with {len(task.subtasks)} subtasks")
         if task.task_deliverable is None:
             task_deliverable = await self.build_task_deliverable(task)
             task.set_deliverable(task_deliverable)
@@ -118,6 +123,9 @@ class LLMTaskCoordinator(TaskCoordinator):
             final_sub_task = await self.generate_final_sub_task_from_description(task)
             task.add_subtask(final_sub_task)
 
+        logger.info(f"Task {task.name} updated with {len(task.subtasks)} subtasks")
+        for subtask in task.subtasks.values():
+            logger.info(f"Subtask {subtask.name} updated with {len(subtask.depends_on)} dependencies")
         # await self.update_team_network(task)
         return task
 
@@ -223,6 +231,8 @@ class LLMTaskCoordinator(TaskCoordinator):
         return get_valid_agent_name()
 
     async def generate_final_sub_task_from_description(self, task: Task) -> SubTask:
+        logger.debug(
+            f"Generating final subtask from task description '{task.description}' and subtasks '{len(task.subtasks)}'")
         pydantic_parser = PydanticOutputParser(pydantic_object=SubTaskModel)
         format_instructions = pydantic_parser.get_format_instructions()
         # Prompt template
@@ -257,7 +267,7 @@ class LLMTaskCoordinator(TaskCoordinator):
             "task_deliverable": task.task_deliverable,
             "existing_subtasks": "\n".join([f"{t.name}- {t.description}" for t in task.subtasks.values()])
         })
-        logger.debug(f"Prompt: {prompt_str}")
+        logger.opt(exception=True).debug(f"Prompt: {prompt_str}")
 
         chain = prompt | self.tool_llm | pydantic_parser
         final_subtask_model = chain.invoke(input={
@@ -269,21 +279,7 @@ class LLMTaskCoordinator(TaskCoordinator):
         return final_subtask_model.to_v2(task.id)
 
     async def generate_tasks_from_description(self, task: Task) -> List[SubTask]:
-
-        # response_schemas = [
-        #     ResponseSchema(
-        #         name="subtask_list",
-        #         description="A list of subtasks for the main task",
-        #         schema=SubTaskListSchema,
-        #         type="json"
-        #     ),
-        #     ResponseSchema(
-        #         name="explanation",
-        #         description="An explanation of the subtask list and its structure"
-        #     )
-        # ]
-        # output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
-        # format_instructions = output_parser.get_format_instructions()
+        logger.info(f"Generating sub tasks from description: {task.description}")
 
         pydantic_parser = PydanticOutputParser(pydantic_object=SubTaskListSchema)
         format_instructions = pydantic_parser.get_format_instructions()
@@ -320,7 +316,7 @@ class LLMTaskCoordinator(TaskCoordinator):
             "task_deliverable": task.task_deliverable,
             "number_of_max_tasks": task.max_subtasks - 1,
         })
-        logger.debug(f"Prompt: {prompt_str}")
+        logger.opt(exception=True).debug(f"Prompt: {prompt_str}")
 
         chain = prompt | self.tool_llm | pydantic_parser
         sub_task_list = chain.invoke(input={
@@ -330,7 +326,7 @@ class LLMTaskCoordinator(TaskCoordinator):
             "number_of_max_tasks": task.max_subtasks - 1,
         })
 
-        logger.info(sub_task_list)
+        # logger.info(sub_task_list)
         # Make sure subtasks are valid
         sub_task_list = self.recheck_and_update_subtasks(subtasks=sub_task_list)
         if len(sub_task_list) == 0:
@@ -395,7 +391,7 @@ class LLMTaskCoordinator(TaskCoordinator):
         prompt_str = prompt.format(**{
             "subtasks": subtasks
         })
-        logger.debug(f"Prompt: {prompt_str}")
+        logger.opt(exception=True).debug(f"Prompt: {prompt_str}")
 
         chain = prompt | self.tool_llm | pydantic_parser
         result: SubTaskListSchema = chain.invoke(input={
@@ -406,6 +402,7 @@ class LLMTaskCoordinator(TaskCoordinator):
         return result.sub_task_list
 
     async def build_task_deliverable(self, task: Task):
+        logger.info(f"Building deliverable for task: {task.id}")
 
         pydantic_parser = PydanticOutputParser(pydantic_object=TaskDeliverableModel)
         format_instructions = pydantic_parser.get_format_instructions()
@@ -437,7 +434,7 @@ class LLMTaskCoordinator(TaskCoordinator):
             "objectives": self.team_goal,
             "task_description": task.description
         })
-        logger.debug(f"Prompt: {prompt_str}")
+        logger.opt(exception=True).debug(f"Prompt: {prompt_str}")
 
         chain = prompt | self.tool_llm | pydantic_parser
         task_deliverable: TaskDeliverableModel = chain.invoke(input={
