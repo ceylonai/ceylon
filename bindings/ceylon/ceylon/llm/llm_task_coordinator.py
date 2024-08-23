@@ -341,6 +341,7 @@ class LLMTaskCoordinator(TaskCoordinator):
         output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
         format_instructions = output_parser.get_format_instructions()
 
+
         # Prompt template
         prompt = PromptTemplate(
             template=dedent(
