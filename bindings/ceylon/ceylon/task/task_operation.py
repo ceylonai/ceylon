@@ -65,6 +65,8 @@ class Task(BaseModel):
     metadata: Dict[str, str] = Field(default_factory=dict, alias="metadata", description="metadata")
     task_deliverable: TaskDeliverable = Field(default=None)
 
+    max_subtasks: int = Field(default=5, description="max number of subtasks")
+
     def add_subtask(self, subtask: SubTask):
         subtask.parent_task_id = self.id
         self.subtasks[subtask.name] = subtask

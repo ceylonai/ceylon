@@ -5,7 +5,7 @@ from typing import Dict, List, Set
 import networkx as nx
 import pydantic.v1
 from langchain.output_parsers import ResponseSchema, StructuredOutputParser
-from langchain_core.output_parsers import StrOutputParser
+from langchain_core.output_parsers import StrOutputParser, PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from loguru import logger
 
@@ -98,11 +98,12 @@ class LLMTaskCoordinator(TaskCoordinator):
             logger.info(
                 f"LLM Task Coordinator initialized with {len(self.tasks)} "
                 f"tasks and {len(self.get_llm_operators)} agents {[agent.details().name for agent in self.get_llm_operators]}")
-        self.initialize_team_network()
 
-    def initialize_team_network(self):
-        for agent in self.get_llm_operators:
-            self.team_network.add_node(agent.details().name, role=agent.details().role)
+    #     self.initialize_team_network()
+    #
+    # def initialize_team_network(self):
+    #     for agent in self.get_llm_operators:
+    #         self.team_network.add_node(agent.details().name, role=agent.details().role)
 
     async def update_task(self, idx: int, task: Task):
         if task.task_deliverable is None:
@@ -117,53 +118,53 @@ class LLMTaskCoordinator(TaskCoordinator):
             final_sub_task = await self.generate_final_sub_task_from_description(task)
             task.add_subtask(final_sub_task)
 
-        await self.update_team_network(task)
+        # await self.update_team_network(task)
         return task
 
-    async def update_team_network(self, task: Task):
-        for subtask in task.subtasks.values():
-            agent_name = await self.get_best_agent_for_subtask(subtask)
-            for dependency in subtask.depends_on:
-                dependency_agent = await self.get_best_agent_for_subtask(task.subtasks[dependency])
-                self.team_network.add_edge(agent_name, dependency_agent, task=task.id, subtask=subtask.name)
-
-    async def analyze_team_dynamics(self) -> str:
-        prompt = PromptTemplate.from_template(
-            dedent("""
-            Analyze the following team network and provide insights on team dynamics:
-
-            Nodes (Agents): {nodes}
-            Edges (Collaborations): {edges}
-
-            Please provide a brief analysis covering:
-            1. Key collaborators
-            2. Potential bottlenecks
-            3. Suggestions for improving team efficiency
-
-            Respond in a concise paragraph.
-            """
-                   ))
-
-        nodes = [f"{node}: {data}" for node, data in self.team_network.nodes(data=True)]
-        edges = [f"{u} - {v}: {data}" for u, v, data in self.team_network.edges(data=True)]
-
-        chain = prompt | self.llm | StrOutputParser()
-        analysis = chain.invoke({"nodes": nodes, "edges": edges})
-        return analysis
-
-    def visualize_team_network(self, output_file: str = None):
-        import matplotlib.pyplot as plt
-        plt.figure(figsize=(12, 8))
-        pos = nx.spring_layout(self.team_network)
-        nx.draw(self.team_network, pos, with_labels=True, node_color='lightblue', node_size=1000, font_size=8)
-        edge_labels = nx.get_edge_attributes(self.team_network, 'task')
-        nx.draw_networkx_edge_labels(self.team_network, pos, edge_labels=edge_labels)
-        if output_file is not None:
-            plt.title("Team Collaboration Network")
-            plt.savefig(output_file)
-            plt.close()
-        else:
-            plt.show()
+    # async def update_team_network(self, task: Task):
+    #     for subtask in task.subtasks.values():
+    #         agent_name = await self.get_best_agent_for_subtask(subtask)
+    #         for dependency in subtask.depends_on:
+    #             dependency_agent = await self.get_best_agent_for_subtask(task.subtasks[dependency])
+    #             self.team_network.add_edge(agent_name, dependency_agent, task=task.id, subtask=subtask.name)
+    #
+    # async def analyze_team_dynamics(self) -> str:
+    #     prompt = PromptTemplate.from_template(
+    #         dedent("""
+    #         Analyze the following team network and provide insights on team dynamics:
+    #
+    #         Nodes (Agents): {nodes}
+    #         Edges (Collaborations): {edges}
+    #
+    #         Please provide a brief analysis covering:
+    #         1. Key collaborators
+    #         2. Potential bottlenecks
+    #         3. Suggestions for improving team efficiency
+    #
+    #         Respond in a concise paragraph.
+    #         """
+    #                ))
+    #
+    #     nodes = [f"{node}: {data}" for node, data in self.team_network.nodes(data=True)]
+    #     edges = [f"{u} - {v}: {data}" for u, v, data in self.team_network.edges(data=True)]
+    #
+    #     chain = prompt | self.llm | StrOutputParser()
+    #     analysis = chain.invoke({"nodes": nodes, "edges": edges})
+    #     return analysis
+    #
+    # def visualize_team_network(self, output_file: str = None):
+    #     import matplotlib.pyplot as plt
+    #     plt.figure(figsize=(12, 8))
+    #     pos = nx.spring_layout(self.team_network)
+    #     nx.draw(self.team_network, pos, with_labels=True, node_color='lightblue', node_size=1000, font_size=8)
+    #     edge_labels = nx.get_edge_attributes(self.team_network, 'task')
+    #     nx.draw_networkx_edge_labels(self.team_network, pos, edge_labels=edge_labels)
+    #     if output_file is not None:
+    #         plt.title("Team Collaboration Network")
+    #         plt.savefig(output_file)
+    #         plt.close()
+    #     else:
+    #         plt.show()
 
     async def get_task_executor(self, task: SubTask) -> str:
         return await self.get_best_agent_for_subtask(task)
@@ -222,17 +223,8 @@ class LLMTaskCoordinator(TaskCoordinator):
         return get_valid_agent_name()
 
     async def generate_final_sub_task_from_description(self, task: Task) -> SubTask:
-        response_schemas = [
-            ResponseSchema(
-                name="final_subtask",
-                description="The final subtask for the main task",
-                schema=SubTaskModel,
-                type="json"
-            )
-        ]
-        output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
-        format_instructions = output_parser.get_format_instructions()
-
+        pydantic_parser = PydanticOutputParser(pydantic_object=SubTaskModel)
+        format_instructions = pydantic_parser.get_format_instructions()
         # Prompt template
         prompt = PromptTemplate(
             template=dedent(
@@ -260,32 +252,41 @@ class LLMTaskCoordinator(TaskCoordinator):
             input_variables=["description", "task_deliverable", "existing_subtasks"],
             partial_variables={"format_instructions": format_instructions},
         )
-
-        chain = prompt | self.tool_llm | output_parser
-        final_subtask = chain.invoke(input={
+        prompt_str = prompt.format(**{
             "description": task.description,
             "task_deliverable": task.task_deliverable,
             "existing_subtasks": "\n".join([f"{t.name}- {t.description}" for t in task.subtasks.values()])
         })
-        final_subtask_model = SubTaskModel.parse_obj(final_subtask["final_subtask"])
+        logger.debug(f"Prompt: {prompt_str}")
+
+        chain = prompt | self.tool_llm | pydantic_parser
+        final_subtask_model = chain.invoke(input={
+            "description": task.description,
+            "task_deliverable": task.task_deliverable,
+            "existing_subtasks": "\n".join([f"{t.name}- {t.description}" for t in task.subtasks.values()])
+        })
+        print(f"Final subtask: {final_subtask_model}")
         return final_subtask_model.to_v2(task.id)
 
     async def generate_tasks_from_description(self, task: Task) -> List[SubTask]:
 
-        response_schemas = [
-            ResponseSchema(
-                name="subtask_list",
-                description="A list of subtasks for the main task",
-                schema=SubTaskListSchema,
-                type="json"
-            ),
-            ResponseSchema(
-                name="explanation",
-                description="An explanation of the subtask list and its structure"
-            )
-        ]
-        output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
-        format_instructions = output_parser.get_format_instructions()
+        # response_schemas = [
+        #     ResponseSchema(
+        #         name="subtask_list",
+        #         description="A list of subtasks for the main task",
+        #         schema=SubTaskListSchema,
+        #         type="json"
+        #     ),
+        #     ResponseSchema(
+        #         name="explanation",
+        #         description="An explanation of the subtask list and its structure"
+        #     )
+        # ]
+        # output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
+        # format_instructions = output_parser.get_format_instructions()
+
+        pydantic_parser = PydanticOutputParser(pydantic_object=SubTaskListSchema)
+        format_instructions = pydantic_parser.get_format_instructions()
 
         # Prompt template
         prompt = PromptTemplate(
@@ -299,6 +300,7 @@ class LLMTaskCoordinator(TaskCoordinator):
                 {format_instructions}
 
                 Guidelines:
+                - Max {number_of_max_tasks} subtasks
                 - Name must be in snake_case
                 - Description must be in clear, action-oriented language
                 - Prioritize subtasks by importance or sequence
@@ -308,14 +310,24 @@ class LLMTaskCoordinator(TaskCoordinator):
                 - Strictly adhere to the JSON format provided above
                 """
             ),
-            input_variables=["description", "task_deliverable"],
+            input_variables=["description", "task_deliverable", "number_of_max_tasks"],
             partial_variables={"format_instructions": format_instructions},
         )
-        chain = prompt | self.tool_llm | output_parser
+
+        prompt_str = prompt.format(**{
+            "description": task.description,
+            "metadata": task.metadata,
+            "task_deliverable": task.task_deliverable,
+            "number_of_max_tasks": task.max_subtasks - 1,
+        })
+        logger.debug(f"Prompt: {prompt_str}")
+
+        chain = prompt | self.tool_llm | pydantic_parser
         sub_task_list = chain.invoke(input={
             "description": task.description,
             "metadata": task.metadata,
             "task_deliverable": task.task_deliverable,
+            "number_of_max_tasks": task.max_subtasks - 1,
         })
 
         logger.info(sub_task_list)
@@ -326,21 +338,23 @@ class LLMTaskCoordinator(TaskCoordinator):
         return [t.to_v2(task.id) for t in sub_task_list]
 
     def recheck_and_update_subtasks(self, subtasks):
-        response_schemas = [
-            ResponseSchema(
-                name="subtask_list",
-                description="A list of subtasks for the main task",
-                schema=SubTaskListSchema,
-                type="json"
-            ),
-            ResponseSchema(
-                name="explanation",
-                description="An explanation of the subtask list and its structure"
-            )
-        ]
-        output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
-        format_instructions = output_parser.get_format_instructions()
+        # response_schemas = [
+        #     ResponseSchema(
+        #         name="subtask_list",
+        #         description="A list of subtasks for the main task",
+        #         schema=SubTaskListSchema,
+        #         type="json"
+        #     ),
+        #     ResponseSchema(
+        #         name="explanation",
+        #         description="An explanation of the subtask list and its structure"
+        #     )
+        # ]
+        # output_parser = StructuredOutputParser.from_response_schemas(response_schemas)
+        # format_instructions = output_parser.get_format_instructions()
 
+        pydantic_parser = PydanticOutputParser(pydantic_object=SubTaskListSchema)
+        format_instructions = pydantic_parser.get_format_instructions()
 
         # Prompt template
         prompt = PromptTemplate(
@@ -390,13 +404,20 @@ class LLMTaskCoordinator(TaskCoordinator):
             input_variables=["subtasks"],
             partial_variables={"format_instructions": format_instructions},
         )
-        chain = prompt | self.tool_llm | output_parser
-        result = chain.invoke(input={
+
+        # Chain
+        prompt_str = prompt.format(**{
             "subtasks": subtasks
         })
-        if len(result) == 0:
+        logger.debug(f"Prompt: {prompt_str}")
+
+        chain = prompt | self.tool_llm | pydantic_parser
+        result: SubTaskListSchema = chain.invoke(input={
+            "subtasks": subtasks
+        })
+        if result is None:
             return []
-        return [SubTaskModel.parse_obj(t) for t in result["subtask_list"]]
+        return result.sub_task_list
 
     async def build_task_deliverable(self, task: Task):
         build_task_deliverable_template = PromptTemplate.from_template(dedent("""

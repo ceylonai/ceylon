@@ -55,9 +55,10 @@ class TaskCoordinator(CoreAdmin):
             if sub_task is None:
                 continue
             subtask_name, subtask_ = sub_task
-            assigned_agent = await self.get_task_executor(subtask_)
-            subtask_ = task.update_subtask_executor(subtask_name, assigned_agent)
-            logger.debug(f"Assigned agent {subtask_.executor} to subtask {subtask_name}")
+            if subtask_.executor is None:
+                assigned_agent = await self.get_task_executor(subtask_)
+                subtask_ = task.update_subtask_executor(subtask_name, assigned_agent)
+                logger.debug(f"Assigned agent {subtask_.executor} to subtask {subtask_name}")
             await self.broadcast_data(
                 TaskAssignment(task=subtask_, assigned_agent=subtask_.executor))
 

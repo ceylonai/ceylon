@@ -1,4 +1,5 @@
 from langchain_ollama import ChatOllama
+from langchain_openai import ChatOpenAI
 
 from ceylon.llm import LLMTaskOperator, LLMTaskCoordinator
 from ceylon.task import Task
@@ -13,9 +14,12 @@ if __name__ == "__main__":
         article_task
     ]
 
-    llm = ChatOllama(model="mistral-nemo:latest", temperature=0)
-    tool_llm = ChatOllama(model="mistral-nemo:latest", format="json", temperature=0)
+    # llm = ChatOllama(model="mistral-nemo:latest", temperature=0)
+    # tool_llm = ChatOllama(model="mistral-nemo:latest", format="json", temperature=0)
 
+    llm = ChatOpenAI(
+        model_name='gpt-4o-mini'
+    )
     # Create specialized agents
     agents = [
         LLMTaskOperator(
@@ -107,7 +111,7 @@ if __name__ == "__main__":
         )
     ]
 
-    task_manager = LLMTaskCoordinator(tasks, agents, tool_llm=tool_llm, llm=llm)
+    task_manager = LLMTaskCoordinator(tasks, agents, llm=llm)
     tasks = task_manager.do(inputs=b"")
 
     for t in tasks:
