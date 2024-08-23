@@ -33,19 +33,25 @@ class SubTask(BaseModel):
 
 
 class TaskDeliverable(BaseModel):
-    objectives: List[str] = Field(
-        description="the objectives of the task, Explains the task in detail",
+    objective: str = Field(
+        description="The main objective of the task",
+        default=""
+    )
+    deliverable: str = Field(
+        description="The single, primary deliverable for the task",
+        default=""
+    )
+    key_features: List[str] = Field(
+        description="Key features of the deliverable",
         default=[]
     )
-    final_output: str = Field(
-        description="the final output of the task",
-        default="")
-    final_output_type: str = Field(
-        description="the type of the final output of the task",
-        default="")
+    considerations: List[str] = Field(
+        description="Important considerations or constraints for the deliverable",
+        default=[]
+    )
 
     def __str__(self):
-        return f"Objectives: {self.objectives} - Final Output: {self.final_output} - Final Output Type: {self.final_output_type}"
+        return f"TaskDeliverable: {self.deliverable} - Key Features: {self.key_features} - Considerations: {self.considerations} - Objective: {self.objective}"
 
 
 class Task(BaseModel):
