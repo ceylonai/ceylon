@@ -13,7 +13,7 @@ task_management_app = Task(
     description=dedent("""
     Develop a advanced task management application with features for adding,  listing, and completing tasks. 
     and with priority from list.also need to download list of tasks by date.and need to check finished tasks 
-     no need to use DB. only UI base output is enough. final output must be python script.
+     This must be a standalone GUI app source code.
     """)
 )
 
@@ -45,6 +45,22 @@ agents = [
             "UI Design",
             "User Experience",
             "Python GUI Frameworks like Tkinter",
+        ],
+        tools=[],
+        llm=code_llm
+    ),
+    LLMTaskOperator(
+        name="qa",
+        role="QA Engineer",
+        context="Experienced in testing and troubleshooting Python applications.",
+        skills=[
+            "Unit Testing",
+            "Functional Testing",
+            "Integration Testing",
+            "End-to-End Testing",
+            "Security Testing",
+            "Performance Testing",
+            "API Testing",
         ],
         tools=[],
         llm=code_llm
