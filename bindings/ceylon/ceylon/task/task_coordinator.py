@@ -51,29 +51,34 @@ class TaskCoordinator(CoreAdmin):
             return
         for task in self.tasks:
             self.results[task.id] = []
-            sub_task = task.get_next_subtask()
-            if sub_task is None:
+            sub_tasks = task.get_next_subtasks()
+            if len(sub_tasks) == 0:
                 continue
-            subtask_name, subtask_ = sub_task
-            if subtask_.executor is None:
-                assigned_agent = await self.get_task_executor(subtask_)
-                subtask_ = task.update_subtask_executor(subtask_name, assigned_agent)
-                logger.debug(f"Assigned agent {subtask_.executor} to subtask {subtask_name}")
-            await self.broadcast_data(
-                TaskAssignment(task=subtask_, assigned_agent=subtask_.executor))
+            for sub_task in sub_tasks:
+                if sub_task is None:
+                    continue
+                subtask_name, subtask_ = sub_task
+                logger.info(f"Assigning agent to subtask {subtask_name}")
+                if subtask_.executor is None:
+                    assigned_agent = await self.get_task_executor(subtask_)
+                    subtask_ = task.update_subtask_executor(subtask_name, assigned_agent)
+                await self.broadcast_data(
+                    TaskAssignment(task=subtask_, assigned_agent=subtask_.executor))
+                logger.info(f"Assigned agent {subtask_.executor} to subtask {subtask_name}")
 
     @on_message(type=SubTaskResult)
     async def on_task_result(self, result: SubTaskResult):
         logger.info(f"Received task result: {result}")
         if result.status == TaskResultStatus.COMPLETED:
             for idx, task in enumerate(self.tasks):
-                sub_task = task.get_next_subtask()
-                print(result.task_id, sub_task[1].id, result.task_id == sub_task[1].id)
-                if sub_task is None or result.task_id != sub_task[1].id:
-                    continue
-                if result.task_id == sub_task[1].id:
-                    task.update_subtask_status(sub_task[1].name, result.result)
-                    break
+                sub_tasks = task.get_next_subtasks()
+                for sub_task in sub_tasks:
+                    print(result.task_id, sub_task[1].id, result.task_id == sub_task[1].id)
+                    if sub_task is None or result.task_id != sub_task[1].id:
+                        continue
+                    if result.task_id == sub_task[1].id:
+                        task.update_subtask_status(sub_task[1].name, result.result)
+                        break
 
             # Task is completed
             for task in self.tasks:

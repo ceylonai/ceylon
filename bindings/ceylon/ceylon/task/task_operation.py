@@ -7,7 +7,6 @@ import networkx as nx
 from loguru import logger
 from pydantic import BaseModel
 from pydantic import Field
-import asyncio
 
 
 class SubTask(BaseModel):
@@ -54,6 +53,15 @@ class TaskDeliverable(BaseModel):
     def __str__(self):
         return f"TaskDeliverable: {self.deliverable} - Key Features: {self.key_features} - Considerations: {self.considerations} - Objective: {self.objective}"
 
+    @staticmethod
+    def default(description: str) -> 'TaskDeliverable':
+        return TaskDeliverable(
+            objective="Complete the assigned task",
+            deliverable=description,
+            key_features=["Basic functionality"],
+            considerations=["Meet minimum requirements"]
+        )
+
 
 class Task(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
@@ -94,12 +102,14 @@ class Task(BaseModel):
     def validate_sub_tasks(self) -> bool:
         subtask_names = set(self.subtasks.keys())
 
+        # Check if all dependencies are present
         for subtask in self.subtasks.values():
             if not subtask.depends_on.issubset(subtask_names):
                 missing_deps = subtask.depends_on - subtask_names
                 logger.info(f"Subtask '{subtask.name}' has missing dependencies: {missing_deps}")
                 return False
 
+        # Check for circular dependencies
         try:
             self._validate_dependencies()
         except ValueError as e:
@@ -112,13 +122,20 @@ class Task(BaseModel):
         graph = self._create_dependency_graph()
         return list(nx.topological_sort(graph))
 
-    def get_ready_subtasks(self) -> List[Tuple[str, SubTask]]:
-        ready_subtasks = []
+    # def get_next_subtask(self) -> Optional[Tuple[str, SubTask]]:
+    #     for subtask_name in self.execution_order:
+    #         subtask = self.subtasks[subtask_name]
+    #         if all(self.subtasks[dep].completed for dep in subtask.depends_on):
+    #             return (subtask_name, subtask)
+    #     return None
+
+    def get_next_subtasks(self) -> List[Tuple[str, SubTask]]:
+        subtasks = []
         for subtask_name in self.execution_order:
             subtask = self.subtasks[subtask_name]
-            if not subtask.completed and all(self.subtasks[dep].completed for dep in subtask.depends_on):
-                ready_subtasks.append((subtask_name, subtask))
-        return ready_subtasks
+            if all(self.subtasks[dep].completed for dep in subtask.depends_on):
+                subtasks.append((subtask_name, subtask))
+        return subtasks
 
     def update_subtask_status(self, subtask_name: str, result: str):
         if subtask_name not in self.subtasks:
@@ -127,6 +144,9 @@ class Task(BaseModel):
         subtask = self.subtasks[subtask_name]
         if result is not None:
             subtask.complete(result)
+
+        if subtask_name in self.execution_order:
+            self.execution_order.remove(subtask_name)
 
     def update_subtask_executor(self, subtask_name: str, executor: str) -> SubTask:
         if subtask_name not in self.subtasks:
@@ -194,35 +214,46 @@ class TaskResult(BaseModel):
     final_answer: str
 
 
-async def execute_subtask(subtask_name: str, subtask: SubTask) -> str:
-    print(f"Executing: {subtask}")
-    # Simulate subtask execution with a delay
-    await asyncio.sleep(1)
-    return f"Success: {subtask_name}"
-
-
-async def execute_task(task: Task) -> None:
-    while not task.is_completed():
-        ready_subtasks = task.get_ready_subtasks()
-        print(f"Ready subtasks: {ready_subtasks}")
-
-        if not ready_subtasks:
-            await asyncio.sleep(0.1)
-            continue
-
-        # Execute ready subtasks in parallel
-        subtask_coroutines = [execute_subtask(name, subtask) for name, subtask in ready_subtasks]
-        results = await asyncio.gather(*subtask_coroutines)
-
-        # Update task status
-        for (subtask_name, _), result in zip(ready_subtasks, results):
-            task.update_subtask_status(subtask_name, result)
-            print(f"Completed: {subtask_name}")
-
-    print("All subtasks completed successfully!")
-
-
 if __name__ == "__main__":
+    def execute_task(task: Task) -> None:
+        execution_step = 0
+        while True:
+            # Get the next subtask
+            next_subtasks: List[tuple[str, SubTask]] = task.get_next_subtasks()
+            print(f"Step {execution_step}: {next_subtasks}")
+            if next_subtasks is None or len(next_subtasks) == 0:
+                break
+            for next_subtask in next_subtasks:
+                # If there are no more subtasks, break the loop
+                if next_subtask is None:
+                    break
+
+                subtask_name, subtask = next_subtask
+                print(f"Executing: {subtask}")
+
+                # Here you would actually execute the subtask
+                # For this example, we'll simulate execution with a simple print statement
+                print(f"Simulating execution of {subtask_name}")
+
+                # Simulate a result (in a real scenario, this would be the outcome of the subtask execution)
+                result = "Success"
+
+                # Update the subtask status
+                task.update_subtask_status(subtask_name, result)
+
+                # Check if the entire task is completed
+                if task.is_completed():
+                    print("All subtasks completed successfully!")
+                    break
+
+            # Final check to see if all subtasks were completed
+            if task.is_completed():
+                print("Task execution completed successfully!")
+            else:
+                print("Task execution incomplete. Some subtasks may have failed.")
+            execution_step += 1
+
+
     # Create a task with initial subtasks
     web_app = Task.create_task("Build Web App", "Create a simple web application",
                                subtasks=[
@@ -233,11 +264,8 @@ if __name__ == "__main__":
                                    SubTask(name="testing", description="Perform unit and integration tests",
                                            depends_on={"backend", "frontend"},
                                            required_specialty="Knowledge about testing tools"),
-                                   SubTask(name="qa_test_cases", description="Perform unit and integration tests",
-                                           depends_on={"backend", "frontend"},
-                                           required_specialty="Knowledge about testing tools"),
                                    SubTask(name="frontend", description="Develop the frontend UI",
-                                           depends_on={"setup", "backend"},
+                                           depends_on={"setup", "database"},
                                            required_specialty="Knowledge about frontend tools"),
                                    SubTask(name="backend", description="Develop the backend API",
                                            depends_on={"setup", "database"},
@@ -249,23 +277,24 @@ if __name__ == "__main__":
                                            depends_on={"deployment"},
                                            required_specialty="Knowledge about delivery tools"),
                                    SubTask(name="qa", description="Perform quality assurance",
-                                           depends_on={"testing", "qa_test_cases"},
+                                           depends_on={"testing"},
                                            required_specialty="Knowledge about testing tools")
                                ])
 
+    # Execute the task
     print("Execution order:", [web_app.subtasks[task_id].name for task_id in web_app.get_execution_order()])
 
     if web_app.validate_sub_tasks():
         print("Subtasks are valid")
 
         print("\nExecuting task:")
-        asyncio.run(execute_task(task=web_app))
+        execute_task(task=web_app)
 
         print("\nFinal task status:")
         print(web_app)
     else:
         print("Subtasks are invalid")
 
-    # Serialization example
+        # Serialization example
     print("\nSerialized Task:")
     print(web_app.model_dump_json(indent=2))

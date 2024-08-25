@@ -1,7 +1,8 @@
 from langchain_community.chat_models import ChatOllama
 
-from ceylon.llm import LLMTaskAgent, LLMTaskManager
+from ceylon.llm import LLMTaskCoordinator, LLMTaskOperator
 from ceylon.task import Task, SubTask
+from ceylon.task.task_operation import TaskDeliverable
 
 # Example usage
 if __name__ == "__main__":
@@ -32,7 +33,7 @@ if __name__ == "__main__":
                                            required_specialty="Knowledge about testing tools")
 
                                ])
-
+    web_app.task_deliverable = TaskDeliverable.default(web_app.description)
     tasks = [
         web_app
     ]
@@ -40,60 +41,54 @@ if __name__ == "__main__":
     llm = ChatOllama(model="llama3.1:latest", temperature=0)
     # Create specialized agents
     agents = [
-        LLMTaskAgent(
+        LLMTaskOperator(
             name="backend",
             role="Backend Developer",
             context="Knowledge about backend tools",
             skills=["Python", "Java", "Node.js"],  # Example skills
-            tools=["Django", "Spring Boot", "Express.js"],  # Example tools
             llm=llm
         ),
 
-        LLMTaskAgent(
+        LLMTaskOperator(
             name="frontend",
             role="Frontend Developer",
             context="Knowledge about frontend tools",
             skills=["HTML", "CSS", "JavaScript", "React"],  # Example skills
-            tools=["React", "Angular", "Vue.js"],  # Example tools
             llm=llm
         ),
 
-        LLMTaskAgent(
+        LLMTaskOperator(
             name="database",
             role="Database Administrator",
             context="Knowledge about database management tools",
             skills=["SQL", "NoSQL", "Database Design"],  # Example skills
-            tools=["MySQL", "MongoDB", "PostgreSQL"],  # Example tools
             llm=llm
         ),
-
-        LLMTaskAgent(
+        #
+        LLMTaskOperator(
             name="deployment",
             role="Deployment Manager",
             context="Knowledge about deployment tools and CI tools",
             skills=["CI/CD", "Docker", "Kubernetes"],  # Example skills
-            tools=["Jenkins", "Docker", "Kubernetes"],  # Example tools
             llm=llm
         ),
-
-        LLMTaskAgent(
-            name="qa",
-            role="Quality Assurance Engineer",
-            context="Knowledge about testing tools",
-            skills=["Automated Testing", "Manual Testing", "Test Case Design"],  # Example skills
-            tools=["Selenium", "JUnit", "TestNG"],  # Example tools
-            llm=llm
-        ),
-
-        LLMTaskAgent(
-            name="delivery",
-            role="Delivery Manager",
-            context="Knowledge about delivery tools",
-            skills=["Release Management", "Continuous Delivery"],  # Example skills
-            tools=["Jira", "Confluence", "GitLab CI"],  # Example tools
-            llm=llm
-        )
+        #
+        # LLMTaskOperator(
+        #     name="qa",
+        #     role="Quality Assurance Engineer",
+        #     context="Knowledge about testing tools",
+        #     skills=["Automated Testing", "Manual Testing", "Test Case Design"],  # Example skills
+        #     llm=llm
+        # ),
+        #
+        # LLMTaskOperator(
+        #     name="delivery",
+        #     role="Delivery Manager",
+        #     context="Knowledge about delivery tools",
+        #     skills=["Release Management", "Continuous Delivery"],  # Example skills
+        #     llm=llm
+        # )
 
     ]
-    task_manager = LLMTaskManager(tasks, agents, tool_llm=llm)
-    task_manager.run_admin(inputs=b"", workers=agents)
+    task_manager = LLMTaskCoordinator(tasks, agents, llm=llm)
+    task_manager.do()
