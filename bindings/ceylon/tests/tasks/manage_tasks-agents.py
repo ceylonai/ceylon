@@ -50,6 +50,15 @@ if __name__ == "__main__":
         ),
 
         LLMTaskOperator(
+            name="setup",
+            role="Setup Manager",
+            context="Knowledge about deployment and development tools",
+            skills=["CI/CD", "Docker", "Kubernetes"],  # Example skills
+            llm=llm
+        ),
+
+
+        LLMTaskOperator(
             name="frontend",
             role="Frontend Developer",
             context="Knowledge about frontend tools",
