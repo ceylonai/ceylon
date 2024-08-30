@@ -123,6 +123,14 @@ class TaskCoordinator(CoreAdmin):
         self.tasks.extend(tasks)
         self.on_init()
 
+    async def add_task(self, task: Task):
+        self.tasks.extend([task])
+        await self.run_tasks()
+
     def add_agents(self, agents: List[TaskOperator]):
         self.agents.extend(agents)
         self.on_init()
+
+    @on_message(type=Task)
+    async def on_add_task(self, task: Task):
+        self.add_tasks([task])
