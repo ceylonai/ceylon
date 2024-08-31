@@ -115,8 +115,8 @@ class TaskCoordinator(CoreAdmin):
         return self.tasks
 
     async def on_agent_connected(self, topic: "str", agent: AgentDetail):
-        await super().on_agent_connected(topic, agent)
         logger.info(f"Agent connected: {agent}")
+        await super().on_agent_connected(topic, agent)
         await self.run_tasks()
 
     def add_tasks(self, tasks: List[Task]):
