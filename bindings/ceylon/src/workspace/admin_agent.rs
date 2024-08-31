@@ -1,4 +1,7 @@
 use std::collections::HashMap;
+use std::env;
+use std::env::set_var;
+use std::net::Ipv4Addr;
 use std::sync::Arc;
 use std::time::SystemTime;
 
@@ -10,7 +13,7 @@ use tracing::{error, info};
 
 use crate::workspace::agent::{AgentDetail, EventHandler};
 use crate::workspace::message::AgentMessage;
-use crate::{MessageHandler, Processor, WorkerAgent};
+use crate::{utils, MessageHandler, Processor, WorkerAgent};
 use sangedama::peer::message::data::{EventType, NodeMessage};
 use sangedama::peer::node::{
     create_key, create_key_from_bytes, get_peer_id, AdminPeer, AdminPeerConfig,
@@ -124,11 +127,28 @@ impl AdminAgent {
         let (mut peer_, mut peer_listener_) =
             AdminPeer::create(admin_config.clone(), peer_key).await;
 
+        let name = self.config.name.clone();
+        let port = self.config.port;
+
         if peer_.id == self._peer_id {
             info!("Admin peer created {}", peer_.id.clone());
+
+            let mut env_vars = HashMap::new();
+            env_vars.insert("ADMIN_PEER_ID".to_string(), peer_.id.clone());
+            env_vars.insert("ADMIN_PEER_PORT".to_string(), port.clone().to_string());
+            env_vars.insert("ADMIN_PEER_NAME".to_string(), name.clone());
+
+            if let Err(e) = utils::env::write_to_env_file(&env_vars) {
+                eprintln!("Failed to write to .ceylon_network file: {}", e);
+            } else {
+                println!("Successfully wrote variables to .ceylon_network file");
+            }
+
             println!("------------------------------------------------------------------");
             println!("| Important");
-            println!("| ServerAdmin peer ID : {}", peer_.id.clone());
+            println!("| Network Name : {}", name.clone());
+            println!("| Network ID : {}", peer_.id.clone());
+            println!("| Network Port: {}", port);
             println!("| Use this ServerAdmin peer ID to connect to the server");
             println!("-------------------------------------------------------------------");
         } else {
