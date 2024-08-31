@@ -133,7 +133,7 @@ impl AdminAgent {
 
         if peer_.id == self._peer_id {
             info!("Admin peer created {}", peer_.id.clone());
-            
+
 
             let mut env_vars = HashMap::new();
             env_vars.insert("ADMIN_PEER_ID".to_string(), peer_.id.clone());
@@ -198,9 +198,18 @@ impl AdminAgent {
             }
         }
 
-        error!("Worker tasks created");
+        info!("Worker tasks created");
 
         let worker_tasks = join_all(worker_tasks);
+        let cancel_token_clone = cancel_token.clone();
+        let worker_task_runner = handle.spawn(async move {
+            worker_tasks.await;
+            loop {
+                if cancel_token_clone.is_cancelled() {
+                    break;
+                }
+            }
+        });
 
         let name = self.config.name.clone();
         let on_message = self._on_message.clone();
@@ -296,6 +305,15 @@ impl AdminAgent {
                 }
             }
         });
+        let cancel_token_clone = cancel_token.clone();
+        let run_holder_process = handle.spawn(async move {
+            loop {
+                if cancel_token_clone.is_cancelled() {
+                    break;
+                }
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            }
+        });
 
         let broadcast_receiver = self.broadcast_receiver.clone();
         let cancel_token_clone = cancel_token.clone();
@@ -334,7 +352,10 @@ impl AdminAgent {
         handle
             .spawn(async move {
                 select! {
-                   _ = worker_tasks => {
+                    _ = run_holder_process => {
+                        info!("Agent {} run_holder_process done", name);
+                    }
+                   _ = worker_task_runner => {
                         info!("Agent {} task_admin_listener done", name);
                     }
                     _ = task_admin => {
