@@ -1,8 +1,7 @@
 import asyncio
-from typing import Any
 
 from ceylon.ceylon import enable_log
-from ceylon.task import TaskCoordinator, TaskOperator
+from ceylon.task import TaskCoordinator
 
 task_manager = TaskCoordinator(tasks=[], agents=[])
 
