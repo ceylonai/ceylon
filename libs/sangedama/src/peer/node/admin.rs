@@ -49,6 +49,8 @@ pub struct AdminPeer {
 
     inside_rx: tokio::sync::mpsc::Receiver<Vec<u8>>,
     inside_tx: tokio::sync::mpsc::Sender<Vec<u8>>,
+
+    _default_address: Multiaddr,
 }
 
 impl AdminPeer {
@@ -61,6 +63,11 @@ impl AdminPeer {
 
         let (inside_tx, inside_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
 
+        let default_address = Multiaddr::empty()
+            .with(Protocol::Ip4(Ipv4Addr::UNSPECIFIED))
+            .with(Protocol::Udp(config.listen_port.unwrap_or(0)))
+            .with(Protocol::QuicV1);
+
         (
             Self {
                 config,
@@ -71,9 +78,15 @@ impl AdminPeer {
 
                 inside_tx,
                 inside_rx,
+                
+                _default_address: default_address,
             },
             outside_rx,
         )
+    }
+
+    pub fn get_address(&self) -> Multiaddr {
+        self._default_address.clone()
     }
 
     pub fn emitter(&self) -> tokio::sync::mpsc::Sender<Vec<u8>> {
@@ -82,10 +95,7 @@ impl AdminPeer {
 
     pub async fn run(&mut self, address: Option<Multiaddr>, cancellation_token: CancellationToken) {
         let address_ = if address.is_none() {
-            Multiaddr::empty()
-                .with(Protocol::Ip4(Ipv4Addr::UNSPECIFIED))
-                .with(Protocol::Udp(self.config.listen_port.unwrap_or(0)))
-                .with(Protocol::QuicV1)
+            self._default_address.clone()
         } else {
             address.unwrap()
         };

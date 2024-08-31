@@ -129,14 +129,17 @@ impl AdminAgent {
 
         let name = self.config.name.clone();
         let port = self.config.port;
+        let address = peer_.get_address();
 
         if peer_.id == self._peer_id {
             info!("Admin peer created {}", peer_.id.clone());
+            
 
             let mut env_vars = HashMap::new();
             env_vars.insert("ADMIN_PEER_ID".to_string(), peer_.id.clone());
             env_vars.insert("ADMIN_PEER_PORT".to_string(), port.clone().to_string());
             env_vars.insert("ADMIN_PEER_NAME".to_string(), name.clone());
+            env_vars.insert("ADMIN_PEER_ADDRESS".to_string(), address.to_string());
 
             if let Err(e) = utils::env::write_to_env_file(&env_vars) {
                 eprintln!("Failed to write to .ceylon_network file: {}", e);
@@ -149,6 +152,7 @@ impl AdminAgent {
             println!("| Network Name : {}", name.clone());
             println!("| Network ID : {}", peer_.id.clone());
             println!("| Network Port: {}", port);
+            println!("| Network Address: {}", address);
             println!("| Use this ServerAdmin peer ID to connect to the server");
             println!("-------------------------------------------------------------------");
         } else {
