@@ -7,3 +7,4 @@ target
 /bindings/ceylon/tests/data/*
 !/bindings/ceylon/tests/data/.no
 
+*.ceylon_network
