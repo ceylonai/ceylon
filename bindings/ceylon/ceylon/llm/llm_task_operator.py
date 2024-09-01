@@ -18,6 +18,7 @@ class LLMTaskOperator(TaskOperator):
 
     def __init__(self, name: str, role: str, context: str, skills: List[str],
                  tools: List[Any] = None, llm=None, tool_llm=None, verbose=False,
+                 config_file=None,
                  workspace_id="ceylon_agent_stack",
                  admin_port=8888, ):
         self.context = context
@@ -28,7 +29,7 @@ class LLMTaskOperator(TaskOperator):
         self.llm = copy.copy(llm)
         self.tool_llm = copy.copy(tool_llm)
         self.history: Dict[str, List[SubTaskResult]] = {}
-        super().__init__(name=name, role=role, workspace_id=workspace_id, admin_port=admin_port)
+        super().__init__(name=name, role=role, workspace_id=workspace_id, admin_port=admin_port, conf_file=config_file)
 
     async def get_result(self, task):
         return await self.get_llm_response(task)
