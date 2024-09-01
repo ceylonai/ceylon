@@ -13,7 +13,7 @@ class TaskOperator(Agent, abc.ABC):
     agent_type = "TASK_OPERATOR"
 
     def __init__(self, name: str, role: str,
-                 conf_file=DEFAULT_CONF_FILE,
+                 conf_file=None,
                  workspace_id: str = DEFAULT_WORKSPACE_ID,
                  admin_port: int = DEFAULT_WORKSPACE_PORT,
                  admin_ip: str = DEFAULT_WORKSPACE_IP,

@@ -9,9 +9,10 @@ from pydantic import BaseModel
 
 from ceylon import on_message
 from ceylon.ceylon import enable_log
+from ceylon.static_val import DEFAULT_CONF_FILE
 from ceylon.task import TaskOperator
 
-enable_log("INFO")
+# enable_log("INFO")
 
 
 class SubTaskMessage(BaseModel):
@@ -34,12 +35,12 @@ class SubTaskWorkingAgent(TaskOperator):
             random_number = random.randint(1, 10)
             await asyncio.sleep(random_number)
 
+    async def on_agent_connected(self, topic: "str", agent: "AgentDetail"):
+        logger.info(f"Agent {agent.name} connected to {topic}")
+        await super().on_agent_connected(topic, agent)
+
 
 worker_1 = SubTaskWorkingAgent("worker_2", "server_admin",
-                               admin_port=8888,
-                               workspace_id="ceylon_agent_stack",
-                               admin_ip="23.94.182.52",
-                               # admin_ip="127.0.0.1",
-                               admin_peer="12D3KooWEUH7vcsHUQ72xfExPZLHawWiYZrybZL5Hj9t6RvkcHpX")
+                               conf_file=DEFAULT_CONF_FILE)
 
 asyncio.run(worker_1.arun_worker(pickle.dumps({})))
