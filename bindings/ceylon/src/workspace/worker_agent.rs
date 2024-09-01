@@ -55,8 +55,8 @@ impl WorkerAgentConfig {
 
     fn to_str(&self) -> String {
         format!(
-            "name: {}, role: {}, work_space_id: {}, admin_peer: {}, admin_port: {}, admin_ip: {}",
-            self.name, self.role, self.work_space_id, self.admin_peer, self.admin_port, self.admin_ip
+            "name: {}, role: {}, work_space_id: {}, admin_peer: {}, admin_port: {}, admin_ip: {}, config_file {:?} ",
+            self.name, self.role, self.work_space_id, self.admin_peer, self.admin_port, self.admin_ip, self.conf_file
         )
     }
 }
@@ -87,8 +87,8 @@ impl WorkerAgent {
         let id = get_peer_id(&admin_peer_key).to_string();
 
         let mut config = config.clone();
-
-        if (!config.conf_file.is_some()) {
+        info!("Config: {}", config.to_str());
+        if (config.conf_file.is_some()) {
             let conf_file = format!("{}", config.clone().conf_file.unwrap().clone());
             info!("Checking .ceylon_network config {}", fs::metadata(conf_file.clone()).is_ok());
             // check .ceylon_network exists
