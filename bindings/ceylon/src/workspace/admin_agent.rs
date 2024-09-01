@@ -136,7 +136,7 @@ impl AdminAgent {
             env_vars.insert(ENV_WORKSPACE_PEER, peer_.id.clone());
             env_vars.insert(ENV_WORKSPACE_PORT, port.clone().to_string());
             env_vars.insert(ENV_WORKSPACE_ID, name.clone());
-            env_vars.insert(ENV_WORKSPACE_IP, "<Use public IP address>".to_string());
+            env_vars.insert(ENV_WORKSPACE_IP, "127.0.0.1".to_string());
 
             if let Err(e) = utils::env::write_to_env_file(&env_vars) {
                 eprintln!("Failed to write to .ceylon_network file: {}", e);
@@ -149,7 +149,7 @@ impl AdminAgent {
             println!("| {}={}", ENV_WORKSPACE_ID, name.clone());
             println!("| {}={}", ENV_WORKSPACE_PEER, peer_.id.clone());
             println!("| {}={}", ENV_WORKSPACE_PORT, port);
-            println!("| {}={}", ENV_WORKSPACE_IP, "<Use public IP address>");
+            println!("| {}={}", ENV_WORKSPACE_IP, "127.0.0.1");
             println!("| Use this ServerAdmin peer ID to connect to the server");
             println!("-------------------------------------------------------------------");
         } else {
