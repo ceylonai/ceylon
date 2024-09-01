@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use std::fs;
 use futures::future::join_all;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -8,8 +10,8 @@ use tokio::task::JoinHandle;
 use tokio::{select, signal};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
-
-use crate::workspace::agent::AgentDetail;
+use uniffi::deps::log::__private_api::log;
+use crate::workspace::agent::{AgentDetail, ENV_WORKSPACE_ID, ENV_WORKSPACE_IP, ENV_WORKSPACE_PEER, ENV_WORKSPACE_PORT};
 use crate::workspace::message::AgentMessage;
 use crate::{EventHandler, MessageHandler, Processor};
 use sangedama::peer::message::data::{EventType, NodeMessage};
@@ -21,10 +23,42 @@ use sangedama::peer::node::{
 pub struct WorkerAgentConfig {
     pub name: String,
     pub role: String,
+    pub conf_file: Option<String>,
     pub work_space_id: String,
     pub admin_peer: String,
     pub admin_port: u16,
     pub admin_ip: String,
+}
+
+impl WorkerAgentConfig {
+    pub fn update_admin_config(&mut self, config_path: String) {
+        let config_content = fs::read_to_string(config_path).unwrap();
+        let config: HashMap<String, String> = config_content
+            .lines()
+            .filter_map(|line| {
+                let parts: Vec<&str> = line.splitn(2, '=').collect();
+                if parts.len() == 2 {
+                    Some((parts[0].to_string(), parts[1].to_string()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        self.work_space_id = config.get(ENV_WORKSPACE_ID).cloned().unwrap_or_default();
+        self.admin_peer = config.get(ENV_WORKSPACE_PEER).cloned().unwrap_or_default();
+        self.admin_port = config.get(ENV_WORKSPACE_PORT)
+            .and_then(|s| s.parse().ok())
+            .unwrap_or_default();
+        self.admin_ip = config.get(ENV_WORKSPACE_IP).cloned().unwrap_or_default();
+    }
+
+    fn to_str(&self) -> String {
+        format!(
+            "name: {}, role: {}, work_space_id: {}, admin_peer: {}, admin_port: {}, admin_ip: {}",
+            self.name, self.role, self.work_space_id, self.admin_peer, self.admin_port, self.admin_ip
+        )
+    }
 }
 
 pub struct WorkerAgent {
@@ -51,6 +85,26 @@ impl WorkerAgent {
         let (broadcast_emitter, broadcast_receiver) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
         let admin_peer_key = create_key();
         let id = get_peer_id(&admin_peer_key).to_string();
+
+        let mut config = config.clone();
+
+        if (!config.conf_file.is_some()) {
+            let conf_file = format!("{}", config.clone().conf_file.unwrap().clone());
+            info!("Checking .ceylon_network config {}", fs::metadata(conf_file.clone()).is_ok());
+            // check .ceylon_network exists
+            if fs::metadata(conf_file.clone()).is_ok() {
+                config.update_admin_config(conf_file.clone());
+                info!("--------------------------------");
+                info!("Using .ceylon_network config");
+                info!( "{} = {}",ENV_WORKSPACE_ID, config.work_space_id);
+                info!( "{} = {}",ENV_WORKSPACE_PEER, config.admin_peer);
+                info!( "{} = {}",ENV_WORKSPACE_PORT, config.admin_port);
+                info!( "{} = {}",ENV_WORKSPACE_IP, config.admin_ip);
+                info!("--------------------------------");
+            }
+        }
+
+
         Self {
             config,
             _processor: Arc::new(Mutex::new(processor)),
@@ -142,6 +196,9 @@ impl WorkerAgent {
         info!("Agent {} running", self.config.name);
 
         let config = worker_agent_config.clone();
+
+        info!("Config {:?}", config.to_str() );
+
         let member_config = MemberPeerConfig::new(
             config.name.clone(),
             config.work_space_id.clone(),

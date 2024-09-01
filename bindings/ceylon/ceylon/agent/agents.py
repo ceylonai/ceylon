@@ -25,6 +25,7 @@ class Agent(Worker):
             workspace_id=workspace_id,
             admin_port=admin_port,
             admin_peer=admin_peer,
+            conf_file=None,
             role=role
         )
 
