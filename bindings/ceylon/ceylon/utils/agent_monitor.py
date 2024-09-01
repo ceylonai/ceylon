@@ -12,12 +12,14 @@ class AgentMonitor(Agent):
                  workspace_id=DEFAULT_WORKSPACE_ID,
                  admin_port=DEFAULT_WORKSPACE_PORT,
                  admin_peer="",
+                 conf_file=None,
                  role="worker"):
         super().__init__(
             name=name,
             workspace_id=workspace_id,
             admin_port=admin_port,
             admin_peer=admin_peer,
+            conf_file=conf_file,
             role=role if role else name
         )
 
