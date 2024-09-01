@@ -8,6 +8,7 @@ from ceylon.llm import LLMTaskOperator, LLMTaskCoordinator
 from ceylon.task import Task
 from ceylon.utils.agent_monitor import AgentMonitor
 
+enable_log("INFO")
 # Define the main task
 task_management_app = Task(
     name="Create Task Management App",
@@ -68,7 +69,6 @@ agents = [
     ),
     AgentMonitor()
 ]
-enable_log("INFO")
 # Initialize TaskManager
 task_manager = LLMTaskCoordinator(tasks, agents, tool_llm=tool_llm, llm=llm,
                                   team_goal=dedent("""
