@@ -11,6 +11,8 @@ from ceylon import on_message
 from ceylon.ceylon import enable_log
 from ceylon.task import TaskOperator
 
+enable_log("INFO")
+
 
 class SubTaskMessage(BaseModel):
     message: str
@@ -38,7 +40,6 @@ worker_1 = SubTaskWorkingAgent("worker_2", "server_admin",
                                workspace_id="ceylon_agent_stack",
                                admin_ip="23.94.182.52",
                                # admin_ip="127.0.0.1",
-                               admin_peer="12D3KooWDQEL2j9LZTZgFk5CJfUVsM35KPg3ijXAv7DeFfCwbhpg")
+                               admin_peer="12D3KooWEUH7vcsHUQ72xfExPZLHawWiYZrybZL5Hj9t6RvkcHpX")
 
-enable_log("INFO")
 asyncio.run(worker_1.arun_worker(pickle.dumps({})))
