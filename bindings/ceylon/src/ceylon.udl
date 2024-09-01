@@ -34,6 +34,7 @@ interface AdminAgent{
 
 dictionary WorkerAgentConfig {
     string name;
+    string? conf_file =".ceylon_network";
     string work_space_id;
     string admin_peer;
     string role;

@@ -1,7 +1,5 @@
 use std::collections::HashMap;
-use std::env;
-use std::env::set_var;
-use std::net::Ipv4Addr;
+
 use std::sync::Arc;
 use std::time::SystemTime;
 
@@ -11,7 +9,7 @@ use tokio::{select, signal};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
 
-use crate::workspace::agent::{AgentDetail, EventHandler};
+use crate::workspace::agent::{AgentDetail, EventHandler, ENV_WORKSPACE_ID, ENV_WORKSPACE_IP, ENV_WORKSPACE_PEER, ENV_WORKSPACE_PORT};
 use crate::workspace::message::AgentMessage;
 use crate::{utils, MessageHandler, Processor, WorkerAgent};
 use sangedama::peer::message::data::{EventType, NodeMessage};
@@ -32,8 +30,8 @@ pub struct AdminAgent {
     _on_message: Arc<Mutex<Arc<dyn MessageHandler>>>,
     _on_event: Arc<Mutex<Arc<dyn EventHandler>>>,
 
-    pub broadcast_emitter: tokio::sync::mpsc::Sender<Vec<u8>>,
-    pub broadcast_receiver: Arc<Mutex<tokio::sync::mpsc::Receiver<Vec<u8>>>>,
+    pub broadcast_emitter: mpsc::Sender<Vec<u8>>,
+    pub broadcast_receiver: Arc<Mutex<mpsc::Receiver<Vec<u8>>>>,
 
     _peer_id: String,
 
@@ -50,7 +48,7 @@ impl AdminAgent {
         processor: Arc<dyn Processor>,
         on_event: Arc<dyn EventHandler>,
     ) -> Self {
-        let (broadcast_emitter, broadcast_receiver) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
+        let (broadcast_emitter, broadcast_receiver) = mpsc::channel::<Vec<u8>>(100);
 
         let admin_peer_key = create_key();
         let id = get_peer_id(&admin_peer_key).to_string();
@@ -94,7 +92,6 @@ impl AdminAgent {
 
     pub async fn stop(&self) {
         info!("Agent {} stop called", self.config.name);
-
         self.shutdown_send.send(self._peer_id.clone()).unwrap();
     }
 
@@ -136,10 +133,10 @@ impl AdminAgent {
 
 
             let mut env_vars = HashMap::new();
-            env_vars.insert("ADMIN_PEER_ID".to_string(), peer_.id.clone());
-            env_vars.insert("ADMIN_PEER_PORT".to_string(), port.clone().to_string());
-            env_vars.insert("ADMIN_PEER_NAME".to_string(), name.clone());
-            env_vars.insert("ADMIN_PEER_ADDRESS".to_string(), address.to_string());
+            env_vars.insert(ENV_WORKSPACE_PEER, peer_.id.clone());
+            env_vars.insert(ENV_WORKSPACE_PORT, port.clone().to_string());
+            env_vars.insert(ENV_WORKSPACE_ID, name.clone());
+            env_vars.insert(ENV_WORKSPACE_IP, "<Use public IP address>".to_string());
 
             if let Err(e) = utils::env::write_to_env_file(&env_vars) {
                 eprintln!("Failed to write to .ceylon_network file: {}", e);
@@ -149,10 +146,10 @@ impl AdminAgent {
 
             println!("------------------------------------------------------------------");
             println!("| Important");
-            println!("| Network Name : {}", name.clone());
-            println!("| Network ID : {}", peer_.id.clone());
-            println!("| Network Port: {}", port);
-            println!("| Network Address: {}", address);
+            println!("| {}={}", ENV_WORKSPACE_ID, name.clone());
+            println!("| {}={}", ENV_WORKSPACE_PEER, peer_.id.clone());
+            println!("| {}={}", ENV_WORKSPACE_PORT, port);
+            println!("| {}={}", ENV_WORKSPACE_IP, "<Use public IP address>");
             println!("| Use this ServerAdmin peer ID to connect to the server");
             println!("-------------------------------------------------------------------");
         } else {

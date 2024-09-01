@@ -12,12 +12,16 @@ from ceylon.static_val import DEFAULT_WORKSPACE_PORT, DEFAULT_WORKSPACE_ID, DEFA
 class Worker(WorkerAgent, Processor, MessageHandler, EventHandler):
     agent_type = "WORKER"
 
-    def __init__(self, name="admin", workspace_id=DEFAULT_WORKSPACE_ID, admin_peer="",
+    def __init__(self, name="admin",
+                 workspace_id=DEFAULT_WORKSPACE_ID,
+                 conf_file=None,
+                 admin_peer="",
                  admin_port=DEFAULT_WORKSPACE_PORT,
                  role="worker",
                  admin_ip=DEFAULT_WORKSPACE_IP):
         super().__init__(config=WorkerAgentConfig(name=name,
                                                   role=role,
+                                                  conf_file=conf_file,
                                                   admin_peer=admin_peer,
                                                   admin_port=admin_port,
                                                   work_space_id=workspace_id, admin_ip=admin_ip), processor=self,
