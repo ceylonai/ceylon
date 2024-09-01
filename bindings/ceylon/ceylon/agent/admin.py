@@ -1,8 +1,22 @@
+import enum
+from typing import List
+
 from loguru import logger
+from pydantic import BaseModel
 
 from .common import AgentCommon
 from ceylon.ceylon import AgentDetail
 from ceylon.core.admin import Admin
+
+
+class AgentInfo(BaseModel):
+    id: str
+    name: str
+    role: str
+
+
+class AgentDetails(BaseModel):
+    agents: List[AgentInfo] = []
 
 
 class CoreAdmin(Admin, AgentCommon):
@@ -20,7 +34,11 @@ class CoreAdmin(Admin, AgentCommon):
         pass
 
     async def on_agent_connected(self, topic: "str", agent: AgentDetail):
-        self.__connected_agents.append(agent)
+        # remove agent list has the same id or name
+        self.__connected_agents = [x for x in self.__connected_agents if x.id != agent.id]
+        self.__connected_agents = [x for x in self.__connected_agents if x.name != agent.name]
+        self.__connected_agents.append(AgentInfo(id=agent.id, name=agent.name, role=agent.role))
+        await self.broadcast_data(AgentDetails(agents=self.__connected_agents))
 
     async def on_message(self, agent_id: "str", data: "bytes", time: "int"):
         await self._on_message_handler(agent_id, data, time)
