@@ -1,4 +1,5 @@
 import enum
+import time
 from typing import List
 
 from loguru import logger
@@ -13,6 +14,7 @@ class AgentInfo(BaseModel):
     id: str
     name: str
     role: str
+    connected_timestamp: float
 
 
 class AgentDetails(BaseModel):
@@ -37,7 +39,8 @@ class CoreAdmin(Admin, AgentCommon):
         # remove agent list has the same id or name
         self.__connected_agents = [x for x in self.__connected_agents if x.id != agent.id]
         self.__connected_agents = [x for x in self.__connected_agents if x.name != agent.name]
-        self.__connected_agents.append(AgentInfo(id=agent.id, name=agent.name, role=agent.role))
+        self.__connected_agents.append(
+            AgentInfo(id=agent.id, name=agent.name, role=agent.role, connected_timestamp=time.time()))
         await self.broadcast_data(AgentDetails(agents=self.__connected_agents))
 
     async def on_message(self, agent_id: "str", data: "bytes", time: "int"):
