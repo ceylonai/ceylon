@@ -31,6 +31,11 @@ class SubTask(BaseModel):
         status = "Completed" if self.completed else "Pending"
         return f"SubTask: {self.name} (ID: {self.id}) - {status} - Dependencies: {self.depends_on}"
 
+    def reset(self):
+        self.result = None
+        self.completed_at = None
+        self.completed = False
+
 
 class TaskDeliverable(BaseModel):
     objective: str = Field(
@@ -75,6 +80,13 @@ class Task(BaseModel):
     task_deliverable: TaskDeliverable = Field(default=None)
 
     max_subtasks: int = Field(default=5, description="max number of subtasks")
+
+    def reinitialize(self):
+        for subtask in self.subtasks.values():
+            subtask.parent_task_id = self.id
+            subtask.reset()
+        self._validate_dependencies()
+        self.execution_order = self.get_execution_order()
 
     def add_subtask(self, subtask: SubTask):
         subtask.parent_task_id = self.id
