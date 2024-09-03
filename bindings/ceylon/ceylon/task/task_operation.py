@@ -14,6 +14,7 @@ class SubTask(BaseModel):
     parent_task_id: Optional[str] = Field(default=None)
     name: str = Field(description="the name of the subtask write in snake_case")
     description: str = Field(description="the description of the subtask, Explains the task in detail")
+    expected_output: str = Field(description="the expected output of the subtask", default="")
     required_specialty: str = Field(description="the required specialty of the subtask", default="")
     depends_on: Set[str] = Field(default_factory=set)
     completed: bool = False
@@ -29,7 +30,7 @@ class SubTask(BaseModel):
 
     def __str__(self):
         status = "Completed" if self.completed else "Pending"
-        return f"SubTask: {self.name} (ID: {self.id}) - {status} - Dependencies: {self.depends_on}"
+        return f"SubTask: {self.name} (ID: {self.id}) - {status} - Dependencies: {self.depends_on} - Expected Output: {self.expected_output}"
 
     def reset(self):
         self.result = None

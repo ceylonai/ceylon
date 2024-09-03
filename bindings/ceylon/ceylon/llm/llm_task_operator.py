@@ -20,8 +20,10 @@ class LLMTaskOperator(TaskOperator):
                  tools: List[Any] = None, llm=None, tool_llm=None, verbose=False,
                  config_file=None,
                  workspace_id="ceylon_agent_stack",
+                 extra_instructions="",
                  admin_port=8888, ):
         self.context = context
+        self.extra_instructions = extra_instructions
         self.verbose = verbose
         self.tools = tools if tools else []
         self.task_history = []
@@ -35,83 +37,80 @@ class LLMTaskOperator(TaskOperator):
         return await self.get_llm_response(task)
 
     async def get_llm_response(self, subtask: SubTask) -> str:
-        agent_profile = f"""
-        You are {self.details().name}, a {self.details().role} {self.context}.
-        Your key skills include: {', '.join(self.skills)}
-        """
+        agent_profile = f"You are {self.details().name}, a {self.details().role} {self.context}. Your key skills include: {', '.join(self.skills)}"
 
         task_info = f"""
         Task: {subtask.name}
         Description: {subtask.description}
-    
+        Expected Output: {subtask.expected_output}
+
         Additional context:
         {self._format_task_history(subtask.parent_task_id, subtask.depends_on)}
-    
+
         Objective: Provide the most successful response for completing {subtask.name}.
         """
 
-        if self.tools:
-            # Create a prompt template suitable for ReAct agent
-            # Create system message template
-            system_template = """
-                {agent_profile}
-                Use the following format:
-                
-                Question: the input question you must answer
-                Thought: you should always think about what to do
-                Action: the action to take, should be one of {tool_names}
-                Action Input: the input to the action
-                Observation: the result of the action
-                ... (this Thought/Action/Action Input/Observation can repeat N times)
-                Thought: I now know the final answer
-                Final Answer: the final answer to the original input question
-            """
-            system_message_prompt = SystemMessagePromptTemplate.from_template(system_template)
+        try:
+            if self.tools:
+                return await self._execute_react_agent(agent_profile, task_info)
+            else:
+                return await self._execute_simple_llm(agent_profile, task_info)
+        except Exception as e:
+            logger.error(f"Error in LLM request: {e}")
+            return f"Error in processing the task: {str(e)}"
 
-            # Create human message template
-            human_template = """
+    async def _execute_react_agent(self, agent_profile: str, task_info: str) -> str:
+        system_template = """
+        {agent_profile}
+            Use the following format:
+    
+            Question: the input question you must answer
+            Thought: you should always think about what to do
+            Action: the action to take, should be one of {tool_names}
+            Action Input: the input to the action
+            Observation: the result of the action
+            ... (this Thought/Action/Action Input/Observation can repeat N times)
+            Thought: I now know the final answer
+    
+            Final Answer: the final answer to the original input question
+        """
+
+        human_template = """
                 Question: {input}
                 Tools: {tools}
+                Extra Instruction: {extra_instructions}
                 {agent_scratchpad}
                 Thought:
-            """
-            human_message_prompt = HumanMessagePromptTemplate.from_template(human_template)
+        """
 
-            # Combine message templates
-            chat_prompt = ChatPromptTemplate.from_messages(
-                [system_message_prompt, human_message_prompt]
-            )
+        chat_prompt = ChatPromptTemplate.from_messages([
+            SystemMessagePromptTemplate.from_template(system_template),
+            HumanMessagePromptTemplate.from_template(human_template)
+        ])
 
-            # Create a ReAct agent with tools
-            react_agent = create_react_agent(self.llm, self.tools, prompt=chat_prompt)
-            agent_executor = AgentExecutor(agent=react_agent, tools=self.tools, verbose=self.verbose)
+        react_agent = create_react_agent(self.llm, self.tools, prompt=chat_prompt)
+        agent_executor = AgentExecutor(agent=react_agent, tools=self.tools, verbose=self.verbose,
+                                       handle_parsing_errors=True)
 
-            try:
-                response = agent_executor.invoke({
-                    "agent_profile": agent_profile,
-                    "input": task_info,
-                    "tools": "\n".join([f"{tool.name}: {tool.description}" for tool in self.tools]),
-                    "agent_scratchpad": "",
-                    "tool_names": [tool.name for tool in self.tools],
-                })
-                return response["output"]  # Assuming the output is in the "output" key
-            except Exception as e:
-                logger.error(f"Error in agent execution: {e}")
-                return f"Error in processing the task with agent: {str(e)}"
-        else:
-            # If no tools are available, use a simpler prompt for regular LLM
-            prompt_template = ChatPromptTemplate.from_messages([
-                SystemMessage(content=agent_profile),
-                HumanMessage(content=task_info)
-            ])
+        response = await agent_executor.ainvoke({
+            "agent_profile": agent_profile,
+            "input": task_info,
+            "extra_instructions": self.extra_instructions,
+            "tools": "\n".join(f"{tool.name}: {tool.description}" for tool in self.tools),
+            "agent_scratchpad": "",
+            "tool_names": [tool.name for tool in self.tools],
+        })
 
-            try:
-                runnable = prompt_template | self.llm | StrOutputParser()
-                response = runnable.invoke({})
-                return response
-            except Exception as e:
-                logger.error(f"Error in LLM request: {e}")
-                return f"Error in processing the task with LLM: {str(e)}"
+        return response["output"]
+
+    async def _execute_simple_llm(self, agent_profile: str, task_info: str) -> str:
+        prompt_template = ChatPromptTemplate.from_messages([
+            SystemMessage(content=agent_profile),
+            HumanMessage(content=task_info)
+        ])
+
+        runnable = prompt_template | self.llm | StrOutputParser()
+        return await runnable.ainvoke({})
 
     def _format_task_history(self, task_id, depends_on: Set[str]) -> str:
         if task_id not in self.history:
