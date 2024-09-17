@@ -1,10 +1,8 @@
-# CLI_TaskManager class that extends TaskManager
 from ceylon.auto.manager.abstract_manager import TaskManager
 
 
 class CLI_TaskManager(TaskManager):
     def progress_subtask(self, subtask):
-        """Simulate the progression of a subtask via CLI interaction."""
         # Approve if needed
         if subtask.needs_approval and subtask.state == 'pending':
             user_input = input(f"SubTask '{subtask.name}' needs approval. Approve? (y/n): ")
@@ -14,6 +12,14 @@ class CLI_TaskManager(TaskManager):
             else:
                 print(f"SubTask '{subtask.name}' not approved.")
                 return
+
+        # Collect required inputs if not yet provided
+        if subtask.inputs_needed and not subtask.has_all_inputs():
+            print(f"SubTask '{subtask.name}' requires additional inputs.")
+            for input_name in subtask.inputs_needed:
+                if input_name not in subtask.inputs_provided:
+                    input_value = input(f"Please provide input '{input_name}': ")
+                    subtask.inputs_provided[input_name] = input_value
 
         # Handle failed state and retries
         if subtask.state == 'failed' and subtask.can_retry():
@@ -39,4 +45,4 @@ class CLI_TaskManager(TaskManager):
                 print(f"SubTask '{subtask.name}' failed.")
         else:
             if subtask.state not in ['completed', 'in_progress', 'failed']:
-                print(f"SubTask '{subtask.name}' cannot start yet. Waiting for dependencies.")
+                print(f"SubTask '{subtask.name}' cannot start yet. Waiting for dependencies or inputs.")

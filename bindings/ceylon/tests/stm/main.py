@@ -1,68 +1,72 @@
-# Assuming the previous code has been imported and the SubTask and Task classes are available
+# Create a new subtask that requires inputs
 from ceylon.auto.manager.cli_manager import CLI_TaskManager
-from ceylon.auto.model import Task, SubTask
+from ceylon.auto.model import SubTask, Task
 
-# Create subtasks for a second task
-# SubTask 1: Gather Data
-gather_data = SubTask(
-    name="Gather Data",
-    executor="Grace",
-    needs_approval=False
+# SubTask 1: Market Research
+market_research = SubTask(
+    name="Market Research",
+    executor="Alice",
+    needs_approval=False,
+    inputs_needed=["Target Demographics", "Market Trends"]
 )
 
-# SubTask 2: Analyze Data
-analyze_data = SubTask(
-    name="Analyze Data",
-    executor="Heidi",
+# SubTask 2: Design Prototype
+design_prototype = SubTask(
+    name="Design Prototype",
+    executor="Bob",
+    needs_approval=False,  # Auto-approves since needs_approval is False
+    dependencies=[market_research]
+)
+
+# SubTask 3: User Testing
+user_testing = SubTask(
+    name="User Testing",
+    executor="Charlie",
     needs_approval=True,
-    dependencies=[gather_data]
+    dependencies=[design_prototype]
 )
 
-# SubTask 3: Write Report
-write_report = SubTask(
-    name="Write Report",
-    executor="Ivan",
+# SubTask 4: Finalize Product
+finalize_product = SubTask(
+    name="Finalize Product",
+    executor="Diana",
     needs_approval=False,
-    dependencies=[analyze_data]
+    dependencies=[user_testing],
+    inputs_needed=["Final Specifications"]
 )
 
-# SubTask 4: Review Report
-review_report = SubTask(
-    name="Review Report",
-    executor="Judy",
+# SubTask 5: Marketing Campaign
+marketing_campaign = SubTask(
+    name="Marketing Campaign",
+    executor="Ethan",
     needs_approval=True,
-    dependencies=[write_report]
+    dependencies=[finalize_product]
 )
 
-# SubTask 5: Finalize Report
-finalize_report = SubTask(
-    name="Finalize Report",
-    executor="Kevin",
+# SubTask 6: Launch Event
+launch_event = SubTask(
+    name="Launch Event",
+    executor="Fiona",
     needs_approval=False,
-    dependencies=[review_report]
+    dependencies=[marketing_campaign]
 )
 
-# SubTask 6: Distribute Report
-distribute_report = SubTask(
-    name="Distribute Report",
-    executor="Laura",
-    needs_approval=False,
-    dependencies=[finalize_report]
+# Create the main task
+launch_product_task = Task(
+    name="Launch New Product",
+    subtasks=[
+        market_research,
+        design_prototype,
+        user_testing,
+        finalize_product,
+        marketing_campaign,
+        launch_event
+    ]
 )
 
-# Create the second main task
-monthly_report_task = Task(
-    name="Prepare Monthly Report",
-    subtasks=[gather_data, analyze_data, write_report, review_report, finalize_report, distribute_report]
-)
-
-# Create TaskManager instance
+# Add the task to the manager and run
 task_manager = CLI_TaskManager()
+task_manager.add_task(launch_product_task)
 
-# Add tasks to the manager
-task_manager.add_task(monthly_report_task)
-# task_manager.add_task(monthly_report_task)
-
-# Simulate the task progression
 while not task_manager.all_tasks_completed():
     task_manager.progress_tasks()
