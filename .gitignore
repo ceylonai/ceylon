@@ -8,3 +8,4 @@ target
 !/bindings/ceylon/tests/data/.no
 
 *.ceylon_network
+/bindings/ceylon/tests/tasks/ceylon-ai.2024-09-02.private-key.pem
