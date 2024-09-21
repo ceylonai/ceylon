@@ -10,7 +10,6 @@ use tokio::task::JoinHandle;
 use tokio::{select, signal};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
-use uniffi::deps::log::__private_api::log;
 use crate::workspace::agent::{AgentDetail, ENV_WORKSPACE_ID, ENV_WORKSPACE_IP, ENV_WORKSPACE_PEER, ENV_WORKSPACE_PORT};
 use crate::workspace::message::AgentMessage;
 use crate::{EventHandler, MessageHandler, Processor};
@@ -88,8 +87,8 @@ impl WorkerAgent {
 
         let mut config = config.clone();
         info!("Config: {}", config.to_str());
-        if (config.conf_file.is_some()) {
-            let conf_file = format!("{}", config.clone().conf_file.unwrap().clone());
+        if config.conf_file.is_some() {
+            let conf_file = config.clone().conf_file.unwrap().clone().to_string();
             info!("Checking .ceylon_network config {}", fs::metadata(conf_file.clone()).is_ok());
             // check .ceylon_network exists
             if fs::metadata(conf_file.clone()).is_ok() {
