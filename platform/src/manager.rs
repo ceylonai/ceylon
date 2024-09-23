@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use ceylon::{AdminAgent, AdminAgentConfig, AgentDetail, EventHandler, MessageHandler, Processor};
+use ceylon::{AdminAgent, AdminAgentConfig, AgentDetail, EventHandler, MessageHandler, Processor, WorkerAgent, WorkerAgentConfig};
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -63,4 +63,26 @@ pub fn get_manager(name: String, port: u16) -> AdminAgent {
         event_handler,
     );
     admin_agent
+}
+
+pub fn connect_monitor() -> WorkerAgent {
+    let conf = WorkerAgentConfig {
+        name: "".to_string(),
+        role: "".to_string(),
+        conf_file: None,
+        work_space_id: "".to_string(),
+        admin_peer: "".to_string(),
+        admin_port: 0,
+        admin_ip: "".to_string(),
+    };
+
+    let message_handler = Arc::new(MyMessageHandler) as Arc<dyn MessageHandler + Send + Sync>;
+    let processor = Arc::new(MyProcessor) as Arc<dyn Processor + Send + Sync>;
+    let event_handler = Arc::new(MyEventHandler) as Arc<dyn EventHandler + Send + Sync>;
+    WorkerAgent::new(
+        conf,
+        message_handler,
+        processor,
+        event_handler,
+    )
 }

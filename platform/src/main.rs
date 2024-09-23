@@ -1,8 +1,6 @@
 mod manager;
 
 use clap::{Parser, Subcommand};
-use ceylon::AdminAgent;
-use crate::manager::get_manager;
 
 /// CLI for Ceylon Agent System
 #[derive(Parser)]
@@ -114,15 +112,7 @@ fn main() {
             ManageCommands::Start { name, port, address } => {
                 println!("Starting agent: {} on port: {} and address: {}", name, port, address);
 
-                tokio::runtime::Builder::new_multi_thread()
-                    .enable_all()
-                    .build()
-                    .unwrap()
-                    .block_on(async {
-                        let admin = get_manager(name.clone(), *port);
-                        admin.start(Vec::new(), Vec::new()).await;  
-                    });
-                
+
                 // let admin = get_manager(name.clone(), *port);
                 // admin.start(Vec::new(), Vec::new()).await;  
             }
