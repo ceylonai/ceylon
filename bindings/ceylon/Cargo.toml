@@ -8,8 +8,11 @@ edition = "2021"
 name = "ceylon"
 crate-type = ["cdylib", "rlib"]
 
-[dependencies]
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 uniffi = { version = "0.28.1", features = ["tokio", "bindgen", "default"] }
+
+[dependencies]
 thiserror = "1.0.61"
 uuid = { version = "1.10.0", features = ["v4"] }
 serde_json = "1.0.128"
@@ -22,5 +25,5 @@ tracing-subscriber = "0.3.18"
 tracing = "0.1.40"
 futures = { version = "0.3.30", default-features = true, features = ["default"] }
 
-[build-dependencies]
+[target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 uniffi = { version = "0.28.1", features = ["build"] }
