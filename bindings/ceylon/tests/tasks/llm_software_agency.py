@@ -1,23 +1,38 @@
 import asyncio
+from pathlib import Path
 from textwrap import dedent
 
+from langchain_community.agent_toolkits import FileManagementToolkit
+from langchain_community.agent_toolkits.github.toolkit import GitHubToolkit
+from langchain_community.utilities.github import GitHubAPIWrapper
 from langchain_openai import ChatOpenAI
+from loguru import logger
 
 from ceylon.ceylon import enable_log
 from ceylon.llm import LLMTaskOperator, LLMTaskCoordinator
 from ceylon.task import Task
 from ceylon.utils.agent_monitor import AgentMonitor
+from tasks.fw_tool import FixedWriteFileTool
 
 enable_log("INFO")
 # Define the main task
 task_management_app = Task(
     name="Create Task Management App",
     description=dedent("""
-    Develop a advanced task management application with features for adding,  listing, and completing tasks. 
-    and with priority from list.also need to download list of tasks by date.and need to check finished tasks 
-     This must be a standalone GUI app source code.
+    Need a software to print "Hello Ceylon" in console. 
     """)
 )
+
+import getpass
+import os
+
+for env_var in [
+    "GITHUB_APP_ID",
+    "GITHUB_APP_PRIVATE_KEY",
+    "GITHUB_REPOSITORY",
+]:
+    if not os.getenv(env_var):
+        os.environ[env_var] = getpass.getpass()
 
 tasks = [task_management_app]
 
@@ -27,14 +42,33 @@ llm = ChatOpenAI(model="gpt-4o-mini")
 tool_llm = ChatOpenAI(model="gpt-4o-mini")
 code_llm = ChatOpenAI(model="gpt-4o-mini")
 
+# github = GitHubAPIWrapper()
+# toolkit = GitHubToolkit.from_github_api_wrapper(github)
+
+
+working_directory = Path("software")
+logger.info(working_directory.absolute())
+root_dir = f"{working_directory.absolute()}"
+toolkit = FileManagementToolkit(
+    root_dir=root_dir,
+    selected_tools=["read_file"],
+)  # If you don't provide a root_dir, operations will default to the current working directory
+logger.info(toolkit.get_tools())
+
 # Create specialized agents
 agents = [
     LLMTaskOperator(
         name="backend_developer",
         role="Python Backend Developer",
-        context="Experienced in developing backend systems, API design, and database integration.",
+        context="Specializes in server-side logic, API development, database design, and system architecture. Focuses on efficiency, scalability, and security.",
         skills=[
             "Python Programming",
+            "RESTful API Design",
+            "Database Management (SQL and NoSQL)",
+            "Server Architecture",
+            "Authentication and Authorization",
+            "Asynchronous Programming",
+            "Microservices Architecture",
         ],
         tools=[],
         llm=code_llm
@@ -42,30 +76,58 @@ agents = [
     LLMTaskOperator(
         name="frontend_developer",
         role="Python Frontend Developer",
-        context="Proficient in creating user interfaces and handling user interactions in Python applications.",
+        context="Expertise in creating intuitive and responsive user interfaces for Python applications. Focuses on user experience, accessibility, and cross-platform compatibility.",
         skills=[
-            "UI Design",
-            "User Experience",
-            "Python GUI Frameworks like Tkinter",
+            "UI/UX Design Principles",
+            "Python GUI Frameworks (Tkinter, PyQt, wxPython)",
+            "Event-driven Programming",
+            "Responsive Design",
+            "User Input Validation",
+            "Data Visualization",
+            "Accessibility Standards",
         ],
         tools=[],
         llm=code_llm
     ),
     LLMTaskOperator(
-        name="qa",
+        name="qa_engineer",
         role="QA Engineer",
-        context="Experienced in testing and troubleshooting Python applications.",
+        context="Ensures software quality through comprehensive testing strategies. Focuses on identifying bugs, improving user experience, and maintaining code integrity.",
         skills=[
-            "Unit Testing",
-            "Functional Testing",
+            "Test Planning and Strategy",
+            "Unit Testing (pytest, unittest)",
             "Integration Testing",
-            "End-to-End Testing",
+            "End-to-End Testing (Selenium, Behave)",
+            "Performance Testing (Locust)",
             "Security Testing",
-            "Performance Testing",
-            "API Testing",
+            "API Testing (Postman, requests)",
+            "Continuous Integration/Continuous Deployment (CI/CD)",
+            "Bug Tracking and Reporting",
         ],
         tools=[],
-        llm=code_llm
+        llm=code_llm,
+        verbose=True
+    ),
+    LLMTaskOperator(
+        name="source_code_writer",
+        role="Source Code Manager",
+        context="Responsible for creating, organizing, and managing source code files within the project structure. Ensures code consistency and proper file management.",
+        skills=[
+            "File System Operations",
+            "Source Code Organization",
+            "Version Control Integration",
+            "Code Template Generation",
+            "Project Structure Management",
+            "File Naming Conventions",
+            "Code Documentation",
+        ],
+        tools=[
+            *toolkit.get_tools(),
+            FixedWriteFileTool(
+                root_dir=root_dir, )
+        ],
+        llm=code_llm,
+        verbose=True
     ),
     AgentMonitor()
 ]

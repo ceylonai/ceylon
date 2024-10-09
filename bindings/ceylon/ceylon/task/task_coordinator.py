@@ -53,6 +53,7 @@ class TaskCoordinator(CoreAdmin):
             self.results[task.id] = []
             sub_tasks = task.get_next_subtasks()
             if len(sub_tasks) == 0:
+                logger.info(f"Task {task.name} has no subtasks")
                 continue
             for sub_task in sub_tasks:
                 if sub_task is None:
@@ -119,9 +120,9 @@ class TaskCoordinator(CoreAdmin):
         await super().on_agent_connected(topic, agent)
         await self.run_tasks()
 
-    def add_tasks(self, tasks: List[Task]):
+    async def add_tasks(self, tasks: List[Task]):
         self.tasks.extend(tasks)
-        self.on_init()
+        await self.run_tasks()
 
     async def add_task(self, task: Task):
         self.tasks.extend([task])
@@ -133,4 +134,6 @@ class TaskCoordinator(CoreAdmin):
 
     @on_message(type=Task)
     async def on_add_task(self, task: Task):
-        self.add_tasks([task])
+        logger.info(f"Adding task {task} to coordinator")
+        task.reinitialize()
+        await self.add_tasks([task])

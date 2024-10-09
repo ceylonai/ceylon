@@ -61,6 +61,7 @@ class SubTaskModel(pydantic.v1.BaseModel):
     description: str = pydantic.v1.Field(description="Detailed subtask explanation", default="")
     required_specialty: str = pydantic.v1.Field(description="Required skill or expertise", default="")
     depends_on: Set[str] = pydantic.v1.Field(description="Names of prerequisite subtasks", default=[])
+    expected_output: str = pydantic.v1.Field(description="Expected output of the subtask", default="")
 
     def to_v2(self, parent_task_id) -> SubTask:
         return SubTask(
@@ -68,7 +69,8 @@ class SubTaskModel(pydantic.v1.BaseModel):
             name=self.name,
             description=self.description,
             required_specialty=self.required_specialty,
-            depends_on=self.depends_on
+            depends_on=self.depends_on,
+            expected_output=self.expected_output
         )
 
 
@@ -103,12 +105,6 @@ class LLMTaskCoordinator(TaskCoordinator):
                 f"LLM Task Coordinator initialized with {len(self.tasks)} "
                 f"tasks and {len(self.get_llm_operators)} agents {[agent.details().name for agent in self.get_llm_operators]}")
 
-    #     self.initialize_team_network()
-    #
-    # def initialize_team_network(self):
-    #     for agent in self.get_llm_operators:
-    #         self.team_network.add_node(agent.details().name, role=agent.details().role)
-
     async def update_task(self, idx: int, task: Task):
         logger.info(f"Updating task {task.name} with {len(task.subtasks)} subtasks")
         if task.task_deliverable is None:
@@ -128,51 +124,6 @@ class LLMTaskCoordinator(TaskCoordinator):
             logger.info(f"Subtask {subtask.name} updated with {len(subtask.depends_on)} dependencies")
         # await self.update_team_network(task)
         return task
-
-    # async def update_team_network(self, task: Task):
-    #     for subtask in task.subtasks.values():
-    #         agent_name = await self.get_best_agent_for_subtask(subtask)
-    #         for dependency in subtask.depends_on:
-    #             dependency_agent = await self.get_best_agent_for_subtask(task.subtasks[dependency])
-    #             self.team_network.add_edge(agent_name, dependency_agent, task=task.id, subtask=subtask.name)
-    #
-    # async def analyze_team_dynamics(self) -> str:
-    #     prompt = PromptTemplate.from_template(
-    #         dedent("""
-    #         Analyze the following team network and provide insights on team dynamics:
-    #
-    #         Nodes (Agents): {nodes}
-    #         Edges (Collaborations): {edges}
-    #
-    #         Please provide a brief analysis covering:
-    #         1. Key collaborators
-    #         2. Potential bottlenecks
-    #         3. Suggestions for improving team efficiency
-    #
-    #         Respond in a concise paragraph.
-    #         """
-    #                ))
-    #
-    #     nodes = [f"{node}: {data}" for node, data in self.team_network.nodes(data=True)]
-    #     edges = [f"{u} - {v}: {data}" for u, v, data in self.team_network.edges(data=True)]
-    #
-    #     chain = prompt | self.llm | StrOutputParser()
-    #     analysis = chain.invoke({"nodes": nodes, "edges": edges})
-    #     return analysis
-    #
-    # def visualize_team_network(self, output_file: str = None):
-    #     import matplotlib.pyplot as plt
-    #     plt.figure(figsize=(12, 8))
-    #     pos = nx.spring_layout(self.team_network)
-    #     nx.draw(self.team_network, pos, with_labels=True, node_color='lightblue', node_size=1000, font_size=8)
-    #     edge_labels = nx.get_edge_attributes(self.team_network, 'task')
-    #     nx.draw_networkx_edge_labels(self.team_network, pos, edge_labels=edge_labels)
-    #     if output_file is not None:
-    #         plt.title("Team Collaboration Network")
-    #         plt.savefig(output_file)
-    #         plt.close()
-    #     else:
-    #         plt.show()
 
     async def get_task_executor(self, task: SubTask) -> str:
         return await self.get_best_agent_for_subtask(task)
@@ -198,6 +149,7 @@ class LLMTaskCoordinator(TaskCoordinator):
 
             Subtask: {subtask_description}
             Required specialty: {required_specialty}
+            Expected output: {expected_output}
 
             Agent specialties:
             {agent_specialties}
@@ -217,6 +169,7 @@ class LLMTaskCoordinator(TaskCoordinator):
             for attempt in range(max_attempts):
                 response = runnable.invoke({
                     "subtask_description": subtask.description,
+                    "expected_output": subtask.expected_output,
                     "required_specialty": subtask.required_specialty,
                     "agent_specialties": agent_specialties,
                     "agent_names": ", ".join(agent_names)

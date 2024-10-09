@@ -126,7 +126,6 @@ impl AdminAgent {
 
         let name = self.config.name.clone();
         let port = self.config.port;
-        let address = peer_.get_address();
 
         if peer_.id == self._peer_id {
             info!("Admin peer created {}", peer_.id.clone());

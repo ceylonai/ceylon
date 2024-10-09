@@ -1,5 +1,6 @@
 import inspect
 import pickle
+import traceback
 from typing import Dict, Callable
 
 from loguru import logger
@@ -58,7 +59,8 @@ class AgentCommon:
                 else:
                     await handler(self, message)
             else:
-                logger.warning(f"No handler registered in the class hierarchy for message type: {message_type}")
+                logger.debug(f"No handler registered in the class hierarchy for message type: {message_type}")
 
         except Exception as e:
-            logger.error(e)
+            # Full traceback
+            logger.error(traceback.format_exc())
