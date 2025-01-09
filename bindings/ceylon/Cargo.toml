@@ -13,17 +13,15 @@ crate-type = ["cdylib", "rlib"]
 uniffi = { version = "0.28.1", features = ["tokio", "bindgen", "default"] }
 
 [dependencies]
-thiserror = "1.0.61"
-uuid = { version = "1.10.0", features = ["v4"] }
-serde_json = "1.0.128"
+serde_json = "1.0.135"
 sangedama = { path = "../../libs/sangedama" }
-tokio = { version = "1.40.0", features = ["full"] }
-tokio-util = { version = "0.7.12", features = ["rt"] }
-async-trait = "0.1.82"
-serde = { version = "1.0.210", features = ["derive"] }
-tracing-subscriber = "0.3.18"
-tracing = "0.1.40"
-futures = { version = "0.3.30", default-features = true, features = ["default"] }
+tokio = { version = "1.43.0", features = ["full"] }
+tokio-util = { version = "0.7.13", features = ["rt"] }
+async-trait = "0.1.85"
+serde = { version = "1.0.217", features = ["derive"] }
+tracing-subscriber = "0.3.19"
+tracing = "0.1.41"
+futures = { version = "0.3.31", default-features = true, features = ["default"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
 uniffi = { version = "0.28.1", features = ["build"] }
