@@ -1,16 +1,63 @@
+# Base package information
 [package]
 name = "sangedama"
 version = "0.1.2"
 edition = "2021"
+# Adding description and other metadata would be good practice
+authors = ["Your Name <your.email@example.com>"]
+description = "A libp2p-based network application with WASM support"
 
+# Feature definitions for different build targets
+[features]
+# Default features for native builds
+default = ["native"]
+
+# Native platform features - includes all desktop/server capabilities
+native = [
+    "tokio/full",
+    "libp2p/tokio",
+    "libp2p/tcp",
+    "libp2p/mdns",
+    "libp2p/quic",
+    "libp2p/relay",
+    "libp2p/dns",
+    "libp2p/autonat",
+]
+
+# WASM-specific features - browser-compatible features
+wasm = [
+    "getrandom/js",
+    "libp2p/wasm-bindgen",
+    "libp2p/websocket",
+]
+
+# Core dependencies that work in both environments
 [dependencies]
 futures = "0.3.31"
-tokio = { version = "1.43.0", features = ["full"] }
-tokio-util = { version = "0.7.13", features = ["rt"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.135"
+
+# libp2p configuration with common features
+[dependencies.libp2p]
+version = "0.54.1"
+features = [
+    "gossipsub", # Peer-to-peer messaging
+    "noise", # Encryption
+    "macros", # Helper macros
+    "yamux", # Connection multiplexing
+    "tls", # Transport security
+    "identify", # Peer identification
+    "rendezvous", # Peer discovery
+    "ping", # Network health checks
+    "request-response" # Basic request/response protocol
+]
+
+# Native-only dependencies
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { version = "1.43.0", features = ["full"] }
+tokio-util = { version = "0.7.13", features = ["rt"] }
 libp2p = { version = "0.54.1", features = [
     "tokio",
     "gossipsub",
@@ -30,3 +77,26 @@ libp2p = { version = "0.54.1", features = [
     "ping",
     "request-response",
 ] }
+
+# WASM-specific dependencies
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# Random number generation for WASM
+getrandom = { version = "0.2", features = ["js"] }
+# Core WASM bindings
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+# Browser API access
+web-sys = { version = "0.3", features = [
+    "Window",
+    "Location",
+    "Performance",
+    "PerformanceTiming",
+    "console"
+] }
+# JavaScript runtime interop
+js-sys = "0.3"
+
+# Development dependencies (useful for testing both environments)
+[dev-dependencies]
+# Add testing frameworks and development tools here
+wasm-bindgen-test = "0.3"
