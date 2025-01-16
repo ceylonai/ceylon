@@ -13,7 +13,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
 
 use crate::peer::behaviour::{PeerAdminBehaviour, PeerAdminEvent};
-use crate::peer::message::data::{EventType, NodeMessage};
+use crate::peer::message::data::{EventType, MessageType, NodeMessage};
 use crate::peer::peer_swarm::create_swarm;
 
 #[derive(Default, Clone)]
@@ -78,7 +78,7 @@ impl AdminPeer {
 
                 inside_tx,
                 inside_rx,
-                
+
                 _default_address: default_address,
             },
             outside_rx,
@@ -133,6 +133,7 @@ impl AdminPeer {
                             data: message,
                             time: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs_f64() as u64,
                             created_by: self.id.clone(),
+                            message_type: MessageType::Broadcast,
                         };
                         match self.swarm.behaviour_mut().gossip_sub.publish(topic,distributed_message.to_bytes()){
                             Ok(_) => {}
