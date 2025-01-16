@@ -29,6 +29,9 @@ interface AdminAgent{
     [Async]
     void broadcast(bytes message);
 
+    [Async]
+    void send_direct(string to_peer, bytes message);
+
     AgentDetail details();
 };
 
@@ -51,6 +54,9 @@ interface WorkerAgent{
 
     [Async]
     void broadcast(bytes message);
+
+    [Async]
+    void send_direct(string to_peer, bytes message);
 
     AgentDetail details();
 

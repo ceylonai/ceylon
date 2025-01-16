@@ -1,7 +1,16 @@
+use crate::workspace::agent::{
+    AgentDetail, ENV_WORKSPACE_ID, ENV_WORKSPACE_IP, ENV_WORKSPACE_PEER, ENV_WORKSPACE_PORT,
+};
+use crate::workspace::message::{AgentMessage, MessageType};
+use crate::{EventHandler, MessageHandler, Processor};
+use futures::future::join_all;
+use sangedama::peer::message::data::{EventType, NodeMessage};
+use sangedama::peer::node::{
+    create_key, create_key_from_bytes, get_peer_id, MemberPeer, MemberPeerConfig,
+};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use futures::future::join_all;
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::runtime::Handle;
@@ -10,13 +19,6 @@ use tokio::task::JoinHandle;
 use tokio::{select, signal};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
-use crate::workspace::agent::{AgentDetail, ENV_WORKSPACE_ID, ENV_WORKSPACE_IP, ENV_WORKSPACE_PEER, ENV_WORKSPACE_PORT};
-use crate::workspace::message::AgentMessage;
-use crate::{EventHandler, MessageHandler, Processor};
-use sangedama::peer::message::data::{EventType, NodeMessage};
-use sangedama::peer::node::{
-    create_key, create_key_from_bytes, get_peer_id, MemberPeer, MemberPeerConfig,
-};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkerAgentConfig {
@@ -46,7 +48,8 @@ impl WorkerAgentConfig {
 
         self.work_space_id = config.get(ENV_WORKSPACE_ID).cloned().unwrap_or_default();
         self.admin_peer = config.get(ENV_WORKSPACE_PEER).cloned().unwrap_or_default();
-        self.admin_port = config.get(ENV_WORKSPACE_PORT)
+        self.admin_port = config
+            .get(ENV_WORKSPACE_PORT)
             .and_then(|s| s.parse().ok())
             .unwrap_or_default();
         self.admin_ip = config.get(ENV_WORKSPACE_IP).cloned().unwrap_or_default();
@@ -89,20 +92,22 @@ impl WorkerAgent {
         info!("Config: {}", config.to_str());
         if config.conf_file.is_some() {
             let conf_file = config.clone().conf_file.unwrap().clone().to_string();
-            info!("Checking .ceylon_network config {}", fs::metadata(conf_file.clone()).is_ok());
+            info!(
+                "Checking .ceylon_network config {}",
+                fs::metadata(conf_file.clone()).is_ok()
+            );
             // check .ceylon_network exists
             if fs::metadata(conf_file.clone()).is_ok() {
                 config.update_admin_config(conf_file.clone());
                 info!("--------------------------------");
                 info!("Using .ceylon_network config");
-                info!( "{} = {}",ENV_WORKSPACE_ID, config.work_space_id);
-                info!( "{} = {}",ENV_WORKSPACE_PEER, config.admin_peer);
-                info!( "{} = {}",ENV_WORKSPACE_PORT, config.admin_port);
-                info!( "{} = {}",ENV_WORKSPACE_IP, config.admin_ip);
+                info!("{} = {}", ENV_WORKSPACE_ID, config.work_space_id);
+                info!("{} = {}", ENV_WORKSPACE_PEER, config.admin_peer);
+                info!("{} = {}", ENV_WORKSPACE_PORT, config.admin_port);
+                info!("{} = {}", ENV_WORKSPACE_IP, config.admin_ip);
                 info!("--------------------------------");
             }
         }
-
 
         Self {
             config,
@@ -115,24 +120,6 @@ impl WorkerAgent {
 
             _peer_id: id,
             _key: admin_peer_key.to_protobuf_encoding().unwrap(),
-        }
-    }
-    pub async fn broadcast(&self, message: Vec<u8>) {
-        let id = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let node_message = AgentMessage::NodeMessage {
-            message,
-            id: id as u64,
-        };
-        let message = node_message.to_bytes();
-
-        match self.broadcast_emitter.send(message).await {
-            Ok(_) => {}
-            Err(_) => {
-                error!("Failed to send broadcast message");
-            }
         }
     }
     pub async fn start(&self, _inputs: Vec<u8>) {
@@ -185,6 +172,25 @@ impl WorkerAgent {
 }
 
 impl WorkerAgent {
+    pub async fn send_direct(&self, to_peer: String, message: Vec<u8>) {
+        let node_message = AgentMessage::create_direct_message(message, to_peer);
+        match self.broadcast_emitter.send(node_message.to_bytes()).await {
+            Ok(_) => {}
+            Err(e) => {
+                error!("Failed to send direct message: {:?}", e);
+            }
+        }
+    }
+
+    pub async fn broadcast(&self, message: Vec<u8>) {
+        let node_message = AgentMessage::create_broadcast_message(message);
+        match self.broadcast_emitter.send(node_message.to_bytes()).await {
+            Ok(_) => {}
+            Err(e) => {
+                error!("Failed to send broadcast message: {:?}", e);
+            }
+        }
+    }
     pub async fn run_with_config(
         &self,
         inputs: Vec<u8>,
@@ -196,7 +202,7 @@ impl WorkerAgent {
 
         let config = worker_agent_config.clone();
 
-        info!("Config {:?}", config.to_str() );
+        info!("Config {:?}", config.to_str());
 
         let member_config = MemberPeerConfig::new(
             config.name.clone(),
@@ -228,6 +234,7 @@ impl WorkerAgent {
         let agent_details = self.details().clone();
 
         let on_event = self._on_event.clone();
+        let peer_id= self._peer_id.clone();
         let task_admin_listener = runtime.spawn(async move {
             loop {
                 if is_request_to_shutdown {
@@ -240,16 +247,30 @@ impl WorkerAgent {
                    event = peer_listener_.recv() => {
                         if let Some(event) = event {
                             match event {
-                                NodeMessage::Message{ data, created_by, time} => {
+                                NodeMessage::Message{ data, created_by, time,..} => {
                                    let agent_message = AgentMessage::from_bytes(data);
 
                                     match agent_message {
-                                        AgentMessage::NodeMessage { message,.. } => {
-                                            on_message.lock().await.on_message(
-                                                created_by,
-                                                message,
-                                                time
-                                            ).await;
+                                        AgentMessage::NodeMessage { message,message_type,.. } => {
+                                             match message_type {
+                                                MessageType::Direct { to_peer } => {
+                                                    // Only process if we're the intended recipient
+                                                    if to_peer == peer_id {
+                                                        on_message.lock().await.on_message(
+                                                            created_by,
+                                                            message,
+                                                            time,
+                                                        ).await;
+                                                    }
+                                                }
+                                                MessageType::Broadcast => {
+                                                    on_message.lock().await.on_message(
+                                                        created_by,
+                                                        message,
+                                                        time,
+                                                    ).await;
+                                                }
+                                            }
                                         }
                                         AgentMessage::AgentIntroduction { id, name, role, topic } => {
                                             let agent_detail = AgentDetail{

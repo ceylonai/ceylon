@@ -4,13 +4,17 @@ use std::sync::Arc;
 use std::time::SystemTime;
 
 use futures::future::join_all;
+use tokio::io::AsyncReadExt;
 use tokio::sync::{mpsc, Mutex, RwLock};
 use tokio::{select, signal};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
 
-use crate::workspace::agent::{AgentDetail, EventHandler, ENV_WORKSPACE_ID, ENV_WORKSPACE_IP, ENV_WORKSPACE_PEER, ENV_WORKSPACE_PORT};
-use crate::workspace::message::AgentMessage;
+use crate::workspace::agent::{
+    AgentDetail, EventHandler, ENV_WORKSPACE_ID, ENV_WORKSPACE_IP, ENV_WORKSPACE_PEER,
+    ENV_WORKSPACE_PORT,
+};
+use crate::workspace::message::{AgentMessage, MessageType};
 use crate::{utils, MessageHandler, Processor, WorkerAgent};
 use sangedama::peer::message::data::{EventType, NodeMessage};
 use sangedama::peer::node::{
@@ -39,6 +43,7 @@ pub struct AdminAgent {
 
     pub shutdown_send: mpsc::UnboundedSender<String>,
     pub shutdown_recv: Arc<Mutex<mpsc::UnboundedReceiver<String>>>,
+    _worker_details: Vec<AgentDetail>,
 }
 
 impl AdminAgent {
@@ -69,6 +74,28 @@ impl AdminAgent {
 
             shutdown_send,
             shutdown_recv: Arc::new(Mutex::new(shutdown_recv)),
+
+            _worker_details: Vec::new(),
+        }
+    }
+
+    pub async fn send_direct(&self, to_peer: String, message: Vec<u8>) {
+        let id = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+
+        let node_message = AgentMessage::NodeMessage {
+            message,
+            id,
+            message_type: MessageType::Direct { to_peer },
+        };
+
+        match self.broadcast_emitter.send(node_message.to_bytes()).await {
+            Ok(_) => {}
+            Err(e) => {
+                error!("Failed to send direct message: {:?}", e);
+            }
         }
     }
 
@@ -77,11 +104,17 @@ impl AdminAgent {
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
             .as_nanos() as u64;
-        let node_message = AgentMessage::NodeMessage { message, id };
+
+        let node_message = AgentMessage::NodeMessage {
+            message,
+            id,
+            message_type: MessageType::Broadcast,
+        };
+
         match self.broadcast_emitter.send(node_message.to_bytes()).await {
             Ok(_) => {}
-            Err(_) => {
-                error!("Failed to send broadcast message");
+            Err(e) => {
+                error!("Failed to send broadcast message: {:?}", e);
             }
         }
     }
@@ -129,7 +162,6 @@ impl AdminAgent {
 
         if peer_.id == self._peer_id {
             info!("Admin peer created {}", peer_.id.clone());
-
 
             let mut env_vars = HashMap::new();
             env_vars.insert(ENV_WORKSPACE_PEER, peer_.id.clone());
@@ -214,6 +246,7 @@ impl AdminAgent {
         let cancel_token_clone = cancel_token.clone();
 
         let mut is_call_agent_on_connect_list: HashMap<String, bool> = HashMap::new();
+        let peer_id = self._peer_id.clone();
         let task_admin_listener = handle.spawn(async move {
             loop {
                 select! {
@@ -223,16 +256,30 @@ impl AdminAgent {
                    event = peer_listener_.recv() => {
                         if let Some(event) = event {
                             match event {
-                                NodeMessage::Message{ data, created_by, time} => {
+                                NodeMessage::Message{ data, created_by, time,..} => {
                                     let agent_message = AgentMessage::from_bytes(data);
 
                                     match agent_message {
-                                        AgentMessage::NodeMessage { message,.. } => {
-                                            on_message.lock().await.on_message(
-                                                created_by,
-                                                message,
-                                                time
-                                            ).await;
+                                        AgentMessage::NodeMessage { message,message_type,.. } => {
+                                            match message_type {
+                                                MessageType::Direct { to_peer } => {
+                                                    // Only process if we're the intended recipient
+                                                    if to_peer == peer_id {
+                                                        on_message.lock().await.on_message(
+                                                            created_by,
+                                                            message,
+                                                            time,
+                                                        ).await;
+                                                    }
+                                                }
+                                                MessageType::Broadcast => {
+                                                    on_message.lock().await.on_message(
+                                                        created_by,
+                                                        message,
+                                                        time,
+                                                    ).await;
+                                                }
+                                            }
                                         }
                                         AgentMessage::AgentIntroduction { id, name,role,topic } => {
                                             info!( "Agent introduction {:?}", id);
