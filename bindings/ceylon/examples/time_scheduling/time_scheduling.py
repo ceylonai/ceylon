@@ -6,8 +6,7 @@ from typing import List, Any
 from pydantic import BaseModel
 from pydantic.dataclasses import dataclass
 
-from ceylon.core.admin import Admin
-from ceylon.core.worker import Worker
+from ceylon.base.agents import Worker, Admin
 
 admin_port = 8000
 admin_peer = "Coordinator"
@@ -151,8 +150,12 @@ async def main():
     agent5 = Participant("Kevin", [TimeSlot("2024-07-21", 10, 13), TimeSlot("2024-07-21", 15, 17)])
 
     coordinator = Coordinator()
-    await coordinator.run_admin(
-        inputs=Meeting(name="Meeting 1", duration=2, date="2024-07-21", minimum_participants=3),
+    await coordinator.arun_admin(
+        inputs=pickle.dumps(
+            RunnerInput(
+                request=Meeting(name="Meeting 1", duration=2, date="2024-07-21", minimum_participants=3)
+            )
+        ),
         workers=[agent1, agent2, agent3, agent4, agent5]
     )
 
