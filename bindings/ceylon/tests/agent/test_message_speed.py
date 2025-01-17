@@ -2,9 +2,8 @@ import asyncio
 import pickle
 import time
 import traceback
-from collections import defaultdict
 from statistics import mean, median
-from typing import Dict, List
+from typing import Dict
 
 from loguru import logger
 
@@ -93,7 +92,7 @@ class NetworkManager(Admin):
             stats = self.metrics.get_stats()
             if stats:
                 logger.info(f"Performance Stats: {stats}")
-            await asyncio.sleep(5)
+            await asyncio.sleep(1)
 
 
 class WorkingAgent(Worker):
@@ -149,7 +148,7 @@ async def main():
     network_manager = NetworkManager()
 
     # Create worker agents
-    worker_names = [f"Agent {i}" for i in range(1, 100)]  # Added more agents for better testing
+    worker_names = [f"Agent {i}" for i in range(1, 5)]  # Added more agents for better testing
     workers = []
 
     admin_details = network_manager.details()
