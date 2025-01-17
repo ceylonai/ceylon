@@ -442,7 +442,6 @@ version = "0.20.0"
 dependencies = [
  "async-trait",
  "futures",
- "log",
  "sangedama",
  "serde",
  "serde_json",

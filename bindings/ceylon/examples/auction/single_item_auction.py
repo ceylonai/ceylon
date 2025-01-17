@@ -84,6 +84,7 @@ class Auctioneer(Admin):
             result = AuctionResult(winner=winning_bid.bidder, winning_bid=winning_bid.amount)
             await self.broadcast_data(result)
             logger.info(f"Auction ended. Winner: {result.winner}, Winning Bid: ${result.winning_bid:.2f}")
+            await self.stop()
 
 
         await self.broadcast_data(AuctionEnd())
