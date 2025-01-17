@@ -29,6 +29,7 @@ async fn main() {
     let (mut admin_peer, mut admin_listener) =
         AdminPeer::create(admin_config.clone(), admin_key).await;
     let admin_id = admin_peer.id.clone();
+    let admin_id_2 = admin_peer.id.clone();
 
     let cancel_token = CancellationToken::new();
 
@@ -65,7 +66,11 @@ async fn main() {
     let task_run_admin = tokio::task::spawn(async move {
         loop {
             admin_emitter
-                .send("Admin Send regards".to_string().as_bytes().to_vec())
+                .send((
+                    admin_id.clone(),
+                    "Admin Send regards".to_string().as_bytes().to_vec(),
+                    None,
+                ))
                 .await
                 .unwrap();
             tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
@@ -80,7 +85,7 @@ async fn main() {
 
     let peer_1 = create_client(
         workspace_id.clone(),
-        admin_id.clone(),
+        admin_id_2.clone(),
         admin_port,
         peer_dial_address.clone(),
         "peer1".to_string(),
@@ -89,7 +94,7 @@ async fn main() {
     .await;
     let peer_2 = create_client(
         workspace_id.clone(),
-        admin_id.clone(),
+        admin_id_2.clone(),
         admin_port,
         peer_dial_address.clone(),
         "peer2".to_string(),
@@ -98,7 +103,7 @@ async fn main() {
     .await;
     let peer_3 = create_client(
         workspace_id.clone(),
-        admin_id.clone(),
+        admin_id_2.clone(),
         admin_port,
         peer_dial_address.clone(),
         "peer3".to_string(),
@@ -107,7 +112,7 @@ async fn main() {
     .await;
     let peer_4 = create_client(
         workspace_id.clone(),
-        admin_id.clone(),
+        admin_id_2.clone(),
         admin_port,
         peer_dial_address.clone(),
         "peer4".to_string(),
@@ -149,6 +154,8 @@ async fn create_client(
     let peer2_emitter = peer2.emitter();
     let peer2_id = peer2.id.clone();
 
+    let peer2_id_2 = peer2_id.clone();
+
     if member_id_from_key.to_string() == peer2_id.to_string() {
         info!("{} {} created", name.clone(), peer2_id);
     }
@@ -181,11 +188,11 @@ async fn create_client(
     let task_run_peer_2 = tokio::task::spawn(async move {
         loop {
             peer2_emitter
-                .send(
-                    format!("{} Send regards", name_clone.clone())
-                        .as_bytes()
-                        .to_vec(),
-                )
+                .send((
+                    peer2_id_2.clone(),
+                    "Peer2 Send regards".to_string().as_bytes().to_vec(),
+                    None,
+                ))
                 .await
                 .expect("TODO: panic message");
             tokio::time::sleep(std::time::Duration::from_millis(3000)).await;
