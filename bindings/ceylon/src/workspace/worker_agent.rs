@@ -29,6 +29,7 @@ pub struct WorkerAgentConfig {
     pub admin_peer: String,
     pub admin_port: u16,
     pub admin_ip: String,
+    pub buffer_size: u16,
 }
 
 impl WorkerAgentConfig {
@@ -85,7 +86,7 @@ impl WorkerAgent {
         on_event: Arc<dyn EventHandler>,
     ) -> Self {
         let (broadcast_emitter, broadcast_receiver) =
-            tokio::sync::mpsc::channel::<NodeMessageTransporter>(100);
+            tokio::sync::mpsc::channel::<NodeMessageTransporter>(2);
         let admin_peer_key = create_key();
         let id = get_peer_id(&admin_peer_key).to_string();
 
@@ -220,6 +221,7 @@ impl WorkerAgent {
             config.admin_peer.clone(),
             config.admin_port,
             config.admin_ip,
+            Some(config.buffer_size as usize),
         );
         let peer_key = create_key_from_bytes(self._key.clone());
         let (mut peer_, mut peer_listener_) =

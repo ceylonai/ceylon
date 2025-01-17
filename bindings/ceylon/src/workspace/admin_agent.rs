@@ -25,6 +25,7 @@ use sangedama::peer::node::{
 pub struct AdminAgentConfig {
     pub name: String,
     pub port: u16,
+    pub buffer_size: u16,
 }
 
 pub struct AdminAgent {
@@ -53,7 +54,7 @@ impl AdminAgent {
         processor: Arc<dyn Processor>,
         on_event: Arc<dyn EventHandler>,
     ) -> Self {
-        let (broadcast_emitter, broadcast_receiver) = mpsc::channel::<NodeMessageTransporter>(100);
+        let (broadcast_emitter, broadcast_receiver) = mpsc::channel::<NodeMessageTransporter>(2);
 
         let admin_peer_key = create_key();
         let id = get_peer_id(&admin_peer_key).to_string();
@@ -139,7 +140,7 @@ impl AdminAgent {
         let worker_details: RwLock<HashMap<String, AgentDetail>> = RwLock::new(HashMap::new());
 
         let config = self.config.clone();
-        let admin_config = AdminPeerConfig::new(config.port, config.name.clone());
+        let admin_config = AdminPeerConfig::new(config.port, config.name.clone(), Some(config.buffer_size as usize));
 
         let peer_key = create_key_from_bytes(self._key.clone());
 

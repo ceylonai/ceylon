@@ -25,8 +25,10 @@ pub struct MemberPeerConfig {
     pub workspace_id: String,
     pub admin_peer: PeerId,
     pub rendezvous_point_address: Multiaddr,
+    pub buffer_size: Option<usize>,
 }
 
+const DEFAULT_BUFFER_SIZE: usize = 100;
 impl MemberPeerConfig {
     pub fn new(
         name: String,
@@ -34,6 +36,7 @@ impl MemberPeerConfig {
         admin_peer: String,
         rendezvous_point_admin_port: u16,
         rendezvous_point_public_ip: String,
+        buffer_size: Option<usize>,
     ) -> Self {
         let rendezvous_point_address = Multiaddr::empty()
             .with(Protocol::Ip4(
@@ -47,6 +50,7 @@ impl MemberPeerConfig {
             workspace_id,
             admin_peer: PeerId::from_str(&admin_peer).unwrap(),
             rendezvous_point_address,
+            buffer_size,
         }
     }
 }
@@ -66,8 +70,11 @@ impl MemberPeer {
         key: identity::Keypair,
     ) -> (Self, tokio::sync::mpsc::Receiver<NodeMessage>) {
         let swarm = create_swarm::<ClientPeerBehaviour>(key).await;
-        let (outside_tx, outside_rx) = mpsc::channel::<NodeMessage>(100);
-        let (inside_tx, inside_rx) = mpsc::channel::<NodeMessageTransporter>(100);
+        let (outside_tx, outside_rx) =
+            mpsc::channel::<NodeMessage>(config.buffer_size.unwrap_or(DEFAULT_BUFFER_SIZE));
+        let (inside_tx, inside_rx) = mpsc::channel::<NodeMessageTransporter>(
+            config.buffer_size.unwrap_or(DEFAULT_BUFFER_SIZE),
+        );
 
         (
             Self {

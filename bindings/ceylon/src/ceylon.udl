@@ -8,6 +8,7 @@ namespace ceylon {
 dictionary AdminAgentConfig {
     string name;
     u16 port;
+    u16 buffer_size;
 };
 
 dictionary AgentDetail{
@@ -43,6 +44,7 @@ dictionary WorkerAgentConfig {
     string role;
     u16 admin_port;
     string admin_ip;
+    u16 buffer_size;
 };
 interface WorkerAgent{
     constructor(WorkerAgentConfig config,MessageHandler on_message, Processor processor, EventHandler on_event);

@@ -20,13 +20,16 @@ use crate::peer::peer_swarm::create_swarm;
 pub struct AdminPeerConfig {
     pub workspace_id: String,
     pub listen_port: Option<u16>,
+    pub buffer_size: Option<usize>,
 }
 
+const DEFAULT_BUFFER_SIZE: usize = 100;
 impl AdminPeerConfig {
-    pub fn new(listen_port: u16, workspace_id: String) -> Self {
+    pub fn new(listen_port: u16, workspace_id: String, buffer_size: Option<usize>) -> Self {
         Self {
             listen_port: Some(listen_port),
             workspace_id,
+            buffer_size,
         }
     }
 
@@ -59,9 +62,13 @@ impl AdminPeer {
         key: identity::Keypair,
     ) -> (Self, tokio::sync::mpsc::Receiver<NodeMessage>) {
         let swarm = create_swarm::<PeerAdminBehaviour>(key.clone()).await;
-        let (outside_tx, outside_rx) = tokio::sync::mpsc::channel::<NodeMessage>(100);
+        let (outside_tx, outside_rx) = tokio::sync::mpsc::channel::<NodeMessage>(
+            config.buffer_size.unwrap_or(DEFAULT_BUFFER_SIZE),
+        );
 
-        let (inside_tx, inside_rx) = tokio::sync::mpsc::channel::<NodeMessageTransporter>(100);
+        let (inside_tx, inside_rx) = tokio::sync::mpsc::channel::<NodeMessageTransporter>(
+            config.buffer_size.unwrap_or(DEFAULT_BUFFER_SIZE),
+        );
 
         let default_address = Multiaddr::empty()
             .with(Protocol::Ip4(Ipv4Addr::UNSPECIFIED))

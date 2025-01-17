@@ -6,14 +6,15 @@ from loguru import logger
 
 from ceylon import AdminAgent, Processor, MessageHandler, EventHandler, AdminAgentConfig, WorkerAgent
 from ceylon.ceylon.ceylon import uniffi_set_event_loop, AgentDetail, WorkerAgentConfig
-from ceylon.static_val import DEFAULT_WORKSPACE_ID, DEFAULT_CONF_FILE, DEFAULT_WORKSPACE_PORT, DEFAULT_WORKSPACE_IP
+from ceylon.static_val import DEFAULT_WORKSPACE_ID, DEFAULT_CONF_FILE, DEFAULT_WORKSPACE_PORT, DEFAULT_WORKSPACE_IP, \
+    DEFAULT_WORKSPACE_BUFFER_SIZE
 
 
 class Admin(AdminAgent, Processor, MessageHandler, EventHandler):
-    def __init__(self, name="admin", port=8888):
+    def __init__(self, name="admin", port=8888, buffer_size=DEFAULT_WORKSPACE_BUFFER_SIZE):
         self.return_response = None
         self.connected_agents: Dict[str, AgentDetail] = {}
-        super().__init__(config=AdminAgentConfig(name=name, port=port),
+        super().__init__(config=AdminAgentConfig(name=name, port=port, buffer_size=buffer_size),
                          processor=self,
                          on_message=self,
                          on_event=self)
@@ -67,6 +68,7 @@ class Admin(AdminAgent, Processor, MessageHandler, EventHandler):
             del self.connected_agents[agent.id]
             logger.info(f"Agent disconnected: {agent.name} ({agent.id})")
 
+
 class Worker(WorkerAgent, Processor, MessageHandler, EventHandler):
     agent_type = "WORKER"
 
@@ -76,7 +78,9 @@ class Worker(WorkerAgent, Processor, MessageHandler, EventHandler):
                  admin_peer="",
                  admin_port=DEFAULT_WORKSPACE_PORT,
                  role="worker",
-                 admin_ip=DEFAULT_WORKSPACE_IP):
+                 admin_ip=DEFAULT_WORKSPACE_IP,
+                 buffer_size=DEFAULT_WORKSPACE_BUFFER_SIZE
+                 ):
         super().__init__(config=WorkerAgentConfig(
             name=name,
             role=role,
@@ -84,7 +88,9 @@ class Worker(WorkerAgent, Processor, MessageHandler, EventHandler):
             admin_peer=admin_peer,
             admin_port=admin_port,
             work_space_id=workspace_id,
-            admin_ip=admin_ip),
+            admin_ip=admin_ip,
+            buffer_size=buffer_size
+        ),
             processor=self,
             on_message=self,
             on_event=self)

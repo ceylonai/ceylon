@@ -23,7 +23,7 @@ async fn main() {
     info!("Starting {}", workspace_id);
 
     let admin_port = 7845;
-    let admin_config = AdminPeerConfig::new(admin_port, workspace_id.clone());
+    let admin_config = AdminPeerConfig::new(admin_port, workspace_id.clone(), None);
     let admin_key = create_key();
     let admin_id_from_key = get_peer_id(&admin_key);
     let (mut admin_peer, mut admin_listener) =
@@ -146,6 +146,7 @@ async fn create_client(
             workspace_id: workspace_id.clone(),
             admin_peer: PeerId::from_str(&admin_id).unwrap(),
             rendezvous_point_address: peer_dial_address.clone(),
+            buffer_size: None,
         },
         member_key,
     )
