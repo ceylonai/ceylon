@@ -1,6 +1,3 @@
-use std::collections::HashMap;
-use std::net::Ipv4Addr;
-
 use futures::StreamExt;
 use libp2p::multiaddr::Protocol;
 use libp2p::swarm::SwarmEvent;
@@ -8,6 +5,10 @@ use libp2p::{
     gossipsub::{self, TopicHash},
     identity, rendezvous, Multiaddr, PeerId, Swarm,
 };
+use std::collections::HashMap;
+use std::net::Ipv4Addr;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Duration;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
@@ -23,6 +24,7 @@ pub struct AdminPeerConfig {
     pub buffer_size: Option<usize>,
 }
 
+static CACHED_TIMESTAMP: AtomicU64 = AtomicU64::new(0);
 const DEFAULT_BUFFER_SIZE: usize = 100;
 impl AdminPeerConfig {
     pub fn new(listen_port: u16, workspace_id: String, buffer_size: Option<usize>) -> Self {
@@ -91,7 +93,25 @@ impl AdminPeer {
             outside_rx,
         )
     }
+    fn get_current_timestamp() -> u64 {
+        // First try to get the cached timestamp
+        let cached = CACHED_TIMESTAMP.load(Ordering::Relaxed);
 
+        // // Get the current system time
+        // let current = SystemTime::now()
+        //     .duration_since(UNIX_EPOCH)
+        //     .unwrap()
+        //     .as_secs_f64() as u64;
+        //
+        // // If the cached timestamp is too old (more than 1ms old) or zero, update it
+        // if cached == 0 || current > cached {
+        //     CACHED_TIMESTAMP.store(current, Ordering::Relaxed);
+        //     current
+        // } else {
+        //     cached
+        // }
+        cached
+    }
     pub fn get_address(&self) -> Multiaddr {
         self._default_address.clone()
     }
@@ -154,6 +174,11 @@ impl AdminPeer {
                         }
                     }
                 }
+
+                // Update the timestamp every 1 nano second
+                _ = tokio::time::sleep(Duration::from_nanos(1)) => {
+                    CACHED_TIMESTAMP.store(0, Ordering::Relaxed);
+                }
             }
         }
     }
@@ -184,17 +209,17 @@ impl AdminPeer {
             }
 
             PeerAdminEvent::GossipSub(event) => match event {
+
+
                 gossipsub::Event::Unsubscribed { topic, peer_id } => {
                     info!(
                         "GossipSub: Unsubscribed to topic {:?} from peer: {:?}",
                         topic, peer_id
                     );
+                    let current_time = Self::get_current_timestamp();
                     self.outside_tx
                         .send(NodeMessage::Event {
-                            time: std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH)
-                                .unwrap()
-                                .as_secs_f64() as u64,
+                            time: current_time,
                             created_by: peer_id.to_string(),
                             event: EventType::Unsubscribe {
                                 topic: topic.to_string(),
@@ -210,6 +235,8 @@ impl AdminPeer {
                     }
                 }
                 gossipsub::Event::Subscribed { topic, peer_id } => {
+
+                    let current_time = Self::get_current_timestamp();
                     info!(
                         "GossipSub: Subscribed to topic {:?} from peer: {:?}",
                         topic, peer_id
@@ -220,10 +247,7 @@ impl AdminPeer {
                         .push(peer_id);
                     self.outside_tx
                         .send(NodeMessage::Event {
-                            time: std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH)
-                                .unwrap()
-                                .as_secs_f64() as u64,
+                            time: current_time,
                             created_by: peer_id.to_string(),
                             event: EventType::Subscribe {
                                 topic: topic.to_string(),
@@ -248,6 +272,8 @@ impl AdminPeer {
                             name_,
                             message.topic.to_string()
                         );
+
+                        let current_time = Self::get_current_timestamp();
                         match message_type {
                             MessageType::Direct { to_peer } => {
                                 // Only process if we're the intended recipient
@@ -255,11 +281,7 @@ impl AdminPeer {
                                     match self
                                         .outside_tx
                                         .send(NodeMessage::Message {
-                                            time: std::time::SystemTime::now()
-                                                .duration_since(std::time::UNIX_EPOCH)
-                                                .unwrap()
-                                                .as_secs_f64()
-                                                as u64,
+                                            time: current_time,
                                             created_by,
                                             message_type: MessageType::Direct { to_peer },
                                             data,

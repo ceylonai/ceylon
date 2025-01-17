@@ -1,6 +1,3 @@
-use std::net::Ipv4Addr;
-use std::str::FromStr;
-
 use futures::StreamExt;
 use libp2p::multiaddr::Protocol;
 use libp2p::swarm::{
@@ -8,6 +5,10 @@ use libp2p::swarm::{
     SwarmEvent,
 };
 use libp2p::{gossipsub, identity, rendezvous, Multiaddr, PeerId, Swarm};
+use std::net::Ipv4Addr;
+use std::str::FromStr;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::select;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
@@ -15,10 +16,9 @@ use tracing::{debug, error, info};
 use crate::peer::behaviour::{ClientPeerBehaviour, ClientPeerEvent};
 use crate::peer::message::data::{EventType, MessageType, NodeMessage, NodeMessageTransporter};
 use crate::peer::peer_swarm::create_swarm;
-use std::collections::HashMap;
-use std::sync::Arc;
 use tokio::sync::mpsc;
-use tokio::sync::RwLock;
+static CACHED_TIMESTAMP: AtomicU64 = AtomicU64::new(0);
+
 #[derive(Debug, Clone)]
 pub struct MemberPeerConfig {
     pub name: String,
@@ -87,6 +87,26 @@ impl MemberPeer {
             },
             outside_rx,
         )
+    }
+
+    fn get_current_timestamp() -> u64 {
+        // First try to get the cached timestamp
+        let cached = CACHED_TIMESTAMP.load(Ordering::Relaxed);
+
+        // // Get the current system time
+        // let current = SystemTime::now()
+        //     .duration_since(UNIX_EPOCH)
+        //     .unwrap()
+        //     .as_secs_f64() as u64;
+        //
+        // // If the cached timestamp is too old (more than 1ms old) or zero, update it
+        // if cached == 0 || current > cached {
+        //     CACHED_TIMESTAMP.store(current, Ordering::Relaxed);
+        //     current
+        // } else {
+        //     cached
+        // }
+        cached
     }
 
     pub fn emitter(&self) -> tokio::sync::mpsc::Sender<NodeMessageTransporter> {
@@ -167,10 +187,11 @@ impl MemberPeer {
 
 
                         let topic = gossipsub::IdentTopic::new(self.config.workspace_id.clone());
+                        let current_time=  Self::get_current_timestamp();
 
                         let distributed_message = NodeMessage::Message {
                             data: message,
-                            time: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs_f64() as u64,
+                            time: current_time,
                             created_by: self.id.clone(),
                             message_type: if to.is_none() { MessageType::Broadcast } else { MessageType::Direct { to_peer: to.unwrap().to_string() } },
                         };
@@ -181,6 +202,11 @@ impl MemberPeer {
                             }
                         }
                     }
+                }
+
+                // Update the timestamp every 1 second
+                _ = tokio::time::sleep(Duration::from_nanos(1)) => {
+                    CACHED_TIMESTAMP.store(0, Ordering::Relaxed);
                 }
             }
         }
@@ -221,6 +247,7 @@ impl MemberPeer {
                         ..
                     } = msg
                     {
+                        let current_time = Self::get_current_timestamp();
                         info!(
                             "Process Message {:?} from {}:  Topic {}",
                             message_type,
@@ -234,11 +261,7 @@ impl MemberPeer {
                                     match self
                                         .outside_tx
                                         .send(NodeMessage::Message {
-                                            time: std::time::SystemTime::now()
-                                                .duration_since(std::time::UNIX_EPOCH)
-                                                .unwrap()
-                                                .as_secs_f64()
-                                                as u64,
+                                            time: current_time,
                                             created_by,
                                             message_type: MessageType::Direct { to_peer },
                                             data,
@@ -270,13 +293,11 @@ impl MemberPeer {
                 }
                 gossipsub::Event::Subscribed { peer_id, topic } => {
                     info!("Subscribed to topic: {:?} from peer: {:?}", topic, peer_id);
+                    let current_time = Self::get_current_timestamp();
                     if peer_id.to_string() == self.config.admin_peer.to_string() {
                         info!("Member {} Subscribe with Admin", name_.clone());
                         let msg = NodeMessage::Event {
-                            time: std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH)
-                                .unwrap()
-                                .as_secs_f64() as u64,
+                            time: current_time,
                             created_by: peer_id.to_string(),
                             event: EventType::Subscribe {
                                 topic: topic.to_string(),
