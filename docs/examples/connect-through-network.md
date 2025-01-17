@@ -24,16 +24,16 @@ On the computer that will act as the server admin:
 ```python
 import pickle
 from loguru import logger
-from ceylon import CoreAdmin, Agent
+from ceylon.base.agents import Admin, Worker
 from ceylon.ceylon import AgentDetail
 
 
-class ServerAdminAgent(CoreAdmin):
+class ServerAdminAgent(Admin):
     async def on_agent_connected(self, topic: "str", agent: AgentDetail):
         logger.info(f"ServerAdminAgent on_agent_connected {self.details().name}", agent.id, agent.name, agent.role)
 
 
-class WorkerAgent1(Agent):
+class WorkerAgent1(Worker):
     async def run(self, inputs: "bytes"):
         logger.info(f"WorkerAgent1 on_run  {self.details().name}", inputs)
 
@@ -81,11 +81,11 @@ On a different computer that will act as the worker:
 import asyncio
 import pickle
 from loguru import logger
-from ceylon import Agent
-from ceylon.ceylon import uniffi_set_event_loop
+from ceylon.base.agents import Admin, Worker
+from ceylon.ceylon.ceylon import uniffi_set_event_loop
 
 
-class WorkerAgent1(Agent):
+class WorkerAgent1(Worker):
     async def run(self, inputs: "bytes"):
         logger.info(f"WorkerAgent1 on_run  {self.details().name}", inputs)
 
@@ -98,7 +98,7 @@ admin_port = 8000
 worker_1 = WorkerAgent1("worker_2", "server_admin", role="Whatever",
                         admin_port=admin_port,
                         admin_peer=f"{admin_peer_id}@{admin_ip}:{admin_port}")
-worker_1.run_worker(pickle.dumps({}))
+worker_1.run(pickle.dumps({}))
 ```
 
 ### 2.2 Understanding the Worker Script

@@ -52,12 +52,15 @@ Ceylon provides a range of tutorials and examples to help you get started and ma
 
 ### Example Projects
 
-- **News Writing Panel**: [Colab Script](https://colab.research.google.com/drive/1ZMy0Iggni6fCQynBlyI1wL4WW4U_Fman?usp=sharing)
 - **Meeting Scheduler**: [Colab Script](https://colab.research.google.com/drive/1C-E9BN992k5sZYeJWnVrsWA5_ryaaT8m?usp=sharing)  
   [Read more](https://github.com/ceylonai/ceylon/blob/master/docs/examples/meeting-sechdular.md)
 - **Single Item Auction**: [Colab Script](https://colab.research.google.com/drive/1C-E9BN992k5sZYeJWnVrsWA5_ryaaT8m?usp=sharing)  
   [Read more](https://github.com/ceylonai/ceylon/blob/master/docs/examples/single-item-auction.md)
-- **Task Manager**: [Read more](https://github.com/ceylonai/ceylon/blob/master/docs/examples/task-manager.md)
+
+### More Examples
+- **Task Manager**: [Read more](bindings/ceylon/examples/task_manager)
+- **Auction System**: [Read more](bindings/ceylon/examples/auction)
+- **Time Scheduling**: [Read more](bindings/ceylon/examples/time_scheduling)
 - **Connect Through Network**: [Read more](.https://github.com/ceylonai/ceylon/blob/master/docs/examples/connect-through-network.md)
 
 ## 🚦 Getting Started
@@ -66,9 +69,10 @@ To get started with Ceylon, refer to our detailed [Getting Started Guide](./docs
 
 ## 🚧 Roadmap
 
-- [X] LLM Agent Stack
-- [X] Job Handling (parallel & sequential)
+- [X] Agent Stack
+- [X] Python Client Release
 - [ ] Web Agent
+- [ ] Task Manager
 - [ ] Agent Registry
 
 ## 🤝 Contributing
