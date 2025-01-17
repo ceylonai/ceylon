@@ -1,123 +1,174 @@
 import asyncio
 import pickle
 import random
-from typing import List
+from dataclasses import dataclass
+from typing import List, Dict
 
-from pydantic.dataclasses import dataclass
+from loguru import logger
 
-from ceylon.core.admin import Admin
-from ceylon.core.worker import Worker
-
-admin_port = 8000
-admin_peer = "Auctioneer"
-workspace_id = "single_item_auction"
+from ceylon import AgentDetail
+from ceylon.base.agents import Admin, Worker
+from ceylon.static_val import DEFAULT_WORKSPACE_ID
 
 
-@dataclass(repr=True)
+@dataclass
 class Item:
     name: str
     starting_price: float
 
-
-@dataclass(repr=True)
+@dataclass
 class Bid:
     bidder: str
     amount: float
 
-
-@dataclass(repr=True)
+@dataclass
 class AuctionStart:
     item: Item
 
-
-@dataclass(repr=True)
+@dataclass
 class AuctionResult:
     winner: str
     winning_bid: float
 
-
-@dataclass(repr=True)
+@dataclass
 class AuctionEnd:
     pass
 
 
-class Bidder(Worker):
-    name: str
-    budget: float
-
-    def __init__(self, name: str, budget: float):
-        self.name = name
-        self.budget = budget
-        super().__init__(name=name, workspace_id=workspace_id, admin_peer=admin_peer, admin_port=admin_port)
-
-    async def on_message(self, agent_id: str, data: bytes, time: int):
-        message = pickle.loads(data)
-        if type(message) == AuctionStart:
-            if self.budget > message.item.starting_price:
-                random_i = random.randint(100, 1000)
-                bid_amount = min(self.budget, message.item.starting_price * random_i / 100)  # Simple bidding strategy
-                await self.broadcast(pickle.dumps(Bid(bidder=self.name, amount=bid_amount)))
-        elif type(message) == AuctionResult:
-            if message.winner == self.name:
-                self.budget -= message.winning_bid
-                print(f"{self.name} won the auction for ${message.winning_bid:.2f}")
-            else:
-                print(f"{self.name} lost the auction")
-
-
 class Auctioneer(Admin):
-    item: Item
-    bids: List[Bid] = []
-    expected_bidders: int
-    connected_bidders: int = 0
-
-    def __init__(self, item: Item, expected_bidders: int):
+    def __init__(self, item: Item, expected_bidders: int, name="auctioneer", port=8888):
+        super().__init__(name=name, port=port)
         self.item = item
         self.expected_bidders = expected_bidders
-        super().__init__(name=workspace_id, port=admin_port)
+        self.bids: List[Bid] = []
+        self.auction_ended = False
 
-    async def on_agent_connected(self, topic: str, agent_id: str):
-        self.connected_bidders += 1
-        print(f"Bidder {agent_id} connected. {self.connected_bidders}/{self.expected_bidders} bidders connected.")
-        if self.connected_bidders == self.expected_bidders:
-            print("All bidders connected. Starting the auction.")
+    async def on_agent_connected(self, topic: str, agent: AgentDetail):
+        await super().on_agent_connected(topic, agent)
+        logger.info(f"Bidder {agent.name} connected. {len(self.get_connected_agents())}/{self.expected_bidders} bidders connected.")
+
+        if len(self.get_connected_agents()) == self.expected_bidders:
+            logger.info("All bidders connected. Starting the auction.")
             await self.start_auction()
 
     async def start_auction(self):
-        print(f"Starting auction for {self.item.name} with starting price ${self.item.starting_price}")
-        await self.broadcast(pickle.dumps(AuctionStart(item=self.item)))
+        logger.info(f"Starting auction for {self.item.name} with starting price ${self.item.starting_price}")
+        start_msg = AuctionStart(item=self.item)
+        await self.broadcast_data(start_msg)
 
     async def on_message(self, agent_id: str, data: bytes, time: int):
-        message = pickle.loads(data)
-        if type(message) == Bid:
-            self.bids.append(message)
-            print(f"Received bid from {message.bidder} for ${message.amount:.2f}")
-        await self.end_auction()
+        if self.auction_ended:
+            return
+
+        try:
+            message = pickle.loads(data)
+
+            if isinstance(message, Bid):
+                self.bids.append(message)
+                logger.info(f"Received bid from {message.bidder} for ${message.amount:.2f}")
+
+                # Check if we've received bids from all bidders
+                if len(self.bids) == self.expected_bidders:
+                    await self.end_auction()
+
+        except Exception as e:
+            logger.error(f"Error processing message: {e}")
 
     async def end_auction(self):
+        self.auction_ended = True
+
         if not self.bids:
-            print(f"No bids received for {self.item.name}")
+            logger.info(f"No bids received for {self.item.name}")
         else:
             winning_bid = max(self.bids, key=lambda x: x.amount)
             result = AuctionResult(winner=winning_bid.bidder, winning_bid=winning_bid.amount)
-            await self.broadcast(pickle.dumps(result))
-            print(f"Auction ended. Winner: {result.winner}, Winning Bid: ${result.winning_bid:.2f}")
+            await self.broadcast_data(result)
+            logger.info(f"Auction ended. Winner: {result.winner}, Winning Bid: ${result.winning_bid:.2f}")
 
-        await self.broadcast(pickle.dumps(AuctionEnd()))
+
+        await self.broadcast_data(AuctionEnd())
+
+    async def run(self, inputs: bytes):
+        logger.info(f"Auctioneer started - {self.details().name}")
+        while True:
+            if self.auction_ended:
+                break
+            await asyncio.sleep(1)
+
+
+class Bidder(Worker):
+    def __init__(self, name: str, budget: float,
+                 workspace_id=DEFAULT_WORKSPACE_ID,
+                 admin_peer="",
+                 admin_port=8888):
+        super().__init__(
+            name=name,
+            workspace_id=workspace_id,
+            admin_peer=admin_peer,
+            admin_port=admin_port
+        )
+        self.budget = budget
+        self.has_bid = False
+
+    async def on_message(self, agent_id: str, data: bytes, time: int):
+        try:
+            message = pickle.loads(data)
+
+            if isinstance(message, AuctionStart) and not self.has_bid:
+                if self.budget > message.item.starting_price:
+                    # Simple bidding strategy with random multiplier
+                    random_multiplier = random.randint(100, 1000) / 100
+                    bid_amount = min(self.budget, message.item.starting_price * random_multiplier)
+
+                    bid = Bid(bidder=self.details().name, amount=bid_amount)
+                    await self.send_direct_data(agent_id, bid)
+                    self.has_bid = True
+                    logger.info(f"{self.details().name} placed bid: ${bid_amount:.2f}")
+
+            elif isinstance(message, AuctionResult):
+                if message.winner == self.details().name:
+                    self.budget -= message.winning_bid
+                    logger.info(f"{self.details().name} won the auction for ${message.winning_bid:.2f}")
+                else:
+                    logger.info(f"{self.details().name} lost the auction")
+
+            elif isinstance(message, AuctionEnd):
+                logger.info(f"{self.details().name} acknowledging auction end")
+
+        except Exception as e:
+            logger.error(f"Error processing message: {e}")
+
+    async def run(self, inputs: bytes):
+        logger.info(f"Bidder started - {self.details().name}")
+        while True:
+            await asyncio.sleep(1)
 
 
 async def main():
-    item = Item("Rare Painting", 1000)
+    # Create auction item
+    item = Item("Rare Painting", 1000.0)
 
+    # Create auctioneer
+    auctioneer = Auctioneer(item, expected_bidders=3)
+    admin_details = auctioneer.details()
+
+    # Create bidders
     bidders = [
-        Bidder("Alice", 1500),
-        Bidder("Bob", 1200),
-        Bidder("Charlie", 2000),
+        Bidder("Alice", 1500.0, admin_peer=admin_details.id),
+        Bidder("Bob", 1200.0, admin_peer=admin_details.id),
+        Bidder("Charlie", 2000.0, admin_peer=admin_details.id)
     ]
 
-    auctioneer = Auctioneer(item, expected_bidders=len(bidders))
-    await auctioneer.run_admin(inputs=b"", workers=bidders)
+    try:
+        logger.info("Starting auction system...")
+        await auctioneer.arun_admin(b"", bidders)
+    except KeyboardInterrupt:
+        logger.info("Shutting down auction system...")
+    finally:
+        # Cleanup code if needed
+        pass
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
+    logger.info("Initializing auction system...")
     asyncio.run(main())
