@@ -13,7 +13,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
 
 use crate::peer::behaviour::{ClientPeerBehaviour, ClientPeerEvent};
-use crate::peer::message::data::{EventType, MessageType, NodeMessage};
+use crate::peer::message::data::{EventType, MessageType, NodeMessage, NodeMessageTransporter};
 use crate::peer::peer_swarm::create_swarm;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -55,13 +55,9 @@ pub struct MemberPeer {
     config: MemberPeerConfig,
     pub id: String,
     swarm: Swarm<ClientPeerBehaviour>,
-    direct_channels: Arc<RwLock<HashMap<String, mpsc::Sender<Vec<u8>>>>>,
-    channel_rx: Option<mpsc::Receiver<Vec<u8>>>,
-    channel_tx: mpsc::Sender<Vec<u8>>,
-
     outside_tx: mpsc::Sender<NodeMessage>,
-    inside_rx: mpsc::Receiver<Vec<u8>>,
-    inside_tx: mpsc::Sender<Vec<u8>>,
+    inside_rx: mpsc::Receiver<NodeMessageTransporter>,
+    inside_tx: mpsc::Sender<NodeMessageTransporter>,
 }
 
 impl MemberPeer {
@@ -71,17 +67,13 @@ impl MemberPeer {
     ) -> (Self, tokio::sync::mpsc::Receiver<NodeMessage>) {
         let swarm = create_swarm::<ClientPeerBehaviour>(key).await;
         let (outside_tx, outside_rx) = mpsc::channel::<NodeMessage>(100);
-        let (inside_tx, inside_rx) = mpsc::channel::<Vec<u8>>(100);
-        let (channel_tx, channel_rx) = mpsc::channel::<Vec<u8>>(100);
+        let (inside_tx, inside_rx) = mpsc::channel::<NodeMessageTransporter>(100);
 
         (
             Self {
                 config,
                 id: swarm.local_peer_id().to_string(),
                 swarm,
-                direct_channels: Arc::new(RwLock::new(HashMap::new())),
-                channel_rx: Some(channel_rx),
-                channel_tx,
                 outside_tx,
                 inside_rx,
                 inside_tx,
@@ -90,32 +82,8 @@ impl MemberPeer {
         )
     }
 
-    pub fn emitter(&self) -> tokio::sync::mpsc::Sender<Vec<u8>> {
+    pub fn emitter(&self) -> tokio::sync::mpsc::Sender<NodeMessageTransporter> {
         self.inside_tx.clone()
-    }
-
-    pub fn get_sender(&self) -> mpsc::Sender<Vec<u8>> {
-        self.channel_tx.clone()
-    }
-
-    // Get a direct channel to a peer
-    pub async fn get_peer_channel(&self, peer_id: &str) -> Option<mpsc::Sender<Vec<u8>>> {
-        let channels = self.direct_channels.read().await;
-        channels.get(peer_id).cloned()
-    }
-
-    // Send a direct message to a peer
-    pub async fn send_direct(
-        &self,
-        peer_id: &str,
-        message: Vec<u8>,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        if let Some(sender) = self.get_peer_channel(peer_id).await {
-            sender.send(message).await?;
-            Ok(())
-        } else {
-            Err("Peer channel not found".into())
-        }
     }
 
     pub async fn run(&mut self, cancellation_token: CancellationToken) {
@@ -150,27 +118,10 @@ impl MemberPeer {
 
         let name_copy = name.clone();
 
-        let mut channel_rx = self.channel_rx.take().unwrap();
-
         loop {
             select! {
                 _ = cancellation_token.cancelled() => {
                     break;
-                }
-                 Some(message) = channel_rx.recv() => {
-                    if let Err(e) = self.outside_tx.send(NodeMessage::Message {
-                        time: std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap()
-                            .as_secs_f64() as u64,
-                        created_by: self.id.clone(),
-                        data: message,
-                        message_type: MessageType::Direct {
-                            to_peer: self.id.clone()
-                        },
-                    }).await {
-                        error!("Failed to forward direct message: {:?}", e);
-                    }
                 }
                 event = self.swarm.select_next_some() => {
                     match event {
@@ -185,19 +136,11 @@ impl MemberPeer {
                                 }
                                 info!("Connection established with rendezvous point {}", peer_id);
                             }
-
-                             let (tx, mut rx) = mpsc::channel::<Vec<u8>>(100);
-                            {
-                                let mut channels = self.direct_channels.write().await;
-                                channels.insert(peer_id.to_string(), tx);
-                            }
                         }
                         SwarmEvent::ConnectionClosed { peer_id, cause,.. } => {
                             if peer_id == self.config.admin_peer {
                                 error!("Lost connection to rendezvous point {:?}", cause);
                             }
-                            let mut channels = self.direct_channels.write().await;
-                            channels.remove(&peer_id.to_string());
                         }
                         SwarmEvent::Behaviour(event) => {
                             self.process_event(event).await;
@@ -209,14 +152,20 @@ impl MemberPeer {
                 }
 
                 message = self.inside_rx.recv() => {
-                    if let Some(message) = message {
+                    if let Some(node_message_tr) = message {
+
+                        let from = node_message_tr.0;
+                        let message = node_message_tr.1;
+                        let to = node_message_tr.2;
+
+
                         let topic = gossipsub::IdentTopic::new(self.config.workspace_id.clone());
 
                         let distributed_message = NodeMessage::Message {
                             data: message,
                             time: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs_f64() as u64,
                             created_by: self.id.clone(),
-                            message_type: MessageType::Broadcast,
+                            message_type: if to.is_none() { MessageType::Broadcast } else { MessageType::Direct { to_peer: to.unwrap().to_string() } },
                         };
                         match self.swarm.behaviour_mut().gossip_sub.publish(topic.clone(),distributed_message.to_bytes()){
                             Ok(_) => {}
@@ -258,7 +207,6 @@ impl MemberPeer {
             ClientPeerEvent::GossipSub(event) => match event {
                 gossipsub::Event::Message { message, .. } => {
                     let msg = NodeMessage::from_bytes(message.data.clone());
-
                     if let NodeMessage::Message {
                         message_type,
                         data,
@@ -266,6 +214,12 @@ impl MemberPeer {
                         ..
                     } = msg
                     {
+                        info!(
+                            "Process Message {:?} from {}:  Topic {}",
+                            message_type,
+                            name_,
+                            message.topic.to_string()
+                        );
                         match message_type {
                             MessageType::Direct { to_peer } => {
                                 // Only process if we're the intended recipient
@@ -339,16 +293,6 @@ impl MemberPeer {
                     if peer_id.to_string() == self.config.admin_peer.to_string() {
                         info!("Member {} Unsubscribe with Admin", name_.clone());
                     }
-                }
-
-                gossipsub::Event::Message { message, .. } => {
-                    let msg = NodeMessage::from_bytes(message.data);
-                    match self.outside_tx.send(msg).await {
-                        Ok(_) => {}
-                        Err(e) => {
-                            error!("Failed to send message to outside: {:?}", e);
-                        }
-                    };
                 }
 
                 _ => {

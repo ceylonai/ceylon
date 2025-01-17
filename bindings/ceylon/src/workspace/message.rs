@@ -1,5 +1,6 @@
 // In message.rs
 use serde::{Deserialize, Serialize};
+use sangedama::peer::message::data::NodeMessage;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum MessageType {

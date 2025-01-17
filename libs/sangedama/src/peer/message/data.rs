@@ -68,3 +68,5 @@ impl NodeMessage {
         }
     }
 }
+// (from, data, to)
+pub type NodeMessageTransporter = (String, Vec<u8>, Option<String>);

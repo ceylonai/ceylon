@@ -13,7 +13,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
 
 use crate::peer::behaviour::{PeerAdminBehaviour, PeerAdminEvent};
-use crate::peer::message::data::{EventType, MessageType, NodeMessage};
+use crate::peer::message::data::{EventType, MessageType, NodeMessage, NodeMessageTransporter};
 use crate::peer::peer_swarm::create_swarm;
 
 #[derive(Default, Clone)]
@@ -47,8 +47,8 @@ pub struct AdminPeer {
 
     outside_tx: tokio::sync::mpsc::Sender<NodeMessage>,
 
-    inside_rx: tokio::sync::mpsc::Receiver<Vec<u8>>,
-    inside_tx: tokio::sync::mpsc::Sender<Vec<u8>>,
+    inside_rx: tokio::sync::mpsc::Receiver<NodeMessageTransporter>,
+    inside_tx: tokio::sync::mpsc::Sender<NodeMessageTransporter>,
 
     _default_address: Multiaddr,
 }
@@ -61,7 +61,7 @@ impl AdminPeer {
         let swarm = create_swarm::<PeerAdminBehaviour>(key.clone()).await;
         let (outside_tx, outside_rx) = tokio::sync::mpsc::channel::<NodeMessage>(100);
 
-        let (inside_tx, inside_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
+        let (inside_tx, inside_rx) = tokio::sync::mpsc::channel::<NodeMessageTransporter>(100);
 
         let default_address = Multiaddr::empty()
             .with(Protocol::Ip4(Ipv4Addr::UNSPECIFIED))
@@ -89,7 +89,7 @@ impl AdminPeer {
         self._default_address.clone()
     }
 
-    pub fn emitter(&self) -> tokio::sync::mpsc::Sender<Vec<u8>> {
+    pub fn emitter(&self) -> tokio::sync::mpsc::Sender<NodeMessageTransporter> {
         self.inside_tx.clone()
     }
 
@@ -126,14 +126,18 @@ impl AdminPeer {
                 }
 
                 message = self.inside_rx.recv() => {
-                    if let Some(message) = message {
+                    if let Some(node_message_tr) = message {
                         let topic = gossipsub::IdentTopic::new(self.config.workspace_id.clone());
+                        let from = node_message_tr.0;
+                        let message = node_message_tr.1;
+                        let to = node_message_tr.2;
+
 
                         let distributed_message = NodeMessage::Message {
                             data: message,
                             time: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs_f64() as u64,
                             created_by: self.id.clone(),
-                            message_type: MessageType::Broadcast,
+                           message_type: if to.is_none() { MessageType::Broadcast } else { MessageType::Direct { to_peer: to.unwrap().to_string() } },
                         };
                         match self.swarm.behaviour_mut().gossip_sub.publish(topic,distributed_message.to_bytes()){
                             Ok(_) => {}
@@ -148,6 +152,7 @@ impl AdminPeer {
     }
 
     async fn process_event(&mut self, event: PeerAdminEvent) {
+        let name_ = self.config.workspace_id.clone();
         match event {
             PeerAdminEvent::Rendezvous(event) => match event {
                 rendezvous::server::Event::PeerRegistered { peer, .. } => {
@@ -222,13 +227,60 @@ impl AdminPeer {
                         .expect("Outside tx failed");
                 }
                 gossipsub::Event::Message { message, .. } => {
-                    let msg = NodeMessage::from_bytes(message.data);
-                    match self.outside_tx.send(msg).await {
-                        Ok(_) => {}
-                        Err(e) => {
-                            error!("Failed to send message to outside: {:?}", e);
+                    let msg = NodeMessage::from_bytes(message.data.clone());
+                    if let NodeMessage::Message {
+                        message_type,
+                        data,
+                        created_by,
+                        ..
+                    } = msg
+                    {
+                        info!(
+                            "Process Message {:?} from {}:  Topic {}",
+                            message_type,
+                            name_,
+                            message.topic.to_string()
+                        );
+                        match message_type {
+                            MessageType::Direct { to_peer } => {
+                                // Only process if we're the intended recipient
+                                if to_peer == self.id {
+                                    match self
+                                        .outside_tx
+                                        .send(NodeMessage::Message {
+                                            time: std::time::SystemTime::now()
+                                                .duration_since(std::time::UNIX_EPOCH)
+                                                .unwrap()
+                                                .as_secs_f64()
+                                                as u64,
+                                            created_by,
+                                            message_type: MessageType::Direct { to_peer },
+                                            data,
+                                        })
+                                        .await
+                                    {
+                                        Ok(_) => {}
+                                        Err(e) => {
+                                            error!("Failed to forward direct message: {:?}", e)
+                                        }
+                                    }
+                                }
+                            }
+                            MessageType::Broadcast => {
+                                // Process broadcast messages as before
+                                match self
+                                    .outside_tx
+                                    .send(NodeMessage::from_bytes(message.data))
+                                    .await
+                                {
+                                    Ok(_) => {}
+                                    Err(e) => {
+                                        error!("Failed to forward broadcast message: {:?}", e)
+                                    }
+                                }
+                            }
                         }
-                    };
+                    }
                 }
                 _ => {
                     info!("GossipSub: {:?}", event);

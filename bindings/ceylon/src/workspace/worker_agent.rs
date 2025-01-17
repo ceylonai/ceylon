@@ -4,7 +4,7 @@ use crate::workspace::agent::{
 use crate::workspace::message::{AgentMessage, MessageType};
 use crate::{EventHandler, MessageHandler, Processor};
 use futures::future::join_all;
-use sangedama::peer::message::data::{EventType, NodeMessage};
+use sangedama::peer::message::data::{EventType, NodeMessage, NodeMessageTransporter};
 use sangedama::peer::node::{
     create_key, create_key_from_bytes, get_peer_id, MemberPeer, MemberPeerConfig,
 };
@@ -70,8 +70,8 @@ pub struct WorkerAgent {
     _on_message: Arc<Mutex<Arc<dyn MessageHandler>>>,
     _on_event: Arc<Mutex<Arc<dyn EventHandler>>>,
 
-    pub broadcast_emitter: tokio::sync::mpsc::Sender<Vec<u8>>,
-    pub broadcast_receiver: Arc<Mutex<tokio::sync::mpsc::Receiver<Vec<u8>>>>,
+    pub broadcast_emitter: tokio::sync::mpsc::Sender<NodeMessageTransporter>,
+    pub broadcast_receiver: Arc<Mutex<tokio::sync::mpsc::Receiver<NodeMessageTransporter>>>,
 
     _peer_id: String,
     _key: Vec<u8>,
@@ -84,7 +84,8 @@ impl WorkerAgent {
         processor: Arc<dyn Processor>,
         on_event: Arc<dyn EventHandler>,
     ) -> Self {
-        let (broadcast_emitter, broadcast_receiver) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
+        let (broadcast_emitter, broadcast_receiver) =
+            tokio::sync::mpsc::channel::<NodeMessageTransporter>(100);
         let admin_peer_key = create_key();
         let id = get_peer_id(&admin_peer_key).to_string();
 
@@ -173,8 +174,13 @@ impl WorkerAgent {
 
 impl WorkerAgent {
     pub async fn send_direct(&self, to_peer: String, message: Vec<u8>) {
-        let node_message = AgentMessage::create_direct_message(message, to_peer);
-        match self.broadcast_emitter.send(node_message.to_bytes()).await {
+        let node_message = AgentMessage::create_direct_message(message, to_peer.clone());
+        info!("Sending direct message to {}", to_peer.clone());
+        match self
+            .broadcast_emitter
+            .send((self.details().id, node_message.to_bytes(), Some(to_peer)))
+            .await
+        {
             Ok(_) => {}
             Err(e) => {
                 error!("Failed to send direct message: {:?}", e);
@@ -184,7 +190,11 @@ impl WorkerAgent {
 
     pub async fn broadcast(&self, message: Vec<u8>) {
         let node_message = AgentMessage::create_broadcast_message(message);
-        match self.broadcast_emitter.send(node_message.to_bytes()).await {
+        match self
+            .broadcast_emitter
+            .send((self.details().id, node_message.to_bytes(), None))
+            .await
+        {
             Ok(_) => {}
             Err(e) => {
                 error!("Failed to send broadcast message: {:?}", e);
@@ -234,7 +244,7 @@ impl WorkerAgent {
         let agent_details = self.details().clone();
 
         let on_event = self._on_event.clone();
-        let peer_id= self._peer_id.clone();
+        let peer_id = self._peer_id.clone();
         let task_admin_listener = runtime.spawn(async move {
             loop {
                 if is_request_to_shutdown {
@@ -305,7 +315,7 @@ impl WorkerAgent {
                                                 topic,
                                             };
                                             peer_emitter_clone.send(
-                                                agent_intro_message.to_bytes()
+                                                (agent_details.id.clone(),agent_intro_message.to_bytes(),None)
                                             ).await.unwrap();
                                         }
                                         _ => {
@@ -327,6 +337,7 @@ impl WorkerAgent {
 
         let broadcast_receiver = self.broadcast_receiver.clone();
         let cancellation_token_clone = cancellation_token.clone();
+        let agent_details = self.details().clone();
         let run_broadcast = runtime.spawn(async move {
             loop {
                 if is_request_to_shutdown {
@@ -336,7 +347,10 @@ impl WorkerAgent {
                 if cancellation_token_clone.is_cancelled() {
                     break;
                 } else if let Some(raw_data) = broadcast_receiver.lock().await.recv().await {
-                    peer_emitter.send(raw_data).await.unwrap();
+                    peer_emitter
+                        .send(raw_data)
+                        .await
+                        .unwrap();
                 }
             }
         });

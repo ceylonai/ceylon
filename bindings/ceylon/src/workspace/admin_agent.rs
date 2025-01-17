@@ -16,7 +16,7 @@ use crate::workspace::agent::{
 };
 use crate::workspace::message::{AgentMessage, MessageType};
 use crate::{utils, MessageHandler, Processor, WorkerAgent};
-use sangedama::peer::message::data::{EventType, NodeMessage};
+use sangedama::peer::message::data::{EventType, NodeMessage, NodeMessageTransporter};
 use sangedama::peer::node::{
     create_key, create_key_from_bytes, get_peer_id, AdminPeer, AdminPeerConfig,
 };
@@ -34,8 +34,8 @@ pub struct AdminAgent {
     _on_message: Arc<Mutex<Arc<dyn MessageHandler>>>,
     _on_event: Arc<Mutex<Arc<dyn EventHandler>>>,
 
-    pub broadcast_emitter: mpsc::Sender<Vec<u8>>,
-    pub broadcast_receiver: Arc<Mutex<mpsc::Receiver<Vec<u8>>>>,
+    pub broadcast_emitter: mpsc::Sender<NodeMessageTransporter>,
+    pub broadcast_receiver: Arc<Mutex<mpsc::Receiver<NodeMessageTransporter>>>,
 
     _peer_id: String,
 
@@ -53,7 +53,7 @@ impl AdminAgent {
         processor: Arc<dyn Processor>,
         on_event: Arc<dyn EventHandler>,
     ) -> Self {
-        let (broadcast_emitter, broadcast_receiver) = mpsc::channel::<Vec<u8>>(100);
+        let (broadcast_emitter, broadcast_receiver) = mpsc::channel::<NodeMessageTransporter>(100);
 
         let admin_peer_key = create_key();
         let id = get_peer_id(&admin_peer_key).to_string();
@@ -80,18 +80,13 @@ impl AdminAgent {
     }
 
     pub async fn send_direct(&self, to_peer: String, message: Vec<u8>) {
-        let id = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as u64;
-
-        let node_message = AgentMessage::NodeMessage {
-            message,
-            id,
-            message_type: MessageType::Direct { to_peer },
-        };
-
-        match self.broadcast_emitter.send(node_message.to_bytes()).await {
+        let node_message = AgentMessage::create_direct_message(message, to_peer.clone());
+        info!("Sending direct message to {}", to_peer.clone());
+        match self
+            .broadcast_emitter
+            .send((self.details().id, node_message.to_bytes(), Some(to_peer)))
+            .await
+        {
             Ok(_) => {}
             Err(e) => {
                 error!("Failed to send direct message: {:?}", e);
@@ -100,18 +95,12 @@ impl AdminAgent {
     }
 
     pub async fn broadcast(&self, message: Vec<u8>) {
-        let id = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as u64;
-
-        let node_message = AgentMessage::NodeMessage {
-            message,
-            id,
-            message_type: MessageType::Broadcast,
-        };
-
-        match self.broadcast_emitter.send(node_message.to_bytes()).await {
+        let node_message = AgentMessage::create_broadcast_message(message);
+        match self
+            .broadcast_emitter
+            .send((self.details().id, node_message.to_bytes(), None))
+            .await
+        {
             Ok(_) => {}
             Err(e) => {
                 error!("Failed to send broadcast message: {:?}", e);
