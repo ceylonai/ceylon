@@ -1,3 +1,10 @@
+## v0.20.1
+- Update python dependencies
+## v0.20.0
+- Improve Performance
+- Improve Examples
+- Remove LLM Support (Will be added more advanced mechanism) 
+- Moved unwanted internal modules- - 
 ## v0.13.5
 - Improve LLM calling 
 - Add Example directory
