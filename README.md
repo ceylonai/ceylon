@@ -2,7 +2,8 @@
 
 > Empowering Collaboration, Simplifying Complexity
 
-![PyPI - Version](https://img.shields.io/pypi/v/ceylon.svg) ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/ceylon.svg)
+![PyPI - Version](https://img.shields.io/pypi/v/ceylon.svg) ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/ceylon.svg) ![PyPI Downloads](https://img.shields.io/pypi/dm/ceylon)
+
 
 ## Introduction
 
