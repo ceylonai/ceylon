@@ -53,9 +53,9 @@ Ceylon provides a range of tutorials and examples to help you get started and ma
 ### Example Projects
 
 - **Meeting Scheduler**: [Colab Script](https://colab.research.google.com/drive/1C-E9BN992k5sZYeJWnVrsWA5_ryaaT8m?usp=sharing)  
-  [Read more](https://github.com/ceylonai/ceylon/blob/master/docs/examples/meeting-sechdular.md)
-- **Single Item Auction**: [Colab Script](https://colab.research.google.com/drive/1C-E9BN992k5sZYeJWnVrsWA5_ryaaT8m?usp=sharing)  
-  [Read more](https://github.com/ceylonai/ceylon/blob/master/docs/examples/single-item-auction.md)
+  [Read more](bindings/ceylon/examples/time_scheduling)
+  - **Single Item Auction**: [Colab Script](https://colab.research.google.com/drive/12o76s4CyGvOpUaACDYIaYmJgJE1hC81Y#scrollTo=_4dqqO616ifQ)
+  [Read more](bindings/ceylon/examples/auction)
 
 ### More Examples
 - **Task Manager**: [Read more](bindings/ceylon/examples/task_manager)
@@ -70,7 +70,11 @@ To get started with Ceylon, refer to our detailed [Getting Started Guide](./docs
 ## 🚧 Roadmap
 
 - [X] Agent Stack
-- [X] Python Client Release
+- [X] Python SDK First Version Release
+- [ ] Java/Kotlin SDK First Version Release
+- [ ] NodeJS SDK First Version Release
+- [ ] JS/TS SDK First Version Release
+- [ ] LLM Agents
 - [ ] Web Agent
 - [ ] Task Manager
 - [ ] Agent Registry
