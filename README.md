@@ -101,7 +101,7 @@ Ceylon is released under the Apache-2.0 license. See the [LICENSE](LICENSE) file
 
 For questions or support, please contact us at [support@ceylon.ai](mailto:support@ceylon.ai).
 
-## DISCLAIMER
+## NOTE
 
 **This project implements a peer-to-peer (P2P) networking solution designed for software agent communication, entirely
 independent of any blockchain technology. Our system utilizes libp2p Rust implementation for enabling cross-network
