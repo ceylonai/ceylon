@@ -154,3 +154,8 @@ print(result)
 - **NotifierAgent** sends a notification with the scheduled meeting time.
 
 This simple example demonstrates how to set up a multi-agent system with Ceylon, where each agent has a specific role and contributes to completing the overall task.
+
+---
+
+Copyright 2024-Present, Syigen Ltd. and Syigen Private Limited. All rights reserved.
+Licensed under the Apache License, Version 2.0 (See LICENSE or http://www.apache.org/licenses/LICENSE-2.0).

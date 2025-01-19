@@ -2,11 +2,14 @@
 
 > Empowering Collaboration, Simplifying Complexity
 
-![PyPI - Version](https://img.shields.io/pypi/v/ceylon.svg) ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/ceylon.svg)
+![PyPI - Version](https://img.shields.io/pypi/v/ceylon.svg) ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/ceylon.svg) ![PyPI Downloads](https://img.shields.io/pypi/dm/ceylon)
 
 ## Introduction
 
-Welcome to Ceylon: A Multi-Agent System (MAS) designed to orchestrate complex task flows among multiple AI agents. Ceylon manages and automates interactions between agents, each with specific roles and responsibilities, enabling powerful collaborative AI solutions. By empowering collaboration and simplifying complexity, Ceylon opens up new possibilities in AI-driven task automation and problem-solving.
+Welcome to Ceylon: A Multi-Agent System (MAS) designed to orchestrate complex task flows among multiple AI agents.
+Ceylon manages and automates interactions between agents, each with specific roles and responsibilities, enabling
+powerful collaborative AI solutions. By empowering collaboration and simplifying complexity, Ceylon opens up new
+possibilities in AI-driven task automation and problem-solving.
 
 ![Ceylon Architecture](https://github.com/ceylonai/ceylon/blob/master/contents/images/img.png?raw=True)
 
@@ -18,7 +21,8 @@ Welcome to Ceylon: A Multi-Agent System (MAS) designed to orchestrate complex ta
 - **Customization**: Highly adaptable to fit diverse use cases.
 - **Distributed Architecture**: Developed as a robust distributed system.
 - **Efficient Message Propagation**: Utilizes a powerful framework for reliable inter-agent communication.
-- **Interoperability and Performance**: Ensures seamless operation across different programming languages while providing memory safety and high performance.
+- **Interoperability and Performance**: Ensures seamless operation across different programming languages while
+  providing memory safety and high performance.
 - **Chief Agent Leadership**: Centralized task management and execution flow.
 - **Parallel or Sequential Execution**: Adapt to your task's needs.
 - **Customizable I/O**: Define inputs and outputs tailored to your requirements.
@@ -26,7 +30,8 @@ Welcome to Ceylon: A Multi-Agent System (MAS) designed to orchestrate complex ta
 
 ## 🌟 Why Ceylon?
 
-Ceylon pushes the boundaries of what's possible in task automation and AI collaboration. It's not just another framework; it's a new paradigm for solving complex problems.
+Ceylon pushes the boundaries of what's possible in task automation and AI collaboration. It's not just another
+framework; it's a new paradigm for solving complex problems.
 
 - **Achieve the Impossible**: Tackle tasks that traditional single-agent or monolithic systems can't handle.
 - **Flexible Architecture**: Easily adapt to various use cases, from customer support to market analysis.
@@ -52,23 +57,34 @@ Ceylon provides a range of tutorials and examples to help you get started and ma
 
 ### Example Projects
 
-- **News Writing Panel**: [Colab Script](https://colab.research.google.com/drive/1ZMy0Iggni6fCQynBlyI1wL4WW4U_Fman?usp=sharing)
-- **Meeting Scheduler**: [Colab Script](https://colab.research.google.com/drive/1C-E9BN992k5sZYeJWnVrsWA5_ryaaT8m?usp=sharing)  
-  [Read more](https://github.com/ceylonai/ceylon/blob/master/docs/examples/meeting-sechdular.md)
-- **Single Item Auction**: [Colab Script](https://colab.research.google.com/drive/1C-E9BN992k5sZYeJWnVrsWA5_ryaaT8m?usp=sharing)  
-  [Read more](https://github.com/ceylonai/ceylon/blob/master/docs/examples/single-item-auction.md)
-- **Task Manager**: [Read more](https://github.com/ceylonai/ceylon/blob/master/docs/examples/task-manager.md)
-- **Connect Through Network**: [Read more](.https://github.com/ceylonai/ceylon/blob/master/docs/examples/connect-through-network.md)
+- **Meeting Scheduler
+  **: [Colab Script](https://colab.research.google.com/drive/1C-E9BN992k5sZYeJWnVrsWA5_ryaaT8m?usp=sharing)  
+  [Read more](examples/time_scheduling)
+  - **Single Item Auction
+    **: [Colab Script](https://colab.research.google.com/drive/12o76s4CyGvOpUaACDYIaYmJgJE1hC81Y#scrollTo=_4dqqO616ifQ)
+    [Read more](examples/auction)
+
+### More Examples
+
+- **Task Manager**: [Read more](examples/task_manager)
+- **Auction System**: [Read more](examples/auction)
+- **Time Scheduling**: [Read more](examples/time_scheduling)
 
 ## 🚦 Getting Started
 
-To get started with Ceylon, refer to our detailed [Getting Started Guide](./docs/GettingStart.md). This guide walks you through setting up a basic multi-agent system with easy-to-follow steps.
+To get started with Ceylon, refer to our detailed [Getting Started Guide](./docs/GettingStart.md). This guide walks you
+through setting up a basic multi-agent system with easy-to-follow steps.
 
 ## 🚧 Roadmap
 
-- [X] LLM Agent Stack
-- [X] Job Handling (parallel & sequential)
+- [X] Agent Stack
+- [X] Python SDK First Version Release
+- [ ] Java/Kotlin SDK First Version Release
+- [ ] NodeJS SDK First Version Release
+- [ ] JS/TS SDK First Version Release
+- [ ] LLM Agents
 - [ ] Web Agent
+- [ ] Task Manager
 - [ ] Agent Registry
 
 ## 🤝 Contributing
@@ -83,6 +99,20 @@ Ceylon is released under the Apache-2.0 license. See the [LICENSE](LICENSE) file
 
 For questions or support, please contact us at [support@ceylon.ai](mailto:support@ceylon.ai).
 
+## NOTE
+
+**This project implements a peer-to-peer (P2P) networking solution designed for software agent communication, entirely
+independent of any blockchain technology. Our system utilizes libp2p Rust implementation for enabling cross-network
+communication between software agents, following distributed networking principles similar to BitTorrent. While libp2p
+is also used in some blockchain projects, our implementation does not incorporate, rely on, or interact with any
+blockchain or cryptocurrency technologies. Each agent in our network functions as an autonomous software component,
+processing data and communicating through our P2P implementation powered by libp2p.**
+
 ---
 
 Built with ☕ by the Ceylon Team. Star us on GitHub if you find this interesting!
+
+---
+
+Copyright 2024-Present, Syigen Ltd. and Syigen Private Limited. All rights reserved.
+Licensed under the Apache License, Version 2.0 (See LICENSE or http://www.apache.org/licenses/LICENSE-2.0).
