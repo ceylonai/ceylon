@@ -149,3 +149,8 @@ If the connection isn't working:
 
 This setup allows for distributed computing, where tasks can be offloaded to worker agents running on different
 machines, all coordinated by a central admin agent.
+
+---
+
+Copyright 2024-Present, Syigen Ltd. and Syigen Private Limited. All rights reserved.
+Licensed under the Apache License, Version 2.0 (See LICENSE or http://www.apache.org/licenses/LICENSE-2.0).

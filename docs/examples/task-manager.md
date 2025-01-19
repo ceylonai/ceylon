@@ -208,3 +208,8 @@ The system will:
 - Task assignments are only made once all workers are connected
 - Each worker tracks its task state to prevent duplicate processing
 - System uses proper serialization for message passing
+
+---
+
+Copyright 2024-Present, Syigen Ltd. and Syigen Private Limited. All rights reserved.
+Licensed under the Apache License, Version 2.0 (See LICENSE or http://www.apache.org/licenses/LICENSE-2.0).

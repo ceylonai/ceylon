@@ -237,3 +237,8 @@ if __name__ == '__main__':
 6. Implement notification system for scheduled meetings
 7. Add support for different time zones
 8. Create a REST API interface for web/mobile clients
+
+---
+
+Copyright 2024-Present, Syigen Ltd. and Syigen Private Limited. All rights reserved.
+Licensed under the Apache License, Version 2.0 (See LICENSE or http://www.apache.org/licenses/LICENSE-2.0).

@@ -69,8 +69,6 @@ Ceylon provides a range of tutorials and examples to help you get started and ma
 - **Task Manager**: [Read more](bindings/ceylon/examples/task_manager)
 - **Auction System**: [Read more](bindings/ceylon/examples/auction)
 - **Time Scheduling**: [Read more](bindings/ceylon/examples/time_scheduling)
-- **Connect Through Network
-  **: [Read more](.https://github.com/ceylonai/ceylon/blob/master/docs/examples/connect-through-network.md)
 
 ## 🚦 Getting Started
 
@@ -113,3 +111,8 @@ processing data and communicating through our P2P implementation powered by libp
 ---
 
 Built with ☕ by the Ceylon Team. Star us on GitHub if you find this interesting!
+
+---
+
+Copyright 2024-Present, Syigen Ltd. and Syigen Private Limited. All rights reserved.
+Licensed under the Apache License, Version 2.0 (See LICENSE or http://www.apache.org/licenses/LICENSE-2.0).

@@ -13,3 +13,8 @@ powerful collaborative AI solutions. By empowering collaboration and simplifying
 possibilities in AI-driven task automation and problem-solving.
 
 ![Ceylon Architecture](../contents/images/img.png)
+
+---
+
+Copyright 2024-Present, Syigen Ltd. and Syigen Private Limited. All rights reserved.
+Licensed under the Apache License, Version 2.0 (See LICENSE or http://www.apache.org/licenses/LICENSE-2.0).
