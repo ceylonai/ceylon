@@ -8,7 +8,7 @@ use libp2p::{gossipsub, identity, rendezvous, Multiaddr, PeerId, Swarm};
 use std::net::Ipv4Addr;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{Duration, UNIX_EPOCH};
+use std::time::{Duration};
 use tokio::select;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
