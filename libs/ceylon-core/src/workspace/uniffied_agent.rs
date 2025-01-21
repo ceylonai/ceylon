@@ -27,7 +27,7 @@ pub struct UnifiedAgentConfig {
     pub port: Option<u16>,
     pub admin_peer: Option<String>,
     pub admin_ip: Option<String>,
-    pub buffer_size: Option<usize>,
+    pub buffer_size: Option<u16>,
 }
 
 pub struct UnifiedAgent {

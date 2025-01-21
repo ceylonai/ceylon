@@ -19,3 +19,5 @@ pub use workspace::{
     UnifiedAgentConfig,
     UnifiedAgent
 };
+
+pub use sangedama::peer::PeerMode;

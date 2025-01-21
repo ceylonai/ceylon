@@ -27,7 +27,7 @@ use crate::peer::message::data::{EventType, MessageType, NodeMessage, NodeMessag
 use crate::peer::peer_swarm::create_swarm;
 
 static CACHED_TIMESTAMP: AtomicU64 = AtomicU64::new(0);
-const DEFAULT_BUFFER_SIZE: usize = 100;
+const DEFAULT_BUFFER_SIZE: u16 = 100;
 
 #[derive(Clone)]
 pub struct UnifiedPeerConfig {
@@ -35,13 +35,13 @@ pub struct UnifiedPeerConfig {
     pub workspace_id: String,
     pub mode: PeerMode,
     pub listen_port: Option<u16>,
-    pub buffer_size: Option<usize>,
+    pub buffer_size: Option<u16>,
     pub admin_peer: Option<PeerId>,
     pub rendezvous_point_address: Option<Multiaddr>,
 }
 
 impl UnifiedPeerConfig {
-    pub fn new_admin(workspace_id: String, listen_port: u16, buffer_size: Option<usize>) -> Self {
+    pub fn new_admin(workspace_id: String, listen_port: u16, buffer_size: Option<u16>) -> Self {
         Self {
             name: "admin".to_string(),
             workspace_id,
@@ -59,7 +59,7 @@ impl UnifiedPeerConfig {
         admin_peer: String,
         rendezvous_point_admin_port: u16,
         rendezvous_point_public_ip: String,
-        buffer_size: Option<usize>,
+        buffer_size: Option<u16>,
     ) -> Self {
         let rendezvous_point_address = Multiaddr::empty()
             .with(Protocol::Ip4(
@@ -82,7 +82,7 @@ impl UnifiedPeerConfig {
     pub fn get_listen_address(&self) -> Multiaddr {
         Multiaddr::empty()
             .with(Protocol::Ip4(Ipv4Addr::UNSPECIFIED))
-            .with(Protocol::Udp(self.listen_port.unwrap_or(0)))
+            .with(Protocol::Udp(self.listen_port.unwrap_or(0) as u16))
             .with(Protocol::QuicV1)
     }
 }
@@ -105,11 +105,11 @@ impl UnifiedPeerImpl {
         let swarm = create_swarm::<UnifiedPeerBehaviour>(key.clone()).await;
 
         let (outside_tx, outside_rx) = tokio::sync::mpsc::channel::<NodeMessage>(
-            config.buffer_size.unwrap_or(DEFAULT_BUFFER_SIZE),
+            config.buffer_size.unwrap_or(DEFAULT_BUFFER_SIZE) as usize,
         );
 
         let (inside_tx, inside_rx) = tokio::sync::mpsc::channel::<NodeMessageTransporter>(
-            config.buffer_size.unwrap_or(DEFAULT_BUFFER_SIZE),
+            config.buffer_size.unwrap_or(DEFAULT_BUFFER_SIZE) as usize,
         );
 
         (

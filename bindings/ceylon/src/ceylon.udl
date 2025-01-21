@@ -82,3 +82,38 @@ interface EventHandler {
     [Async]
     void on_agent_connected(string topic,AgentDetail agent);
 };
+
+enum PeerMode{
+    "Admin",
+    "Client"
+};
+
+dictionary UnifiedAgentConfig {
+    string name;
+    string role;
+    PeerMode mode;
+    string work_space_id;
+    u16? port;
+    string? admin_peer;
+    string? admin_ip;
+    u16? buffer_size;
+};
+
+interface UnifiedAgent{
+    constructor(UnifiedAgentConfig config,MessageHandler on_message, Processor processor, EventHandler on_event);
+    
+    [Async]
+    void start(bytes inputs);
+
+    [Async]
+    void stop();
+
+    [Async]
+    void broadcast(bytes message);
+
+    [Async]
+    void send_direct(string to_peer, bytes message);
+
+    AgentDetail details();
+
+};

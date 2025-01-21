@@ -11,6 +11,7 @@ use std::time::Duration;
 use crate::peer::behaviour::PeerBehaviour;
 use libp2p::swarm::NetworkBehaviour;
 use libp2p::{gossipsub, identify, identity, ping, rendezvous};
+use serde::{Deserialize, Serialize};
 
 // Custom enum to handle both client and server rendezvous behaviors
 #[derive(NetworkBehaviour)]
@@ -121,7 +122,7 @@ pub struct UnifiedPeer {
     mode: PeerMode,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum PeerMode {
     Client,
     Admin,
