@@ -101,22 +101,7 @@ impl AdminPeer {
     }
     fn get_current_timestamp() -> u64 {
         // First try to get the cached timestamp
-        let cached = CACHED_TIMESTAMP.load(Ordering::Relaxed);
-
-        // // Get the current system time
-        // let current = SystemTime::now()
-        //     .duration_since(UNIX_EPOCH)
-        //     .unwrap()
-        //     .as_secs_f64() as u64;
-        //
-        // // If the cached timestamp is too old (more than 1ms old) or zero, update it
-        // if cached == 0 || current > cached {
-        //     CACHED_TIMESTAMP.store(current, Ordering::Relaxed);
-        //     current
-        // } else {
-        //     cached
-        // }
-        cached
+        CACHED_TIMESTAMP.load(Ordering::Relaxed)
     }
     pub fn get_address(&self) -> Multiaddr {
         self._default_address.clone()
