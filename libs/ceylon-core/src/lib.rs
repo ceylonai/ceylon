@@ -15,5 +15,7 @@ pub use workspace::{
     Processor,
     MessageHandler,
     EventHandler,
-    AgentDetail
+    AgentDetail,
+    UnifiedAgentConfig,
+    UnifiedAgent
 };
