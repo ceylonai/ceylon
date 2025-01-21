@@ -7,33 +7,34 @@
 mod peer;
 
 use std::net::Ipv4Addr;
-use std::str::FromStr;
-
 use libp2p::multiaddr::Protocol;
-use libp2p::{Multiaddr, PeerId};
+use libp2p::Multiaddr;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
 use tracing::info;
 
 use peer::message::data::NodeMessage;
-use peer::node::{
-    create_key, get_peer_id, AdminPeer, AdminPeerConfig, MemberPeer, MemberPeerConfig,
-};
+use peer::node::{create_key, get_peer_id};
+use peer::node::node::{UnifiedPeerImpl, UnifiedPeerConfig};
 
 #[tokio::main]
 async fn main() {
     let subscriber = tracing_subscriber::FmtSubscriber::new();
-    // use that subscriber to process traces emitted after this point
     tracing::subscriber::set_global_default(subscriber).unwrap();
+
     let workspace_id = "workspace-test".to_string();
     info!("Starting {}", workspace_id);
 
     let admin_port = 7845;
-    let admin_config = AdminPeerConfig::new(admin_port, workspace_id.clone(), None);
+    let admin_config = UnifiedPeerConfig::new_admin(
+        workspace_id.clone(),
+        admin_port,
+        None,
+    );
+
     let admin_key = create_key();
     let admin_id_from_key = get_peer_id(&admin_key);
-    let (mut admin_peer, mut admin_listener) =
-        AdminPeer::create(admin_config.clone(), admin_key).await;
+    let (mut admin_peer, mut admin_listener) = UnifiedPeerImpl::create(admin_config.clone(), admin_key).await;
     let admin_id = admin_peer.id.clone();
     let admin_id_2 = admin_peer.id.clone();
 
@@ -46,21 +47,23 @@ async fn main() {
     let admin_emitter = admin_peer.emitter();
     let cancel_token_clone = cancel_token.clone();
     let task_admin = tokio::task::spawn(async move {
-        admin_peer.run(None, cancel_token_clone).await;
+        admin_peer.run(cancel_token_clone).await;
     });
 
     let task_admin_listener = tokio::spawn(async move {
         loop {
             select! {
-               event = admin_listener.recv() => {
-                    if event.is_some() {
-                        let event = event.unwrap();
-                        match event{
-                            NodeMessage::Message{ data,created_by, ..} => {
-                                info!("Admin listener Message {:?} from {:?}",String::from_utf8(data),created_by);
+                event = admin_listener.recv() => {
+                    if let Some(event) = event {
+                        match event {
+                            NodeMessage::Message{ data, created_by, ..} => {
+                                info!("Admin listener Message {:?} from {:?}",
+                                    String::from_utf8(data),
+                                    created_by
+                                );
                             }
                             _ => {
-                                info!("peer1 listener {:?}", event);
+                                info!("Admin listener {:?}", event);
                             }
                         }
                     }
@@ -83,7 +86,7 @@ async fn main() {
         }
     });
 
-    // Here we create localhost address to connect peer with admin
+    // Create localhost address for peer-admin connection
     let peer_dial_address = Multiaddr::empty()
         .with(Protocol::Ip4(Ipv4Addr::LOCALHOST))
         .with(Protocol::Udp(admin_port))
@@ -93,38 +96,33 @@ async fn main() {
         workspace_id.clone(),
         admin_id_2.clone(),
         admin_port,
-        peer_dial_address.clone(),
         "peer1".to_string(),
         cancel_token.clone(),
-    )
-    .await;
+    ).await;
+
     let peer_2 = create_client(
         workspace_id.clone(),
         admin_id_2.clone(),
         admin_port,
-        peer_dial_address.clone(),
         "peer2".to_string(),
         cancel_token.clone(),
-    )
-    .await;
+    ).await;
+
     let peer_3 = create_client(
         workspace_id.clone(),
         admin_id_2.clone(),
         admin_port,
-        peer_dial_address.clone(),
         "peer3".to_string(),
         cancel_token.clone(),
-    )
-    .await;
+    ).await;
+
     let peer_4 = create_client(
         workspace_id.clone(),
         admin_id_2.clone(),
         admin_port,
-        peer_dial_address.clone(),
         "peer4".to_string(),
         cancel_token.clone(),
-    )
-    .await;
+    ).await;
 
     task_admin.await.unwrap();
     task_admin_listener.await.unwrap();
@@ -139,51 +137,57 @@ async fn main() {
 async fn create_client(
     workspace_id: String,
     admin_id: String,
-    admin_port: u16,
-    peer_dial_address: Multiaddr,
+    peer_dial_port: u16,
     name: String,
     cancel_token: CancellationToken,
 ) -> tokio::task::JoinHandle<()> {
     let member_key = create_key();
     let member_id_from_key = get_peer_id(&member_key);
-    let (mut peer2, mut peer2_listener) = MemberPeer::create(
-        MemberPeerConfig {
-            name: name.clone(),
-            workspace_id: workspace_id.clone(),
-            admin_peer: PeerId::from_str(&admin_id).unwrap(),
-            rendezvous_point_address: peer_dial_address.clone(),
-            buffer_size: None,
-        },
+
+    let member_config = UnifiedPeerConfig::new_member(
+        name.clone(),
+        workspace_id.clone(),
+        admin_id,
+        peer_dial_port,
+        "127.0.0.1".to_string(),
+        None,
+    );
+
+    let (mut peer, mut peer_listener) = UnifiedPeerImpl::create(
+        member_config,
         member_key,
-    )
-    .await;
+    ).await;
 
-    let peer2_emitter = peer2.emitter();
-    let peer2_id = peer2.id.clone();
+    let peer_emitter = peer.emitter();
+    let peer_id = peer.id.clone();
+    let peer_id_2 = peer_id.clone();
 
-    let peer2_id_2 = peer2_id.clone();
-
-    if member_id_from_key.to_string() == peer2_id.to_string() {
-        info!("{} {} created", name.clone(), peer2_id);
+    if member_id_from_key.to_string() == peer_id.to_string() {
+        info!("{} {} created", name.clone(), peer_id);
     }
+
     let cancel_token_clone = cancel_token.clone();
-    let task_peer_2 = tokio::task::spawn(async move {
-        peer2.run(cancel_token_clone).await;
+    let task_peer = tokio::task::spawn(async move {
+        peer.run(cancel_token_clone).await;
     });
 
     let name_clone = name.clone();
-    let task_peer_2_listener = tokio::spawn(async move {
+    let task_peer_listener = tokio::spawn(async move {
         loop {
             select! {
-                event = peer2_listener.recv() => {
-                  if event.is_some() {
-                        let event = event.unwrap();
-                        match event{
-                            NodeMessage::Message{ data,created_by, ..} => {
-                                info!("{} {} listener Message {:?} from {:?}",name.clone(),peer2_id, String::from_utf8(data),created_by);
+                event = peer_listener.recv() => {
+                    if let Some(event) = event {
+                        match event {
+                            NodeMessage::Message{ data, created_by, ..} => {
+                                info!("{} {} listener Message {:?} from {:?}",
+                                    name_clone,
+                                    peer_id,
+                                    String::from_utf8(data),
+                                    created_by
+                                );
                             }
                             _ => {
-                                info!("{} listener {:?}",name.clone(), event);
+                                info!("{} listener {:?}", name_clone, event);
                             }
                         }
                     }
@@ -192,23 +196,23 @@ async fn create_client(
         }
     });
 
-    let task_run_peer_2 = tokio::task::spawn(async move {
+    let task_run_peer = tokio::task::spawn(async move {
         loop {
-            peer2_emitter
+            peer_emitter
                 .send((
-                    peer2_id_2.clone(),
-                    "Peer2 Send regards".to_string().as_bytes().to_vec(),
+                    peer_id_2.clone(),
+                    format!("{} Send regards", name).as_bytes().to_vec(),
                     None,
                 ))
                 .await
-                .expect("TODO: panic message");
+                .expect("Failed to send message");
             tokio::time::sleep(std::time::Duration::from_millis(3000)).await;
         }
     });
 
     tokio::spawn(async {
-        task_peer_2.await.unwrap();
-        task_peer_2_listener.await.unwrap();
-        task_run_peer_2.await.unwrap();
+        task_peer.await.unwrap();
+        task_peer_listener.await.unwrap();
+        task_run_peer.await.unwrap();
     })
 }

@@ -7,6 +7,7 @@
 mod admin;
 mod member;
 mod peer_builder;
+pub mod node;
 
 pub use admin::{AdminPeer, AdminPeerConfig};
 pub use member::{MemberPeer, MemberPeerConfig};
