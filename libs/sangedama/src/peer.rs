@@ -5,8 +5,8 @@
  */
 
 mod behaviour;
-mod message;
-mod node;
+pub mod message;
+pub mod node;
 mod peer_swarm;
 
 pub use behaviour::peer::PeerMode;
