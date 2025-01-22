@@ -12,7 +12,7 @@ use crate::workspace::message::{AgentMessage, MessageType};
 use crate::WorkerAgent;
 use futures::future::join_all;
 use log::log_enabled;
-use sangedama::peer::message::data::{NodeMessage, NodeMessageTransporter};
+use sangedama::peer::message::data::{EventType, NodeMessage, NodeMessageTransporter};
 use sangedama::peer::node::node::{UnifiedPeerConfig, UnifiedPeerImpl};
 use sangedama::peer::node::peer_builder::{create_key, create_key_from_bytes, get_peer_id};
 use sangedama::peer::PeerMode;
@@ -20,6 +20,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::runtime::{Handle, Runtime};
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
@@ -227,23 +228,18 @@ impl UnifiedAgent {
         let cancel_token = CancellationToken::new();
         let cancel_token_clone = cancel_token.clone();
 
-        // Get all task handlers but don't await them yet
-        let mut self_agent_handlers = self
-            .run(inputs.clone(), Some(vec![]), cancel_token.clone())
+        // Get all task handlers
+        let self_agent_handlers = self
+            .run(
+                inputs.clone(),
+                agents,
+                cancel_token.clone(),
+                runtime.handle(),
+            )
             .await;
 
-        if agents.is_some() {
-            let agents = agents.unwrap();
-            for agent in agents {
-                let mut agent_handler = agent.run(inputs.clone(), None, cancel_token.clone()).await;
-                self_agent_handlers.append(&mut agent_handler);
-            }
-        }
-
         // Create a single future that completes when all tasks are done
-        let all_tasks = async move {
-            join_all(self_agent_handlers).await;
-        };
+        let all_tasks = join_all(self_agent_handlers);
 
         // Use select to handle either ctrl-c or task completion
         runtime.block_on(async {
@@ -251,19 +247,22 @@ impl UnifiedAgent {
                 _ = all_tasks => {
                     info!("All agent tasks completed normally");
                 }
-                // _ = signal::ctrl_c() => {
-                //     info!("Received ctrl-c, initiating shutdown");
-                //     cancel_token_clone.cancel();
-                // }
+                _ = signal::ctrl_c() => {
+                    info!("Received ctrl-c, initiating shutdown");
+                    cancel_token_clone.cancel();
+                    // Wait for tasks to complete after cancellation
+                    // all_tasks.await;
+                }
             }
-        })
+        });
     }
 
-    pub async fn run(
+    async fn run(
         &self,
         inputs: Vec<u8>,
         agents: Option<Vec<Arc<UnifiedAgent>>>,
         cancel_token: CancellationToken,
+        handle: &Handle,
     ) -> Vec<JoinHandle<()>> {
         let mut config = self._config.clone();
         let config_path = self._config_path.clone();
@@ -286,13 +285,6 @@ impl UnifiedAgent {
                 info!("--------------------------------");
             }
         }
-
-        let runtime = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .unwrap();
-
-        let handle = runtime.handle().clone();
         let peer_config = match self._config.mode {
             PeerMode::Admin => UnifiedPeerConfig::new_admin(
                 config
@@ -315,15 +307,16 @@ impl UnifiedAgent {
             ),
         };
 
+        // Create peer and listener
         let peer_key = create_key_from_bytes(self._key.clone());
         let (mut peer, mut peer_listener) =
             UnifiedPeerImpl::create(peer_config.clone(), peer_key).await;
 
         let worker_details: Arc<Mutex<HashMap<String, AgentDetail>>> =
             Arc::new(Mutex::new(HashMap::new()));
-        let cancel_token_clone = cancel_token.clone();
 
-        // Spawn peer runner
+        // Spawn peer runner with proper cancellation
+        let cancel_token_clone = cancel_token.clone();
         let task_peer = handle.spawn(async move {
             select! {
                 _ = peer.run(cancel_token_clone.clone()) => {
@@ -340,6 +333,8 @@ impl UnifiedAgent {
         let peer_id = self._peer_id.clone();
         let cancel_token_clone = cancel_token.clone();
 
+        let peer_emitter_clone = self.broadcast_emitter.clone();
+        let agent_details = self.details().clone();
         // Handle peer events
         let task_peer_listener = handle.spawn(async move {
             let mut is_call_agent_on_connect_list: HashMap<String, bool> = HashMap::new();
@@ -386,6 +381,8 @@ impl UnifiedAgent {
                                                 role,
                                             };
 
+                                            info!( "Agent connected: {} ({}) - Role: {}", agent_detail.name, agent_detail.id, agent_detail.role);
+
                                             worker_details.lock().await.insert(id.clone(), agent_detail.clone());
 
                                             if !is_call_agent_on_connect_list.get(&id).unwrap_or(&false) {
@@ -397,7 +394,26 @@ impl UnifiedAgent {
                                     }
                                 }
                                 NodeMessage::Event { event, .. } => {
-                                    // Handle events as needed
+                                  match event{
+                                        EventType::Subscribe{
+                                            topic,
+                                            ..
+                                        }=>{
+                                            info!("Worker {} Subscribed to topic {:?}", agent_details.id, topic);
+                                            let agent_intro_message = AgentMessage::AgentIntroduction {
+                                                id: agent_details.id.clone(),
+                                                name: agent_details.name.clone(),
+                                                role:agent_details.role.clone(),
+                                                topic,
+                                            };
+                                            peer_emitter_clone.send(
+                                                (agent_details.id.clone(),agent_intro_message.to_bytes(),None)
+                                            ).await.unwrap();
+                                        }
+                                        _ => {
+                                            info!("Admin Received Event {:?}", event);
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -406,65 +422,107 @@ impl UnifiedAgent {
             }
         });
 
+        // Spawn processor with proper cancellation
         let processor = self._processor.clone();
         let cancel_token_clone = cancel_token.clone();
         let task_processor = handle.spawn(async move {
             processor.lock().await.run(inputs).await;
             loop {
                 if cancel_token_clone.is_cancelled() {
+                    info!("Processor shutting down");
                     break;
                 }
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
             }
         });
 
+        // Spawn broadcast handler with proper cancellation
         let broadcast_receiver = self.broadcast_receiver.clone();
         let cancel_token_clone = cancel_token.clone();
         let task_broadcast = handle.spawn(async move {
+            let mut broadcast_receiver_lock = broadcast_receiver.lock().await;
             loop {
-                if cancel_token_clone.is_cancelled() {
-                    break;
-                } else if let Some(raw_data) = broadcast_receiver.lock().await.recv().await {
-                    // Handle broadcasting
-                }
-            }
-        });
-
-        let cancel_token_clone = cancel_token.clone();
-        let shutdown_recv = self.shutdown_recv.clone();
-        let admin_id = self._peer_id.clone();
-        let task_shutdown = handle.spawn(async move {
-            loop {
-                if let Some(raw_data) = shutdown_recv.lock().await.recv().await {
-                    if raw_data == admin_id {
-                        info!("Received shutdown signal");
-                        cancel_token.cancel();
+                select! {
+                    _ = cancel_token_clone.cancelled() => {
+                        info!("Broadcast handler shutting down");
                         break;
+                    }
+                    msg = broadcast_receiver_lock.recv() => {
+                        if let Some(raw_data) = msg {
+                            // Handle broadcasting
+                        }
                     }
                 }
             }
         });
 
-        let tasks = handle.spawn(async move {
-            select! {
-                _ = task_peer => {
-                    info!("Peer task completed");
-                }
-                _ = task_peer_listener => {
-                    info!("Peer listener task completed");
-                }
-                _ = task_processor => {
-                    info!("Processor task completed");
-                }
-                _ = task_broadcast => {
-                    info!("Broadcast task completed");
-                }
-                _ = task_shutdown => {
-                    info!("Shutdown task completed");
+        // Spawn shutdown handler
+        let cancel_token_clone = cancel_token.clone();
+        let shutdown_recv = self.shutdown_recv.clone();
+        let admin_id = self._peer_id.clone();
+        let task_shutdown = handle.spawn(async move {
+            let mut shutdown_recv_lock = shutdown_recv.lock().await;
+            loop {
+                select! {
+                    _ = cancel_token_clone.cancelled() => {
+                        info!("Shutdown handler shutting down");
+                        break;
+                    }
+                    msg = shutdown_recv_lock.recv() => {
+                        if let Some(raw_data) = msg {
+                            if raw_data == admin_id {
+                                info!("Received shutdown signal");
+                                cancel_token_clone.cancel();
+                                break;
+                            }
+                        }
+                    }
                 }
             }
         });
 
-        vec![tasks]
+        let cancel_token_clone = cancel_token.clone();
+        let run_holder_process = handle.spawn(async move {
+            loop {
+                if cancel_token_clone.is_cancelled() {
+                    break;
+                }
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            }
+        });
+
+        // select! {
+        //     _ = cancel_token.cancelled() => {
+        //         info!("Agent cancelled");
+        //     }
+        //     _ = task_peer => {
+        //         info!("Peer task completed");
+        //     }
+        //     _ = task_peer_listener => {
+        //         info!("Peer listener task completed");
+        //     }
+        //     _ = task_processor => {
+        //         info!("Processor task completed");
+        //     }
+        //     _ = task_broadcast => {
+        //         info!("Broadcast task completed");
+        //     }
+        //     _ = task_shutdown => {
+        //         info!("Shutdown task completed");
+        //     }
+        //     _ = run_holder_process => {
+        //         info!("Run holder process task completed");
+        //     }
+        // }
+
+        vec![
+            task_peer,
+            task_peer_listener,
+            task_processor,
+            task_broadcast,
+            task_shutdown,
+            run_holder_process,
+        ]
     }
 
     async fn cleanup(&self) {

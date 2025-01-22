@@ -9,12 +9,14 @@ from loguru import logger
 
 from ceylon import AgentDetail
 from ceylon.base.agents import Admin, Worker
+from ceylon.base.uni_agent import BaseAgent
+from ceylon.ceylon import PeerMode
 from ceylon.static_val import DEFAULT_WORKSPACE_ID, DEFAULT_CONF_FILE, DEFAULT_WORKSPACE_PORT, DEFAULT_WORKSPACE_IP
 
 
-class NetworkManager(Admin):
+class NetworkManager(BaseAgent):
     def __init__(self, name="admin", port=8888):
-        super().__init__(name=name, port=port)
+        super().__init__(name=name, port=port, mode=PeerMode.ADMIN, role="network_manager")
         self.return_response = None
 
     async def on_agent_connected(self, topic: str, agent: AgentDetail):
@@ -28,14 +30,14 @@ class NetworkManager(Admin):
             "to": agent.id,
             "message": f"Welcome {agent.name}!"
         }
-        await self.send_direct_data(agent.id, welcome_msg)
+        await self.send_message(agent.id, welcome_msg)
 
         # Broadcast new agent arrival
         broadcast_msg = {
             "type": "system",
             "message": f"New agent joined: {agent.name}"
         }
-        await self.broadcast_data(broadcast_msg)
+        await self.broadcast_message(broadcast_msg)
 
     async def on_message(self, agent_id: str, data: bytes, time: int):
         try:
@@ -49,7 +51,7 @@ class NetworkManager(Admin):
                 "from_admin": True,
                 "to": agent_id
             }
-            await self.send_direct_data(agent_id, response)
+            await self.send_message(agent_id, response)
 
         except Exception as e:
             logger.error(f"Error processing message: {e}")
@@ -63,11 +65,11 @@ class NetworkManager(Admin):
                     "type": "status",
                     "connected_agents": len(connected_agents)
                 }
-                await self.broadcast_data(status_msg)
+                await self.broadcast_message(status_msg)
             await asyncio.sleep(30)
 
 
-class WorkingAgent(Worker):
+class WorkingAgent(BaseAgent):
     def __init__(self, name="worker",
                  workspace_id=DEFAULT_WORKSPACE_ID,
                  conf_file=DEFAULT_CONF_FILE,
@@ -76,12 +78,8 @@ class WorkingAgent(Worker):
                  role="worker",
                  admin_ip=DEFAULT_WORKSPACE_IP):
         super().__init__(name=name,
-                         workspace_id=workspace_id,
-                         conf_file=conf_file,
-                         admin_peer=admin_peer,
-                         admin_port=admin_port,
-                         role=role,
-                         admin_ip=admin_ip)
+                         mode=PeerMode.CLIENT,
+                         role=role, )
         self.message_count = 0
 
     async def on_message(self, agent_id: str, data: bytes, time: int):
@@ -97,7 +95,7 @@ class WorkingAgent(Worker):
                     "to": agent_id,
                     "message": f"Thanks for the welcome! From {self.details().name}"
                 }
-                await self.send_direct_data(agent_id, response)
+                await self.send_message(agent_id, response)
 
             self.message_count += 1
 
@@ -114,7 +112,7 @@ class WorkingAgent(Worker):
             "to": agent.id,
             "message": f"Hello {agent.name}!"
         }
-        await self.send_direct_data(agent.id, greeting)
+        await self.send_message(agent.id, greeting)
 
     async def run(self, inputs: bytes):
         logger.info(f"Worker started - {self.details().name} ({self.details().id})")
@@ -124,7 +122,7 @@ class WorkingAgent(Worker):
                 "name": self.details().name,
                 "messages_received": self.message_count
             }
-            await self.broadcast_data(status)
+            await self.broadcast_message(status)
             await asyncio.sleep(60)
 
 
@@ -147,7 +145,7 @@ async def main():
 
     try:
         # Start the network
-        await network_manager.arun_admin(b"", workers)
+        await network_manager.start_agent(b"", workers)
     except KeyboardInterrupt:
         logger.info("Shutting down...")
     finally:

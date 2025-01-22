@@ -9,6 +9,7 @@ from ceylon import (
     AgentDetail
 )
 from ceylon.ceylon import UnifiedAgent, PeerMode, UnifiedAgentConfig
+from ceylon.ceylon.ceylon import uniffi_set_event_loop
 
 
 class BaseAgent(UnifiedAgent, MessageHandler, EventHandler, Processor):
@@ -66,6 +67,7 @@ class BaseAgent(UnifiedAgent, MessageHandler, EventHandler, Processor):
         self._event_handlers: List[callable] = []
 
     async def start_agent(self, inputs: bytes = b"", workers: Optional[List[UnifiedAgent]] = None) -> None:
+        uniffi_set_event_loop(asyncio.get_event_loop())
         """
         Start the agent. Wrapper around the base start() method for clarity.
         """
@@ -158,20 +160,20 @@ class BaseAgent(UnifiedAgent, MessageHandler, EventHandler, Processor):
             logger.error(f"Error handling message: {e}")
 
     # EventHandler interface implementation
-    async def on_agent_connected(self, topic: str, agent: AgentDetail) -> None:
-        """
-        Handle agent connection events and distribute to registered handlers.
-        """
-        # Update connected agents
-        self.connected_agents[agent.id] = agent
-        logger.info(f"Agent connected: {agent.name} ({agent.id}) - Role: {agent.role}")
-
-        # Call all registered event handlers
-        for handler in self._event_handlers:
-            try:
-                await handler(topic, agent)
-            except Exception as e:
-                logger.error(f"Error in event handler: {e}")
+    # async def on_agent_connected(self, topic: str, agent: AgentDetail) -> None:
+    #     """
+    #     Handle agent connection events and distribute to registered handlers.
+    #     """
+    #     # Update connected agents
+    #     self.connected_agents[agent.id] = agent
+    #     logger.info(f"Agent connected: {agent.name} ({agent.id}) - Role: {agent.role}")
+    #
+    #     # Call all registered event handlers
+    #     for handler in self._event_handlers:
+    #         try:
+    #             await handler(topic, agent)
+    #         except Exception as e:
+    #             logger.error(f"Error in event handler: {e}")
 
     # Processor interface implementation
     async def run(self, inputs: bytes) -> None:

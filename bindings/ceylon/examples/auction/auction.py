@@ -179,7 +179,7 @@ async def main():
         BidderAgent("Charlie", 2000.0)
     ]
 
-    await auctioneer.start(b"", bidders)
+    await auctioneer.start_agent(b"", bidders)
     # Start all bidders
 
     try:
