@@ -13,6 +13,8 @@ from loguru import logger
 
 from ceylon import AgentDetail
 from ceylon.base.agents import Admin, Worker
+from ceylon.base.uni_agent import BaseAgent
+from ceylon.ceylon import PeerMode
 from ceylon.static_val import DEFAULT_WORKSPACE_ID, DEFAULT_CONF_FILE, DEFAULT_WORKSPACE_PORT, DEFAULT_WORKSPACE_IP
 
 
@@ -42,9 +44,9 @@ class PerformanceMetrics:
         }
 
 
-class NetworkManager(Admin):
+class NetworkManager(BaseAgent):
     def __init__(self, name="admin", port=8888):
-        super().__init__(name=name, port=port)
+        super().__init__(name=name, port=port, mode=PeerMode.ADMIN, role="network_manager")
         self.metrics = PerformanceMetrics()
         self.message_timestamps: Dict[str, float] = {}
 
@@ -59,7 +61,7 @@ class NetworkManager(Admin):
             "message_id": f"test_{self.metrics.total_messages}"
         }
         self.message_timestamps[test_msg["message_id"]] = test_msg["timestamp"]
-        await self.send_direct_data(agent.id, test_msg)
+        await self.send_message(agent.id, test_msg)
 
     async def on_message(self, agent_id: str, data: bytes, time_: int):
         try:
@@ -84,7 +86,7 @@ class NetworkManager(Admin):
                             "message_id": f"test_{self.metrics.total_messages}"
                         }
                         self.message_timestamps[next_msg["message_id"]] = current_time
-                        await self.send_direct_data(agent_id, next_msg)
+                        await self.send_message(agent_id, next_msg)
 
         except Exception as e:
             traceback.print_exc()
@@ -99,7 +101,7 @@ class NetworkManager(Admin):
             await asyncio.sleep(1)
 
 
-class WorkingAgent(Worker):
+class WorkingAgent(BaseAgent):
     def __init__(self, name="worker",
                  workspace_id=DEFAULT_WORKSPACE_ID,
                  conf_file=DEFAULT_CONF_FILE,
@@ -108,12 +110,9 @@ class WorkingAgent(Worker):
                  role="worker",
                  admin_ip=DEFAULT_WORKSPACE_IP):
         super().__init__(name=name,
-                         workspace_id=workspace_id,
-                         conf_file=conf_file,
-                         admin_peer=admin_peer,
-                         admin_port=admin_port,
                          role=role,
-                         admin_ip=admin_ip)
+                         mode=PeerMode.CLIENT,
+                         )
         self.messages_processed = 0
         self.start_time = time.time()
 
@@ -129,7 +128,7 @@ class WorkingAgent(Worker):
                     "worker_name": self.details().name,
                     "processed_time": time.time()
                 }
-                await self.send_direct_data(agent_id, response)
+                await self.send_message(agent_id, response)
 
                 self.messages_processed += 1
                 elapsed = time.time() - self.start_time
@@ -166,7 +165,7 @@ async def main():
 
     try:
         logger.info("Starting performance test...")
-        await network_manager.arun_admin(b"", workers)
+        await network_manager.start_agent(b"", workers)
     except KeyboardInterrupt:
         # Print final statistics
         final_stats = network_manager.metrics.get_stats()
