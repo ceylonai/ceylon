@@ -58,7 +58,6 @@ class Auctioneer(BaseAgent):
         self.auction_ended = False
 
     async def on_agent_connected(self, topic: str, agent: AgentDetail):
-        await super().on_agent_connected(topic, agent)
         logger.info(
             f"Bidder {agent.name} connected. {len(self.get_connected_agents())}/{self.expected_bidders} bidders connected.")
 

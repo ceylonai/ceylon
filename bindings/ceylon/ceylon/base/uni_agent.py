@@ -160,20 +160,20 @@ class BaseAgent(UnifiedAgent, MessageHandler, EventHandler, Processor):
             logger.error(f"Error handling message: {e}")
 
     # EventHandler interface implementation
-    # async def on_agent_connected(self, topic: str, agent: AgentDetail) -> None:
-    #     """
-    #     Handle agent connection events and distribute to registered handlers.
-    #     """
-    #     # Update connected agents
-    #     self.connected_agents[agent.id] = agent
-    #     logger.info(f"Agent connected: {agent.name} ({agent.id}) - Role: {agent.role}")
-    #
-    #     # Call all registered event handlers
-    #     for handler in self._event_handlers:
-    #         try:
-    #             await handler(topic, agent)
-    #         except Exception as e:
-    #             logger.error(f"Error in event handler: {e}")
+    async def on_agent_connected(self, topic: str, agent: AgentDetail) -> None:
+        """
+        Handle agent connection events and distribute to registered handlers.
+        """
+        # Update connected agents
+        self.connected_agents[agent.id] = agent
+        logger.info(f"Agent connected: {agent.name} ({agent.id}) - Role: {agent.role}")
+
+        # Call all registered event handlers
+        for handler in self._event_handlers:
+            try:
+                await handler(topic, agent)
+            except Exception as e:
+                logger.error(f"Error in event handler: {e}")
 
     # Processor interface implementation
     async def run(self, inputs: bytes) -> None:
