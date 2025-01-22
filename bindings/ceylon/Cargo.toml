@@ -1,7 +1,10 @@
 [package]
 name = "ceylon"
-version = "0.21.0"
+version = "0.22.1"
 edition = "2021"
+authors = ["Syigen Ltd. <dewmal@syigen.com>"]
+license = "Apache-2.0"
+description = "Ceylon framework"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]

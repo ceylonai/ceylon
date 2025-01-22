@@ -438,7 +438,7 @@ checksum = "e9e8aabfac534be767c909e0690571677d49f41bd8465ae876fe043d52ba5292"
 
 [[package]]
 name = "ceylon"
-version = "0.21.0"
+version = "0.22.1"
 dependencies = [
  "async-trait",
  "ceylon-core",
@@ -2953,7 +2953,7 @@ dependencies = [
 
 [[package]]
 name = "sangedama"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "async-trait",
  "futures",

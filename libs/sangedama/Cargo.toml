@@ -1,7 +1,7 @@
 # Base package information
 [package]
 name = "sangedama"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 # Adding description and other metadata would be good practice
 authors = ["Dewmal <dewmal@syigen.com>"]
