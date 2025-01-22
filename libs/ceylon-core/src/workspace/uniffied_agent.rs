@@ -401,24 +401,19 @@ impl UnifiedAgent {
                                             }
                                         }
                                         AgentMessage::AgentIntroduction { id, name, role, topic } => {
-                                             debug!( "Agent introduction {:?}", id);
+                                            info!( "Agent introduction {:?}", id);
                                             let peer_id = id.clone();
                                             let id_key = id.clone();
-                                            let agent_detail = AgentDetail {
-                                               name,
-                                               id,
-                                               role
+                                            let agent_detail = AgentDetail{
+                                                name,
+                                                id,
+                                                role
                                             };
+                                            on_event.lock().await.on_agent_connected(
+                                                topic,
+                                                agent_detail.clone()
+                                            ).await;
                                             worker_details.write().await.insert(id_key, agent_detail);
-                                            let is_call_agent_on_connect = is_call_agent_on_connect_list.get( &peer_id).unwrap_or(&false).clone();
-                                            if !is_call_agent_on_connect{
-                                                if let Some(agent) = worker_details.read().await.get(&peer_id) {
-                                                    let agent = agent.clone();
-                                                    on_event.lock().await.on_agent_connected(topic,agent)
-                                                    .await;
-                                                    is_call_agent_on_connect_list.insert(peer_id, true);
-                                                }
-                                            }
                                         }
                                         _ => {}
                                     }
@@ -432,10 +427,10 @@ impl UnifiedAgent {
                                         }=>{
                                             // if worker_details.read().await.get(&peer_id).is_none() {
                                                 let agent_intro_message = AgentMessage::create_introduction_message(
-                                                peer_id.clone(),
-                                                agent_details.clone().name,
-                                                agent_details.clone().role,
-                                                topic.clone(),
+                                                    peer_id.clone(),
+                                                    agent_details.clone().name,
+                                                    agent_details.clone().role,
+                                                    topic.clone(),
                                                 );
                                                 peer_emitter_clone.send(
                                                     (agent_details.id.clone(),agent_intro_message.to_bytes(),None)
