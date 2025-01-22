@@ -27,7 +27,7 @@ use tokio::sync::{mpsc, RwLock};
 use tokio::task::JoinHandle;
 use tokio::{select, signal};
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 #[derive(Clone, Default, Debug)]
 pub struct UnifiedAgentConfig {
@@ -189,7 +189,7 @@ impl UnifiedAgent {
 
     pub async fn send_direct(&self, to_peer: String, message: Vec<u8>) {
         let node_message = AgentMessage::create_direct_message(message, to_peer.clone());
-        info!("Sending direct message to {}", to_peer);
+        debug!("Sending direct message to {}", to_peer);
         match self
             .broadcast_emitter
             .send((self.details().id, node_message.to_bytes(), Some(to_peer)))
@@ -263,10 +263,10 @@ impl UnifiedAgent {
             .spawn(async move {
                 select! {
                     _ = all_tasks => {
-                        info!("All agent tasks completed normally");
+                        debug!("All agent tasks completed normally");
                     }
                     _ = signal::ctrl_c() => {
-                        info!("Received ctrl-c, initiating shutdown");
+                        debug!("Received ctrl-c, initiating shutdown");
                         cancel_token_clone.cancel();
                         // Wait for tasks to complete after cancellation
                         // all_tasks.await;
@@ -286,24 +286,24 @@ impl UnifiedAgent {
     ) -> Vec<JoinHandle<()>> {
         let mut config = self._config.clone();
         let config_path = self._config_path.clone();
-        info!("Config: {}", config.to_str());
-        info!("Config path: {}", config_path.clone().unwrap());
+        debug!("Config: {}", config.to_str());
+        debug!("Config path: {}", config_path.clone().unwrap());
         if config_path.is_some() || config.mode == PeerMode::Client {
             let conf_file = config_path.unwrap().clone();
-            info!(
+            debug!(
                 "Checking .ceylon_network config {}",
                 fs::metadata(conf_file.clone()).is_ok()
             );
             // check .ceylon_network exists
             if fs::metadata(conf_file.clone()).is_ok() {
                 config.update_from_file(conf_file.clone());
-                info!("--------------------------------");
-                info!("Using .ceylon_network config");
-                info!("{} = {:?}", ENV_WORKSPACE_ID, config.work_space_id);
-                info!("{} = {:?}", ENV_WORKSPACE_PEER, config.admin_peer);
-                info!("{} = {:?}", ENV_WORKSPACE_PORT, config.port);
-                info!("{} = {:?}", ENV_WORKSPACE_IP, config.admin_ip);
-                info!("--------------------------------");
+                debug!("--------------------------------");
+                debug!("Using .ceylon_network config");
+                debug!("{} = {:?}", ENV_WORKSPACE_ID, config.work_space_id);
+                debug!("{} = {:?}", ENV_WORKSPACE_PEER, config.admin_peer);
+                debug!("{} = {:?}", ENV_WORKSPACE_PORT, config.port);
+                debug!("{} = {:?}", ENV_WORKSPACE_IP, config.admin_ip);
+                debug!("--------------------------------");
             }
         }
         let peer_config = match self._config.mode {
@@ -334,23 +334,23 @@ impl UnifiedAgent {
         let (mut peer, mut peer_listener) =
             UnifiedPeerImpl::create(peer_config.clone(), peer_key).await;
 
-
-        let worker_details: Arc<RwLock<HashMap<String, AgentDetail>>> = self._connected_agents.clone();
+        let worker_details: Arc<RwLock<HashMap<String, AgentDetail>>> =
+            self._connected_agents.clone();
         let peer_emitter_clone = peer.emitter().clone();
+        let broadcast_emitter_clone = peer.emitter().clone();
 
         // Spawn peer runner with proper cancellation
         let cancel_token_clone = cancel_token.clone();
         let task_peer = handle.spawn(async move {
             select! {
                 _ = peer.run(cancel_token_clone.clone()) => {
-                    info!("Peer run completed");
+                    debug!("Peer run completed");
                 }
                 _ = cancel_token_clone.cancelled() => {
-                    info!("Peer run cancelled");
+                    debug!("Peer run cancelled");
                 }
             }
         });
-
 
         let on_message = self._on_message.clone();
         let on_event = self._on_event.clone();
@@ -365,20 +365,22 @@ impl UnifiedAgent {
             loop {
                 select! {
                      _ = cancel_token_clone.cancelled() => {
-                        info!("Peer listener shutting down");
+                        debug!("Peer listener shutting down");
                         break;
                     }
                     event = peer_listener.recv() => {
-                        if let Some(event) = event {
-                            info!( "Peer event: {:?}", event);
+                        if let Some(node_message) = event {
                             if cancel_token_clone.is_cancelled() {
                                 break;
                             }
-                            match event {
-                                NodeMessage::Message{ data, created_by, time, message_type } => {
+                            // debug!( "Node Message: {:?}", node_message);
+                            match node_message {
+                                NodeMessage::Message{ data, created_by, time, .. } => {
                                     let agent_message = AgentMessage::from_bytes(data);
+                                    debug!( "Agent message from data: {:#?}", agent_message);
                                     match agent_message {
                                         AgentMessage::NodeMessage { message, message_type, .. } => {
+                                            debug!( "Agent message: {:#?}", message);
                                             match message_type {
                                                 MessageType::Direct { to_peer } => {
                                                     if to_peer == peer_id {
@@ -399,7 +401,7 @@ impl UnifiedAgent {
                                             }
                                         }
                                         AgentMessage::AgentIntroduction { id, name, role, topic } => {
-                                             info!( "Agent introduction {:?}", id);
+                                             debug!( "Agent introduction {:?}", id);
                                             let peer_id = id.clone();
                                             let id_key = id.clone();
                                             let agent_detail = AgentDetail {
@@ -422,29 +424,26 @@ impl UnifiedAgent {
                                     }
                                 }
                                 NodeMessage::Event { event, .. } => {
-                                    info!( "Peer event: {:?}", event);
+                                    debug!( "Peer event: {:?}", event);
                                     match event{
                                         EventType::Subscribe{
                                             peer_id,
                                             topic,
                                         }=>{
-                                            // let agent = agent_details.clone();
-                                            //         on_event.lock().await.on_agent_connected(topic,agent)
-                                            //         .await;
-
-                                            let agent_intro_message = AgentMessage::AgentIntroduction {
-                                                id: agent_details.id.clone(),
-                                                name: agent_details.name.clone(),
-                                                role:agent_details.role.clone(),
-                                                topic,
-                                            };
-                                            peer_emitter_clone.send(
-                                                (agent_details.id.clone(),agent_intro_message.to_bytes(),None)
-                                            ).await.unwrap();
-
+                                            // if worker_details.read().await.get(&peer_id).is_none() {
+                                                let agent_intro_message = AgentMessage::create_introduction_message(
+                                                peer_id.clone(),
+                                                agent_details.clone().name,
+                                                agent_details.clone().role,
+                                                topic.clone(),
+                                                );
+                                                peer_emitter_clone.send(
+                                                    (agent_details.id.clone(),agent_intro_message.to_bytes(),None)
+                                                ).await.unwrap();
+                                            // }
                                         }
                                         _ => {
-                                            info!("Admin Received Event {:?}", event);
+                                            debug!("Admin Received Event {:?}", event);
                                         }
                                     }
                                 }
@@ -462,7 +461,7 @@ impl UnifiedAgent {
             processor.lock().await.run(inputs).await;
             loop {
                 if cancel_token_clone.is_cancelled() {
-                    info!("Processor shutting down");
+                    debug!("Processor shutting down");
                     break;
                 }
                 tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
@@ -477,12 +476,12 @@ impl UnifiedAgent {
             loop {
                 select! {
                     _ = cancel_token_clone.cancelled() => {
-                        info!("Broadcast handler shutting down");
+                        debug!("Broadcast handler shutting down");
                         break;
                     }
                     msg = broadcast_receiver_lock.recv() => {
                         if let Some(raw_data) = msg {
-                            // Handle broadcasting
+                            broadcast_emitter_clone.send(raw_data).await.unwrap();
                         }
                     }
                 }
@@ -498,13 +497,13 @@ impl UnifiedAgent {
             loop {
                 select! {
                     _ = cancel_token_clone.cancelled() => {
-                        info!("Shutdown handler shutting down");
+                        debug!("Shutdown handler shutting down");
                         break;
                     }
                     msg = shutdown_recv_lock.recv() => {
                         if let Some(raw_data) = msg {
                             if raw_data == admin_id {
-                                info!("Received shutdown signal");
+                                debug!("Received shutdown signal");
                                 cancel_token_clone.cancel();
                                 break;
                             }
@@ -535,14 +534,14 @@ impl UnifiedAgent {
 
     async fn cleanup(&self) {
         // Release any resources that need explicit cleanup
-        info!("Cleaning up agent resources");
+        debug!("Cleaning up agent resources");
         // Close channels
         drop(self.broadcast_emitter.clone());
         // Any other cleanup...
     }
 
     pub async fn stop(&self) {
-        info!("Agent {} stop called", self._config.name);
+        debug!("Agent {} stop called", self._config.name);
         self.shutdown_send.send(self._peer_id.clone()).unwrap();
         self.cleanup().await;
     }

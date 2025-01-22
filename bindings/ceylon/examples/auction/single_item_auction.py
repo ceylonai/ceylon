@@ -15,7 +15,8 @@ from ceylon.base.uni_agent import BaseAgent
 from ceylon.ceylon import PeerMode
 from ceylon.static_val import DEFAULT_WORKSPACE_ID
 
-# enable_log("INFO")
+
+enable_log("INFO")
 
 
 @dataclass
@@ -73,6 +74,7 @@ class Auctioneer(BaseAgent):
         await self.broadcast_message(start_msg)
 
     async def on_message(self, agent_id: str, data: bytes, time: int):
+        logger.debug(f"Received message from {agent_id}: {data}")
         if self.auction_ended:
             return
 
@@ -128,6 +130,7 @@ class Bidder(BaseAgent):
     async def on_message(self, agent_id: str, data: bytes, time: int):
         try:
             message = pickle.loads(data)
+            logger.debug(f"Received message from {agent_id}: {message}")
 
             if isinstance(message, AuctionStart) and not self.has_bid:
                 if self.budget > message.item.starting_price:

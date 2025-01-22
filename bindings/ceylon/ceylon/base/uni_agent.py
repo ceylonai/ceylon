@@ -94,7 +94,6 @@ class BaseAgent(UnifiedAgent, MessageHandler, EventHandler, Processor):
             if not isinstance(message, bytes):
                 message = pickle.dumps(message)
             await self.send_direct(peer_id, message)
-            logger.debug(f"Direct message sent to {peer_id}: {message}")
         except Exception as e:
             logger.error(f"Error sending direct message: {e}")
 
@@ -112,4 +111,7 @@ class BaseAgent(UnifiedAgent, MessageHandler, EventHandler, Processor):
         pass
 
     async def on_agent_connected(self, topic: str, agent: AgentDetail):
-        logger.info(f"Agent connected: {agent.name} ({agent.id}) - Role: {agent.role}")
+        pass
+
+    async def run(self, inputs: bytes):
+        pass

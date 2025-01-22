@@ -9,13 +9,16 @@ from ceylon import enable_log
 from ceylon.base.uni_agent import BaseAgent
 from ceylon.ceylon import PeerMode
 
-enable_log("INFO")
+# enable_log("INFO")
 
 
 class AdminAgent(BaseAgent):
 
     async def on_agent_connected(self, topic: "str", agent: "AgentDetail"):
         logger.info(f"Agent connected: {agent.name} ({agent.id}) - Role: {agent.role}")
+
+    async def on_message(self, agent_id: str, data: bytes, time: int):
+        logger.info(f"Received message from {agent_id}: {data}")
 
 
 class WorkerAgent(BaseAgent):
@@ -26,6 +29,7 @@ class WorkerAgent(BaseAgent):
         logger.info(f"Worker started - {self.details().name} ({self.details().id})")
         while True:
             logger.info(f"Worker running - {self.details().name} ({self.details().id})")
+            await self.broadcast_message({"type": "worker_status", "name": self.details().name, "messages_received": 1})
             await asyncio.sleep(1)
 
 

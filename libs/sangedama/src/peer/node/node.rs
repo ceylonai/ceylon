@@ -135,13 +135,13 @@ impl UnifiedPeerImpl {
     }
 
     pub async fn run(&mut self, cancellation_token: CancellationToken) {
-        info!("Peer {:?}: {:?} Starting..", self.config.name, self.id);
+        debug!("Peer {:?}: {:?} Starting..", self.config.name, self.id);
 
         match self.config.mode {
             PeerMode::Admin => {
                 let listen_addr = self.config.get_listen_address();
                 self.swarm.listen_on(listen_addr.clone()).unwrap();
-                info!("Admin listening on: {:?}", listen_addr);
+                debug!("Admin listening on: {:?}", listen_addr);
             }
             PeerMode::Client => {
                 let ext_address = Multiaddr::empty()
@@ -159,7 +159,7 @@ impl UnifiedPeerImpl {
                         .condition(PeerCondition::Always)
                         .build();
                     self.swarm.dial(dial_opts).unwrap();
-                    info!("Member connecting to admin at: {:?}", rendezvous_address);
+                    debug!("Member connecting to admin at: {:?}", rendezvous_address);
                 }
             }
         }
@@ -167,7 +167,7 @@ impl UnifiedPeerImpl {
         loop {
             select! {
                 _ = cancellation_token.cancelled() => {
-                    info!("Peer Stopping..");
+                    debug!("Peer Stopping..");
                     break;
                 }
                 event = self.swarm.select_next_some() => {
@@ -182,16 +182,16 @@ impl UnifiedPeerImpl {
                                     ) {
                                         error!("Failed to register with admin: {error}");
                                     }
-                                    info!("Connection established with admin {}", peer_id);
+                                    debug!("Connection established with admin {}", peer_id);
                                 }
                                 PeerMode::Admin => {
-                                    info!("Admin: Connected to {}", peer_id);
+                                    debug!("Admin: Connected to {}", peer_id);
                                 }
                                 _ => {}
                             }
                         }
                         SwarmEvent::ConnectionClosed { peer_id, .. } => {
-                            info!("Disconnected from {}", peer_id);
+                            debug!("Disconnected from {}", peer_id);
                         }
                         SwarmEvent::Behaviour(event) => {
                             self.process_event(event).await;
@@ -212,7 +212,7 @@ impl UnifiedPeerImpl {
                             time: std::time::SystemTime::now()
                                 .duration_since(std::time::UNIX_EPOCH)
                                 .unwrap()
-                                .as_secs_f64() as u64,
+                                .as_nanos() as u64,
                             created_by: self.id.clone(),
                             message_type: if to.is_none() {
                                 MessageType::Broadcast
@@ -223,10 +223,12 @@ impl UnifiedPeerImpl {
                             },
                         };
 
+                        debug!( "Broadcasting message: {:?} to topic: {}", distributed_message, topic.to_string());
+
                         match self.swarm.behaviour_mut().gossip_sub.publish(topic, distributed_message.to_bytes()) {
                             Ok(_) => {}
                             Err(e) => {
-                                error!("Failed to broadcast message: {:?}", e);
+                                error!("Failed to broadcast message: {:?} {:#?}", e, distributed_message);
                             }
                         }
                     }
@@ -262,7 +264,7 @@ impl UnifiedPeerImpl {
                     ..
                 } = NodeMessage::from_bytes(message.data.clone())
                 {
-                    info!(
+                    debug!(
                         "Process Message {:?} from {}: Topic {}",
                         message_type,
                         self.config.name,
@@ -300,7 +302,7 @@ impl UnifiedPeerImpl {
                 }
             }
             gossipsub::Event::Subscribed { topic, peer_id } => {
-                info!("Subscribed to topic {:?} from peer: {:?}", topic, peer_id);
+                debug!("Subscribed to topic {:?} from peer: {:?}", topic, peer_id);
                 if let PeerMode::Admin = self.config.mode {
                     self.connected_peers
                         .entry(topic.clone())
@@ -325,7 +327,7 @@ impl UnifiedPeerImpl {
                 }
             }
             gossipsub::Event::Unsubscribed { topic, peer_id } => {
-                info!(
+                debug!(
                     "Unsubscribed from topic {:?} from peer: {:?}",
                     topic, peer_id
                 );
@@ -350,7 +352,7 @@ impl UnifiedPeerImpl {
                     rendezvous_node,
                 }),
             ) => {
-                info!(
+                debug!(
                     "Registered for namespace '{}' at rendezvous point {} for the next {} seconds",
                     namespace, rendezvous_node, ttl
                 );
@@ -363,7 +365,7 @@ impl UnifiedPeerImpl {
                 PeerMode::Admin,
                 RendezvousEvent::Server(rendezvous::server::Event::PeerRegistered { peer, .. }),
             ) => {
-                info!("RendezvousServerConnected: {:?}", peer);
+                debug!("RendezvousServerConnected: {:?}", peer);
                 let topic = gossipsub::IdentTopic::new(self.config.workspace_id.clone());
                 if let Err(e) = self.swarm.behaviour_mut().gossip_sub.subscribe(&topic) {
                     error!("Failed to subscribe to topic: {:?}", e);

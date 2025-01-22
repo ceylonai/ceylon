@@ -5,8 +5,8 @@
  */
 
 // In message.rs
-use serde::{Deserialize, Serialize};
 use sangedama::peer::message::data::NodeMessage;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum MessageType {
@@ -61,6 +61,20 @@ impl AgentMessage {
                 .as_nanos() as u64,
             message,
             message_type: MessageType::Broadcast,
+        }
+    }
+
+    pub fn create_introduction_message(
+        peer: String,
+        name: String,
+        role: String,
+        topic: String,
+    ) -> Self {
+        AgentMessage::AgentIntroduction {
+            id: peer,
+            role,
+            name,
+            topic,
         }
     }
 }
