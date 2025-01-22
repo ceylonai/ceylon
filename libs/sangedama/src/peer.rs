@@ -5,8 +5,8 @@
  */
 
 mod behaviour;
-pub mod message;
-pub mod node;
+mod message;
+mod node;
 mod peer_swarm;
 
 pub use behaviour::peer::PeerMode;
@@ -16,3 +16,5 @@ pub use message::data::NodeMessage;
 pub use node::node::UnifiedPeerConfig;
 pub use node::node::UnifiedPeerImpl;
 pub use peer_swarm::create_swarm;
+pub use node::get_peer_id;
+pub use node::create_key;

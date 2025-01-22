@@ -13,9 +13,9 @@ use tokio::select;
 use tokio_util::sync::CancellationToken;
 use tracing::info;
 
-use peer::message::data::NodeMessage;
-use peer::node::{create_key, get_peer_id};
-use peer::node::node::{UnifiedPeerImpl, UnifiedPeerConfig};
+use peer::NodeMessage;
+use peer::{create_key, get_peer_id};
+use peer::{UnifiedPeerImpl, UnifiedPeerConfig};
 
 #[tokio::main]
 async fn main() {
