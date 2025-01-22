@@ -352,12 +352,14 @@ impl UnifiedAgent {
             }
         });
 
+        let registration_intro_send_cancel_token = CancellationToken::new();
+
         let on_message = self._on_message.clone();
         let on_event = self._on_event.clone();
         let peer_id = self._peer_id.clone();
         let cancel_token_clone = cancel_token.clone();
 
-        let agent_details = self.details().clone();
+        let my_self_details = self.details().clone();
         // Handle peer events
         let task_peer_listener = handle.spawn(async move {
             let mut is_call_agent_on_connect_list: HashMap<String, bool> = HashMap::new();
@@ -401,19 +403,35 @@ impl UnifiedAgent {
                                             }
                                         }
                                         AgentMessage::AgentIntroduction { id, name, role, topic } => {
-                                            info!( "Agent introduction {:?}", id);
+                                            debug!( "Agent introduction {:?}", id);
                                             let peer_id = id.clone();
                                             let id_key = id.clone();
-                                            let agent_detail = AgentDetail{
+                                            let _ag = AgentDetail{
                                                 name,
                                                 id,
                                                 role
                                             };
                                             on_event.lock().await.on_agent_connected(
-                                                topic,
-                                                agent_detail.clone()
+                                                topic.clone(),
+                                                _ag.clone()
                                             ).await;
-                                            worker_details.write().await.insert(id_key, agent_detail);
+                                            worker_details.write().await.insert(id_key, _ag.clone());
+                                            if config.mode == PeerMode::Admin {
+                                                 let agent_intro_message = AgentMessage::create_registration_ack_message(
+                                                    peer_id.clone(),
+                                                    true,
+                                                );
+                                                peer_emitter_clone.send(
+                                                    (my_self_details.id.clone(),agent_intro_message.to_bytes(),None)
+                                                ).await.unwrap();
+                                            }
+                                            debug!( "{:?} Worker details: {:#?}", my_self_details.clone().id, worker_details.read().await);
+                                        }
+                                        AgentMessage::AgentRegistrationAck { id,status } => {
+                                            debug!( "Agent registration ack: {:#?}", status);
+                                            if (status){
+                                                registration_intro_send_cancel_token.cancel();
+                                            }
                                         }
                                         _ => {}
                                     }
@@ -425,17 +443,36 @@ impl UnifiedAgent {
                                             peer_id,
                                             topic,
                                         }=>{
-                                            // if worker_details.read().await.get(&peer_id).is_none() {
+                                            if worker_details.read().await.get(&peer_id).is_none() {
                                                 let agent_intro_message = AgentMessage::create_introduction_message(
-                                                    peer_id.clone(),
-                                                    agent_details.clone().name,
-                                                    agent_details.clone().role,
+                                                    my_self_details.clone().id,
+                                                    my_self_details.clone().name,
+                                                    my_self_details.clone().role,
                                                     topic.clone(),
                                                 );
-                                                peer_emitter_clone.send(
-                                                    (agent_details.id.clone(),agent_intro_message.to_bytes(),None)
-                                                ).await.unwrap();
-                                            // }
+                                                let _cancel_token = registration_intro_send_cancel_token.clone();
+                                                let _emitter = peer_emitter_clone.clone();
+                                                let _id = my_self_details.id.clone();
+
+
+                                                if config.mode == PeerMode::Admin {
+                                                    _emitter.send(
+                                                            (_id.clone(),agent_intro_message.to_bytes(),None)
+                                                        ).await.unwrap();
+                                                }else{
+                                                    tokio::spawn(async move {
+                                                    loop{
+                                                        if _cancel_token.is_cancelled() {
+                                                            break;
+                                                        }
+                                                        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                                                            _emitter.send(
+                                                            (_id.clone(),agent_intro_message.to_bytes(),None)
+                                                        ).await.unwrap();
+                                                    }
+                                                });
+                                                }
+                                            }
                                         }
                                         _ => {
                                             debug!("Admin Received Event {:?}", event);
@@ -456,7 +493,7 @@ impl UnifiedAgent {
             processor.lock().await.run(inputs).await;
             loop {
                 if cancel_token_clone.is_cancelled() {
-                    debug!("Processor shutting down");
+                    info!("Processor shutting down");
                     break;
                 }
                 tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
@@ -498,7 +535,7 @@ impl UnifiedAgent {
                     msg = shutdown_recv_lock.recv() => {
                         if let Some(raw_data) = msg {
                             if raw_data == admin_id {
-                                debug!("Received shutdown signal");
+                                info!("Received shutdown signal");
                                 cancel_token_clone.cancel();
                                 break;
                             }

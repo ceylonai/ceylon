@@ -31,6 +31,10 @@ pub enum AgentMessage {
         name: String,
         topic: String,
     },
+    AgentRegistrationAck {
+        id: String,
+        status: bool,
+    },
 }
 
 impl AgentMessage {
@@ -75,6 +79,13 @@ impl AgentMessage {
             role,
             name,
             topic,
+        }
+    }
+    
+    pub fn create_registration_ack_message(peer: String, status: bool) -> Self {
+        AgentMessage::AgentRegistrationAck {
+            id: peer,
+            status,
         }
     }
 }

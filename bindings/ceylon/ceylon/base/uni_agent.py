@@ -82,7 +82,7 @@ class BaseAgent(UnifiedAgent, MessageHandler, EventHandler, Processor):
             if not isinstance(message, bytes):
                 message = pickle.dumps(message)
             await self.broadcast(message)
-            logger.debug(f"Broadcast message sent: {message}")
+            # logger.debug(f"Broadcast message sent: {message}")
         except Exception as e:
             logger.error(f"Error broadcasting message: {e}")
 

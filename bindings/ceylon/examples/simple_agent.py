@@ -9,7 +9,7 @@ from ceylon import enable_log
 from ceylon.base.uni_agent import BaseAgent
 from ceylon.ceylon import PeerMode
 
-# enable_log("INFO")
+enable_log("INFO")
 
 
 class AdminAgent(BaseAgent):
