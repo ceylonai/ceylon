@@ -10,7 +10,7 @@ from typing import List
 from loguru import logger
 
 from ceylon import AgentDetail, enable_log
-from ceylon.base.uni_agent import UnifiedAgentHandler
+from ceylon.base.uni_agent import BaseAgent
 from ceylon.ceylon import PeerMode
 
 enable_log("INFO")
@@ -44,7 +44,7 @@ class AuctionEnd:
     pass
 
 
-class AuctioneerAgent(UnifiedAgentHandler):
+class AuctioneerAgent(BaseAgent):
     def __init__(self, item: Item, expected_bidders: int, name="auctioneer", port=8888):
         super().__init__(
             name=name,
@@ -69,7 +69,7 @@ class AuctioneerAgent(UnifiedAgentHandler):
     async def start_auction(self):
         logger.info(f"Starting auction for {self.item.name} with starting price ${self.item.starting_price}")
         start_msg = AuctionStart(item=self.item)
-        await self.broadcast(start_msg)
+        await self.broadcast_message(start_msg)
 
     async def on_message(self, agent_id: str, data: bytes, time: int) -> None:
         if self.auction_ended:
@@ -97,21 +97,22 @@ class AuctioneerAgent(UnifiedAgentHandler):
         else:
             winning_bid = max(self.bids, key=lambda x: x.amount)
             result = AuctionResult(winner=winning_bid.bidder, winning_bid=winning_bid.amount)
-            await self.broadcast(result)
+            await self.broadcast_message(result)
             logger.info(f"Auction ended. Winner: {result.winner}, Winning Bid: ${result.winning_bid:.2f}")
             await self.stop()
 
-        await self.broadcast(AuctionEnd())
+        await self.broadcast_message(AuctionEnd())
 
     async def run(self, inputs: bytes) -> None:
-        logger.info(f"Auctioneer started - {self.get_agent_details().name}")
+        logger.info(f"Auctioneer started - {self.details().name}")
         while True:
+            await self.broadcast_message(AuctionStart(item=self.item))
             if self.auction_ended:
                 break
             await asyncio.sleep(1)
 
 
-class BidderAgent(UnifiedAgentHandler):
+class BidderAgent(BaseAgent):
     def __init__(self,
                  name: str,
                  budget: float,
@@ -169,19 +170,17 @@ async def main():
     item = Item("Rare Painting", 1000.0)
 
     # Create auctioneer
-    auctioneer = AuctioneerAgent(item, expected_bidders=3)
+    auctioneer = AuctioneerAgent(item, expected_bidders=3, port=5454)
 
     # Create bidders
-    # bidders = [
-    #     BidderAgent("Alice", 1500.0),
-    #     BidderAgent("Bob", 1200.0),
-    #     BidderAgent("Charlie", 2000.0)
-    # ]
+    bidders = [
+        BidderAgent("Alice", 1500.0),
+        BidderAgent("Bob", 1200.0),
+        BidderAgent("Charlie", 2000.0)
+    ]
 
-    await auctioneer.start(b"")
+    await auctioneer.start(b"", bidders)
     # Start all bidders
-    # for bidder in bidders:
-    #     await bidder.start()
 
     try:
         # Keep the main task running

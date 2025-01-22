@@ -6,13 +6,16 @@ import asyncio
 import pickle
 import random
 from dataclasses import dataclass
-from typing import List, Dict
+from typing import List
 
 from loguru import logger
 
-from ceylon import AgentDetail
-from ceylon.base.agents import Admin, Worker
+from ceylon import AgentDetail, enable_log
+from ceylon.base.uni_agent import BaseAgent
+from ceylon.ceylon import PeerMode
 from ceylon.static_val import DEFAULT_WORKSPACE_ID
+
+enable_log("INFO")
 
 
 @dataclass
@@ -20,28 +23,35 @@ class Item:
     name: str
     starting_price: float
 
+
 @dataclass
 class Bid:
     bidder: str
     amount: float
 
+
 @dataclass
 class AuctionStart:
     item: Item
+
 
 @dataclass
 class AuctionResult:
     winner: str
     winning_bid: float
 
+
 @dataclass
 class AuctionEnd:
     pass
 
 
-class Auctioneer(Admin):
+class Auctioneer(BaseAgent):
     def __init__(self, item: Item, expected_bidders: int, name="auctioneer", port=8888):
-        super().__init__(name=name, port=port)
+        super().__init__(name=name,
+                         mode=PeerMode.ADMIN,
+                         role="auctioneer",
+                         port=port)
         self.item = item
         self.expected_bidders = expected_bidders
         self.bids: List[Bid] = []
@@ -49,7 +59,8 @@ class Auctioneer(Admin):
 
     async def on_agent_connected(self, topic: str, agent: AgentDetail):
         await super().on_agent_connected(topic, agent)
-        logger.info(f"Bidder {agent.name} connected. {len(self.get_connected_agents())}/{self.expected_bidders} bidders connected.")
+        logger.info(
+            f"Bidder {agent.name} connected. {len(self.get_connected_agents())}/{self.expected_bidders} bidders connected.")
 
         if len(self.get_connected_agents()) == self.expected_bidders:
             logger.info("All bidders connected. Starting the auction.")
@@ -58,7 +69,7 @@ class Auctioneer(Admin):
     async def start_auction(self):
         logger.info(f"Starting auction for {self.item.name} with starting price ${self.item.starting_price}")
         start_msg = AuctionStart(item=self.item)
-        await self.broadcast_data(start_msg)
+        await self.broadcast_message(start_msg)
 
     async def on_message(self, agent_id: str, data: bytes, time: int):
         if self.auction_ended:
@@ -86,12 +97,11 @@ class Auctioneer(Admin):
         else:
             winning_bid = max(self.bids, key=lambda x: x.amount)
             result = AuctionResult(winner=winning_bid.bidder, winning_bid=winning_bid.amount)
-            await self.broadcast_data(result)
+            await self.broadcast_message(result)
             logger.info(f"Auction ended. Winner: {result.winner}, Winning Bid: ${result.winning_bid:.2f}")
             await self.stop()
 
-
-        await self.broadcast_data(AuctionEnd())
+        await self.broadcast_message(AuctionEnd())
 
     async def run(self, inputs: bytes):
         logger.info(f"Auctioneer started - {self.details().name}")
@@ -101,16 +111,15 @@ class Auctioneer(Admin):
             await asyncio.sleep(1)
 
 
-class Bidder(Worker):
+class Bidder(BaseAgent):
     def __init__(self, name: str, budget: float,
                  workspace_id=DEFAULT_WORKSPACE_ID,
                  admin_peer="",
                  admin_port=8888):
         super().__init__(
             name=name,
-            workspace_id=workspace_id,
-            admin_peer=admin_peer,
-            admin_port=admin_port
+            mode=PeerMode.CLIENT,
+            role="bidder"
         )
         self.budget = budget
         self.has_bid = False
@@ -126,7 +135,7 @@ class Bidder(Worker):
                     bid_amount = min(self.budget, message.item.starting_price * random_multiplier)
 
                     bid = Bid(bidder=self.details().name, amount=bid_amount)
-                    await self.send_direct_data(agent_id, bid)
+                    await self.send_message(agent_id, bid)
                     self.has_bid = True
                     logger.info(f"{self.details().name} placed bid: ${bid_amount:.2f}")
 
@@ -154,7 +163,7 @@ async def main():
     item = Item("Rare Painting", 1000.0)
 
     # Create auctioneer
-    auctioneer = Auctioneer(item, expected_bidders=3)
+    auctioneer = Auctioneer(item, expected_bidders=3, port=8455)
     admin_details = auctioneer.details()
 
     # Create bidders
@@ -166,7 +175,7 @@ async def main():
 
     try:
         logger.info("Starting auction system...")
-        await auctioneer.arun_admin(b"", bidders)
+        await auctioneer.start_agent(b"", bidders)
     except KeyboardInterrupt:
         logger.info("Shutting down auction system...")
     finally:

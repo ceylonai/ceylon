@@ -11,6 +11,7 @@ use crate::workspace::agent::{EventHandler, MessageHandler, Processor};
 use crate::workspace::message::{AgentMessage, MessageType};
 use crate::WorkerAgent;
 use futures::future::join_all;
+use log::log_enabled;
 use sangedama::peer::message::data::{NodeMessage, NodeMessageTransporter};
 use sangedama::peer::node::node::{UnifiedPeerConfig, UnifiedPeerImpl};
 use sangedama::peer::node::peer_builder::{create_key, create_key_from_bytes, get_peer_id};
@@ -36,6 +37,15 @@ pub struct UnifiedAgentConfig {
     pub admin_peer: Option<String>,
     pub admin_ip: Option<String>,
     pub buffer_size: Option<u16>,
+}
+
+impl UnifiedAgentConfig {
+    fn to_str(&self) -> String {
+        format!(
+            "name: {}, role: {:?}, work_space_id: {:?}, admin_peer: {:?}, admin_port: {:?}, admin_ip: {:?}, config_file {:?} ",
+            self.name, self.role, self.work_space_id, self.admin_peer, self.port, self.admin_ip, self.buffer_size
+        )
+    }
 }
 
 impl UnifiedAgentConfig {
@@ -91,10 +101,22 @@ impl UnifiedAgentConfig {
             .join("\n");
         fs::write(config_path, config_content)
     }
+
+    pub fn copy_with(&mut self, _conf: UnifiedAgentConfig) {
+        self.name = _conf.name.clone();
+        self.mode = _conf.mode;
+        self.role = _conf.role.clone();
+        self.work_space_id = _conf.work_space_id.clone();
+        self.port = _conf.port.clone();
+        self.admin_peer = _conf.admin_peer.clone();
+        self.admin_ip = _conf.admin_ip.clone();
+        self.buffer_size = _conf.buffer_size.clone();
+    }
 }
 
 pub struct UnifiedAgent {
     _config: UnifiedAgentConfig,
+    _config_path: Option<String>,
     _processor: Arc<Mutex<Arc<dyn Processor>>>,
     _on_message: Arc<Mutex<Arc<dyn MessageHandler>>>,
     _on_event: Arc<Mutex<Arc<dyn EventHandler>>>,
@@ -123,44 +145,27 @@ impl UnifiedAgent {
 
         let (shutdown_send, shutdown_recv) = mpsc::unbounded_channel();
 
-        info!("Config0: {:?} {:?}", config, id);
         let mut _config = UnifiedAgentConfig::default();
-        // if let Some(config) = config {
-        //     _config = config;
-        //
-        //     if _config.mode == PeerMode::Admin {
-        //         _config.admin_peer = Some(id.clone());
-        //         _config
-        //             .write_to_file("./.ceylon_network".to_string())
-        //             .unwrap();
-        //     }
-        // } else {
-        //     _config
-        //         .update_from_file("./.ceylon_network".to_string())
-        //         .unwrap();
-        // }
-        // info!("Config2: {:?}", _config);
-        // if _config.mode == PeerMode::Client && _config.admin_peer.is_none() {
-        //     _config
-        //         .update_from_file("./.ceylon_network".to_string())
-        //         .unwrap();
-        // }
-        // info!("Config3: {:?}", _config);
-        // if let Some(config_path) = config_path {
-        //     _config.update_from_file(config_path).unwrap();
-        // }
-        //
-        // info!("Config4: {:?}", _config);
-        let conf = config.clone().unwrap();
-        if conf.mode == PeerMode::Admin {
-            _config.admin_peer = Some(id.clone());
-            _config.port = conf.port;
-            _config.admin_ip = conf.admin_ip;
+
+        let conf = config.clone();
+        if let Some(_conf) = conf {
+            _config.copy_with(_conf);
         }
 
-        info!("Config1: {:?}", _config);
+        if _config.mode == PeerMode::Admin {
+            _config.admin_peer = Some(id.clone());
+            _config
+                .write_to_file(".ceylon_network".to_string())
+                .expect("Failed to write config");
+        }
+
         Self {
             _config,
+            _config_path: if config_path.is_some() {
+                Some(config_path.unwrap())
+            } else {
+                Some("./.ceylon_network".to_string())
+            },
             _processor: Arc::new(Mutex::new(processor)),
             _on_message: Arc::new(Mutex::new(on_message)),
             _on_event: Arc::new(Mutex::new(on_event)),
@@ -223,7 +228,17 @@ impl UnifiedAgent {
         let cancel_token_clone = cancel_token.clone();
 
         // Get all task handlers but don't await them yet
-        let self_agent_handlers = self.run(inputs, agents, cancel_token.clone()).await;
+        let mut self_agent_handlers = self
+            .run(inputs.clone(), Some(vec![]), cancel_token.clone())
+            .await;
+
+        if agents.is_some() {
+            let agents = agents.unwrap();
+            for agent in agents {
+                let mut agent_handler = agent.run(inputs.clone(), None, cancel_token.clone()).await;
+                self_agent_handlers.append(&mut agent_handler);
+            }
+        }
 
         // Create a single future that completes when all tasks are done
         let all_tasks = async move {
@@ -231,15 +246,17 @@ impl UnifiedAgent {
         };
 
         // Use select to handle either ctrl-c or task completion
-        select! {
-            _ = all_tasks => {
-                info!("All agent tasks completed normally");
+        runtime.block_on(async {
+            select! {
+                _ = all_tasks => {
+                    info!("All agent tasks completed normally");
+                }
+                // _ = signal::ctrl_c() => {
+                //     info!("Received ctrl-c, initiating shutdown");
+                //     cancel_token_clone.cancel();
+                // }
             }
-            _ = signal::ctrl_c() => {
-                info!("Received ctrl-c, initiating shutdown");
-                cancel_token_clone.cancel();
-            }
-        }
+        })
     }
 
     pub async fn run(
@@ -248,6 +265,28 @@ impl UnifiedAgent {
         agents: Option<Vec<Arc<UnifiedAgent>>>,
         cancel_token: CancellationToken,
     ) -> Vec<JoinHandle<()>> {
+        let mut config = self._config.clone();
+        let config_path = self._config_path.clone();
+        info!("Config: {}", config.to_str());
+        if config_path.is_some() {
+            let conf_file = config_path.unwrap().clone();
+            info!(
+                "Checking .ceylon_network config {}",
+                fs::metadata(conf_file.clone()).is_ok()
+            );
+            // check .ceylon_network exists
+            if fs::metadata(conf_file.clone()).is_ok() {
+                config.update_from_file(conf_file.clone());
+                info!("--------------------------------");
+                info!("Using .ceylon_network config");
+                info!("{} = {:?}", ENV_WORKSPACE_ID, config.work_space_id);
+                info!("{} = {:?}", ENV_WORKSPACE_PEER, config.admin_peer);
+                info!("{} = {:?}", ENV_WORKSPACE_PORT, config.port);
+                info!("{} = {:?}", ENV_WORKSPACE_IP, config.admin_ip);
+                info!("--------------------------------");
+            }
+        }
+
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
@@ -256,23 +295,23 @@ impl UnifiedAgent {
         let handle = runtime.handle().clone();
         let peer_config = match self._config.mode {
             PeerMode::Admin => UnifiedPeerConfig::new_admin(
-                self._config
+                config
                     .work_space_id
                     .clone()
                     .unwrap_or("CEYLON-AI-AGENT-NETWORK".to_string()),
-                self._config.port.unwrap_or(0),
-                self._config.buffer_size,
+                config.port.unwrap_or(0),
+                config.buffer_size,
             ),
             PeerMode::Client => UnifiedPeerConfig::new_member(
-                self._config.name.clone(),
-                self._config
+                config.name.clone(),
+                config
                     .work_space_id
                     .clone()
                     .unwrap_or("CEYLON-AI-AGENT-NETWORK".to_string()),
-                self._config.admin_peer.clone().unwrap(),
-                self._config.port.unwrap_or(0),
-                self._config.admin_ip.clone().unwrap_or_default(),
-                self._config.buffer_size,
+                config.admin_peer.clone().unwrap(),
+                config.port.unwrap_or(0),
+                config.admin_ip.clone().unwrap_or_default(),
+                config.buffer_size,
             ),
         };
 
@@ -405,30 +444,27 @@ impl UnifiedAgent {
             }
         });
 
-        // select! {
-        //     _ = task_peer => {
-        //         info!("Peer task completed");
-        //     }
-        //     _ = task_peer_listener => {
-        //         info!("Peer listener task completed");
-        //     }
-        //     _ = task_processor => {
-        //         info!("Processor task completed");
-        //     }
-        //     _ = task_broadcast => {
-        //         info!("Broadcast task completed");
-        //     }
-        //     _ = task_shutdown => {
-        //         info!("Shutdown task completed");
-        //     }
-        // }
-        vec![
-            task_peer,
-            task_peer_listener,
-            task_processor,
-            task_broadcast,
-            task_shutdown,
-        ]
+        let tasks = handle.spawn(async move {
+            select! {
+                _ = task_peer => {
+                    info!("Peer task completed");
+                }
+                _ = task_peer_listener => {
+                    info!("Peer listener task completed");
+                }
+                _ = task_processor => {
+                    info!("Processor task completed");
+                }
+                _ = task_broadcast => {
+                    info!("Broadcast task completed");
+                }
+                _ = task_shutdown => {
+                    info!("Shutdown task completed");
+                }
+            }
+        });
+
+        vec![tasks]
     }
 
     async fn cleanup(&self) {

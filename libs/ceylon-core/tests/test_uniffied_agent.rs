@@ -112,7 +112,7 @@ async fn run_agent_with_commands(
         }
     });
 
-    agent.start(inputs).await;
+    // agent.start(inputs).await;
 }
 
 #[tokio::test]

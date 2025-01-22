@@ -1,22 +1,20 @@
-#  Copyright 2024-Present, Syigen Ltd. and Syigen Private Limited. All rights reserved.
-#  Licensed under the Apache License, Version 2.0 (See LICENSE.md or http://www.apache.org/licenses/LICENSE-2.0).
-#
 import asyncio
 import pickle
 from typing import Optional, List, Dict, Any
 
 from loguru import logger
-from mkdocs.commands.new import config_text
 
-from ceylon import Processor, MessageHandler, EventHandler, AgentDetail
-from ceylon.ceylon import PeerMode, UnifiedAgent, UnifiedAgentConfig
-from ceylon.ceylon.ceylon import uniffi_set_event_loop
+from ceylon import (
+    MessageHandler, EventHandler, Processor,
+    AgentDetail
+)
+from ceylon.ceylon import UnifiedAgent, PeerMode, UnifiedAgentConfig
 
 
-class UnifiedAgentHandler(Processor, MessageHandler, EventHandler):
+class BaseAgent(UnifiedAgent, MessageHandler, EventHandler, Processor):
     """
-    A unified handler for different agent types in Ceylon framework.
-    Supports both admin and worker agent modes.
+    Extended UnifiedAgent with additional functionality and built-in message/event handling.
+    Inherits directly from UnifiedAgent and implements required handler interfaces.
     """
 
     def __init__(
@@ -31,6 +29,28 @@ class UnifiedAgentHandler(Processor, MessageHandler, EventHandler):
             buffer_size: int = 1024,
             config_path: Optional[str] = None
     ):
+        # Create configuration
+        config = UnifiedAgentConfig(
+            name=name,
+            mode=mode,
+            role=role,
+            port=port,
+            buffer_size=buffer_size,
+            work_space_id=workspace_id,
+            admin_peer=admin_peer,
+            admin_ip=admin_ip
+        )
+
+        # Initialize UnifiedAgent with self as handlers
+        super().__init__(
+            config=config,
+            config_path=config_path,
+            processor=self,
+            on_message=self,
+            on_event=self
+        )
+
+        # Store initialization parameters
         self.name = name
         self.mode = mode
         self.role = role
@@ -39,99 +59,63 @@ class UnifiedAgentHandler(Processor, MessageHandler, EventHandler):
         self.admin_ip = admin_ip
         self.workspace_id = workspace_id
         self.buffer_size = buffer_size
-        self.config_path = config_path
 
-        # Initialize storage for connected agents
+        # Initialize agent storage
         self.connected_agents: Dict[str, AgentDetail] = {}
-        self.agent: Optional[UnifiedAgent] = None
+        self._message_handlers: List[callable] = []
+        self._event_handlers: List[callable] = []
 
-        # Create appropriate agent configuration
-        if self.mode == PeerMode.ADMIN:
-            self._setup_admin_agent()
-        else:
-            self._setup_worker_agent()
-
-    def _setup_admin_agent(self) -> None:
-        """Setup agent in admin mode"""
-        config = UnifiedAgentConfig(
-            name=self.name,
-            port=self.port or 8888,
-            buffer_size=self.buffer_size,
-            mode=PeerMode.ADMIN,
-            role=self.role,
-            work_space_id=self.name if self.workspace_id is None else self.workspace_id,
-            admin_peer=None,
-            admin_ip=self.admin_ip or "127.0.0.1",
-        )
-
-        self.agent = UnifiedAgent(
-            config=config,
-            config_path=None,
-            processor=self,
-            on_message=self,
-            on_event=self
-        )
-
-    def _setup_worker_agent(self) -> None:
-        """Setup agent in worker mode"""
-        config = UnifiedAgentConfig(
-            name=self.name,
-            mode=PeerMode.CLIENT,
-            role=self.role,
-            port=None,
-            buffer_size=self.buffer_size,
-            work_space_id=None,
-            admin_peer=None,
-            admin_ip=None,
-        )
-        self.agent = UnifiedAgent(
-            config=config,
-            config_path=None,
-            processor=self,
-            on_message=self,
-            on_event=self
-        )
-
-    async def start(self, inputs: bytes = b"", workers: Optional[List[UnifiedAgent]] = None) -> None:
-
-        uniffi_set_event_loop(asyncio.get_event_loop())
-        """Start the agent"""
-        if not self.agent:
-            raise RuntimeError("Agent not initialized")
-
+    async def start_agent(self, inputs: bytes = b"", workers: Optional[List[UnifiedAgent]] = None) -> None:
+        """
+        Start the agent. Wrapper around the base start() method for clarity.
+        """
         logger.info(f"Starting {self.name} agent in {self.mode.name} mode")
-        await self.agent.start(inputs, workers)
+        await self.start(inputs, workers)
 
-    async def stop(self) -> None:
-        """Stop the agent"""
-        if not self.agent:
-            raise RuntimeError("Agent not initialized")
-
+    async def stop_agent(self) -> None:
+        """
+        Stop the agent. Wrapper around the base stop() method for clarity.
+        """
         logger.info(f"Stopping {self.name} agent")
-        await self.agent.stop()
+        await self.stop()
 
-    async def broadcast(self, message: Any) -> None:
-        """Broadcast a message to all connected agents"""
-        if not self.agent:
-            raise RuntimeError("Agent not initialized")
+    async def broadcast_message(self, message: Any) -> None:
+        """
+        Broadcast a message to all connected agents with automatic serialization.
+        """
+        try:
+            if not isinstance(message, bytes):
+                message = pickle.dumps(message)
+            await self.broadcast(message)
+            logger.debug(f"Broadcast message sent: {message}")
+        except Exception as e:
+            logger.error(f"Error broadcasting message: {e}")
 
-        message_bytes = pickle.dumps(message)
-        await self.agent.broadcast(message_bytes)
+    async def send_message(self, peer_id: str, message: Any) -> None:
+        """
+        Send a direct message to a specific peer with automatic serialization.
+        """
+        try:
+            if not isinstance(message, bytes):
+                message = pickle.dumps(message)
+            await self.send_direct(peer_id, message)
+            logger.debug(f"Direct message sent to {peer_id}: {message}")
+        except Exception as e:
+            logger.error(f"Error sending direct message: {e}")
 
-    async def send_direct(self, peer_id: str, message: Any) -> None:
-        """Send a message directly to a specific peer"""
-        if not self.agent:
-            raise RuntimeError("Agent not initialized")
+    def add_message_handler(self, handler: callable) -> None:
+        """
+        Add a custom message handler function.
+        Handler should be async and accept (agent_id: str, message: Any, timestamp: int).
+        """
+        self._message_handlers.append(handler)
 
-        message_bytes = pickle.dumps(message)
-        await self.agent.send_direct(peer_id, message_bytes)
-
-    def get_agent_details(self) -> AgentDetail:
-        """Get details about the current agent"""
-        if not self.agent:
-            raise RuntimeError("Agent not initialized")
-
-        return self.agent.details()
+    def add_event_handler(self, handler: callable) -> None:
+        """
+        Add a custom event handler function.
+        Handler should be async and accept (topic: str, agent: AgentDetail).
+        """
+        self._event_handlers.append(handler)
 
     def get_connected_agents(self) -> List[AgentDetail]:
         """Get list of all connected agents"""
@@ -148,28 +132,60 @@ class UnifiedAgentHandler(Processor, MessageHandler, EventHandler):
             if agent.role == role
         ]
 
-    # Processor interface implementation
-    async def run(self, inputs: bytes) -> None:
-        """Process incoming data"""
-        try:
-            data = pickle.loads(inputs)
-            logger.debug(f"Processing data: {data}")
-            # Implement your processing logic here
-        except Exception as e:
-            logger.error(f"Error processing data: {e}")
-
     # MessageHandler interface implementation
     async def on_message(self, agent_id: str, data: bytes, time: int) -> None:
-        """Handle incoming messages"""
+        """
+        Handle incoming messages and distribute to registered handlers.
+        Attempts to deserialize message data if possible.
+        """
         try:
-            message = pickle.loads(data)
+            # Try to deserialize the message
+            try:
+                message = pickle.loads(data)
+            except:
+                message = data
+
             logger.debug(f"Received message from {agent_id}: {message}")
-            # Implement your message handling logic here
+
+            # Call all registered message handlers
+            for handler in self._message_handlers:
+                try:
+                    await handler(agent_id, message, time)
+                except Exception as e:
+                    logger.error(f"Error in message handler: {e}")
+
         except Exception as e:
             logger.error(f"Error handling message: {e}")
 
     # EventHandler interface implementation
     async def on_agent_connected(self, topic: str, agent: AgentDetail) -> None:
-        """Handle agent connection events"""
+        """
+        Handle agent connection events and distribute to registered handlers.
+        """
+        # Update connected agents
         self.connected_agents[agent.id] = agent
         logger.info(f"Agent connected: {agent.name} ({agent.id}) - Role: {agent.role}")
+
+        # Call all registered event handlers
+        for handler in self._event_handlers:
+            try:
+                await handler(topic, agent)
+            except Exception as e:
+                logger.error(f"Error in event handler: {e}")
+
+    # Processor interface implementation
+    async def run(self, inputs: bytes) -> None:
+        """
+        Process incoming data.
+        Override this method to implement custom processing logic.
+        """
+        try:
+            # Try to deserialize the input data
+            try:
+                data = pickle.loads(inputs)
+            except:
+                data = inputs
+            logger.debug(f"Processing data: {data}")
+            # Implement your processing logic here
+        except Exception as e:
+            logger.error(f"Error processing data: {e}")
