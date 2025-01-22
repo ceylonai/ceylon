@@ -167,6 +167,7 @@ impl UnifiedPeerImpl {
         loop {
             select! {
                 _ = cancellation_token.cancelled() => {
+                    info!("Peer Stopping..");
                     break;
                 }
                 event = self.swarm.select_next_some() => {

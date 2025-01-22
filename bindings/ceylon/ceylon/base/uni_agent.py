@@ -92,7 +92,7 @@ class UnifiedAgentHandler(Processor, MessageHandler, EventHandler):
             on_event=self
         )
 
-    async def start(self, inputs: bytes = b"") -> None:
+    async def start(self, inputs: bytes = b"", workers: Optional[List[UnifiedAgent]] = None) -> None:
 
         uniffi_set_event_loop(asyncio.get_event_loop())
         """Start the agent"""
@@ -100,7 +100,7 @@ class UnifiedAgentHandler(Processor, MessageHandler, EventHandler):
             raise RuntimeError("Agent not initialized")
 
         logger.info(f"Starting {self.name} agent in {self.mode.name} mode")
-        await self.agent.start(inputs)
+        await self.agent.start(inputs, workers)
 
     async def stop(self) -> None:
         """Stop the agent"""

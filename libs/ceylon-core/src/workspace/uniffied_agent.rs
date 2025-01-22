@@ -9,6 +9,8 @@ use crate::workspace::agent::{
 };
 use crate::workspace::agent::{EventHandler, MessageHandler, Processor};
 use crate::workspace::message::{AgentMessage, MessageType};
+use crate::WorkerAgent;
+use futures::future::join_all;
 use sangedama::peer::message::data::{NodeMessage, NodeMessageTransporter};
 use sangedama::peer::node::node::{UnifiedPeerConfig, UnifiedPeerImpl};
 use sangedama::peer::node::peer_builder::{create_key, create_key_from_bytes, get_peer_id};
@@ -16,11 +18,14 @@ use sangedama::peer::PeerMode;
 use std::collections::HashMap;
 use std::fs;
 use std::sync::Arc;
-use tokio::select;
+use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
+use tokio::task::JoinHandle;
+use tokio::{select, signal};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
+
 #[derive(Clone, Default, Debug)]
 pub struct UnifiedAgentConfig {
     pub name: String,
@@ -208,15 +213,47 @@ impl UnifiedAgent {
         }
     }
 
-    pub async fn start(&self, inputs: Vec<u8>) {
+    pub async fn start(&self, inputs: Vec<u8>, agents: Option<Vec<Arc<UnifiedAgent>>>) {
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        let cancel_token = CancellationToken::new();
+        let cancel_token_clone = cancel_token.clone();
+
+        // Get all task handlers but don't await them yet
+        let self_agent_handlers = self.run(inputs, agents, cancel_token.clone()).await;
+
+        // Create a single future that completes when all tasks are done
+        let all_tasks = async move {
+            join_all(self_agent_handlers).await;
+        };
+
+        // Use select to handle either ctrl-c or task completion
+        select! {
+            _ = all_tasks => {
+                info!("All agent tasks completed normally");
+            }
+            _ = signal::ctrl_c() => {
+                info!("Received ctrl-c, initiating shutdown");
+                cancel_token_clone.cancel();
+            }
+        }
+    }
+
+    pub async fn run(
+        &self,
+        inputs: Vec<u8>,
+        agents: Option<Vec<Arc<UnifiedAgent>>>,
+        cancel_token: CancellationToken,
+    ) -> Vec<JoinHandle<()>> {
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
             .unwrap();
 
         let handle = runtime.handle().clone();
-        let cancel_token = CancellationToken::new();
-
         let peer_config = match self._config.mode {
             PeerMode::Admin => UnifiedPeerConfig::new_admin(
                 self._config
@@ -249,7 +286,14 @@ impl UnifiedAgent {
 
         // Spawn peer runner
         let task_peer = handle.spawn(async move {
-            peer.run(cancel_token_clone).await;
+            select! {
+                _ = peer.run(cancel_token_clone.clone()) => {
+                    info!("Peer run completed");
+                }
+                _ = cancel_token_clone.cancelled() => {
+                    info!("Peer run cancelled");
+                }
+            }
         });
 
         let on_message = self._on_message.clone();
@@ -263,11 +307,15 @@ impl UnifiedAgent {
 
             loop {
                 select! {
-                    _ = cancel_token_clone.cancelled() => {
+                     _ = cancel_token_clone.cancelled() => {
+                        info!("Peer listener shutting down");
                         break;
                     }
                     event = peer_listener.recv() => {
                         if let Some(event) = event {
+                             if cancel_token_clone.is_cancelled() {
+                                break;
+                            }
                             match event {
                                 NodeMessage::Message{ data, created_by, time, message_type } => {
                                     let agent_message = AgentMessage::from_bytes(data);
@@ -342,6 +390,7 @@ impl UnifiedAgent {
             }
         });
 
+        let cancel_token_clone = cancel_token.clone();
         let shutdown_recv = self.shutdown_recv.clone();
         let admin_id = self._peer_id.clone();
         let task_shutdown = handle.spawn(async move {
@@ -356,27 +405,43 @@ impl UnifiedAgent {
             }
         });
 
-        select! {
-            _ = task_peer => {
-                info!("Peer task completed");
-            }
-            _ = task_peer_listener => {
-                info!("Peer listener task completed");
-            }
-            _ = task_processor => {
-                info!("Processor task completed");
-            }
-            _ = task_broadcast => {
-                info!("Broadcast task completed");
-            }
-            _ = task_shutdown => {
-                info!("Shutdown task completed");
-            }
-        }
+        // select! {
+        //     _ = task_peer => {
+        //         info!("Peer task completed");
+        //     }
+        //     _ = task_peer_listener => {
+        //         info!("Peer listener task completed");
+        //     }
+        //     _ = task_processor => {
+        //         info!("Processor task completed");
+        //     }
+        //     _ = task_broadcast => {
+        //         info!("Broadcast task completed");
+        //     }
+        //     _ = task_shutdown => {
+        //         info!("Shutdown task completed");
+        //     }
+        // }
+        vec![
+            task_peer,
+            task_peer_listener,
+            task_processor,
+            task_broadcast,
+            task_shutdown,
+        ]
+    }
+
+    async fn cleanup(&self) {
+        // Release any resources that need explicit cleanup
+        info!("Cleaning up agent resources");
+        // Close channels
+        drop(self.broadcast_emitter.clone());
+        // Any other cleanup...
     }
 
     pub async fn stop(&self) {
         info!("Agent {} stop called", self._config.name);
         self.shutdown_send.send(self._peer_id.clone()).unwrap();
+        self.cleanup().await;
     }
 }

@@ -103,7 +103,7 @@ interface UnifiedAgent{
     constructor(UnifiedAgentConfig? config,string? config_path,MessageHandler on_message, Processor processor, EventHandler on_event);
     
     [Async]
-    void start(bytes inputs);
+    void start(bytes inputs, sequence<UnifiedAgent>? workers);
 
     [Async]
     void stop();
