@@ -4,8 +4,9 @@ name = "sangedama"
 version = "0.1.2"
 edition = "2021"
 # Adding description and other metadata would be good practice
-authors = ["Your Name <your.email@example.com>"]
+authors = ["Dewmal <dewmal@syigen.com>"]
 description = "A libp2p-based network application with WASM support"
+license = "Apache-2.0"
 
 # Feature definitions for different build targets
 [features]
