@@ -122,8 +122,9 @@ pub struct UnifiedPeer {
     mode: PeerMode,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, Default)]
 pub enum PeerMode {
+    #[default]
     Client,
     Admin,
 }

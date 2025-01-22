@@ -133,9 +133,9 @@ async fn test_unified_agent_communication() {
     // Create admin agent
     let admin_config = UnifiedAgentConfig {
         name: "admin-test".to_string(),
-        role: "admin".to_string(),
+        role: Some("admin".to_string()),
         mode: PeerMode::Admin,
-        work_space_id: "test-workspace".to_string(),
+        work_space_id: Some("test-workspace".to_string()),
         port: Some(7846),
         admin_peer: None,
         admin_ip: None,
@@ -143,7 +143,8 @@ async fn test_unified_agent_communication() {
     };
 
     let admin_agent = UnifiedAgent::new(
-        admin_config,
+        Some(admin_config),
+        None,
         admin_message_handler.clone(),
         admin_processor.clone(),
         admin_event_handler.clone(),
@@ -166,9 +167,9 @@ async fn test_unified_agent_communication() {
     // Create worker agent
     let worker_config = UnifiedAgentConfig {
         name: "worker-test".to_string(),
-        role: "worker".to_string(),
+        role: Some("worker".to_string()),
         mode: PeerMode::Client,
-        work_space_id: "test-workspace".to_string(),
+        work_space_id: Some("test-workspace".to_string()),
         port: None,
         admin_peer: Some(admin_id.clone()),
         admin_ip: Some("127.0.0.1".to_string()),
@@ -176,7 +177,8 @@ async fn test_unified_agent_communication() {
     };
 
     let worker_agent = UnifiedAgent::new(
-        worker_config,
+        Some(worker_config),
+        None,
         worker_message_handler.clone(),
         worker_processor.clone(),
         worker_event_handler.clone(),
@@ -208,7 +210,6 @@ async fn test_unified_agent_communication() {
     // sleep(Duration::from_secs(2)).await;
 
     // Verify messages and connections
-
 
     // Clean up
     // admin_tx.send(AgentCommand::Stop).await.unwrap();

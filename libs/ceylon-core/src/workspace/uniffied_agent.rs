@@ -4,34 +4,92 @@
  *
  */
 
-use crate::workspace::agent::{AgentDetail, EventHandler, MessageHandler, Processor};
+use crate::workspace::agent::{
+    AgentDetail, ENV_WORKSPACE_ID, ENV_WORKSPACE_IP, ENV_WORKSPACE_PEER, ENV_WORKSPACE_PORT,
+};
+use crate::workspace::agent::{EventHandler, MessageHandler, Processor};
 use crate::workspace::message::{AgentMessage, MessageType};
 use sangedama::peer::message::data::{NodeMessage, NodeMessageTransporter};
 use sangedama::peer::node::node::{UnifiedPeerConfig, UnifiedPeerImpl};
 use sangedama::peer::node::peer_builder::{create_key, create_key_from_bytes, get_peer_id};
 use sangedama::peer::PeerMode;
 use std::collections::HashMap;
+use std::fs;
 use std::sync::Arc;
 use tokio::select;
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
-
-#[derive(Clone)]
+#[derive(Clone, Default, Debug)]
 pub struct UnifiedAgentConfig {
     pub name: String,
-    pub role: String,
     pub mode: PeerMode,
-    pub work_space_id: String,
+    pub role: Option<String>,
+    pub work_space_id: Option<String>,
     pub port: Option<u16>,
     pub admin_peer: Option<String>,
     pub admin_ip: Option<String>,
     pub buffer_size: Option<u16>,
 }
 
+impl UnifiedAgentConfig {
+    pub fn update_from_file(&mut self, config_path: String) -> Result<(), std::io::Error> {
+        let config_content = fs::read_to_string(config_path)?;
+        let config: HashMap<String, String> = config_content
+            .lines()
+            .filter_map(|line| {
+                let parts: Vec<&str> = line.splitn(2, '=').collect();
+                if parts.len() == 2 {
+                    Some((parts[0].to_string(), parts[1].to_string()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if let Some(workspace_id) = config.get(ENV_WORKSPACE_ID) {
+            self.work_space_id = Some(workspace_id.clone());
+        }
+        if let Some(admin_peer) = config.get(ENV_WORKSPACE_PEER) {
+            self.admin_peer = Some(admin_peer.clone());
+        }
+        if let Some(port) = config.get(ENV_WORKSPACE_PORT) {
+            self.port = port.parse().ok();
+        }
+        if let Some(ip) = config.get(ENV_WORKSPACE_IP) {
+            self.admin_ip = Some(ip.clone());
+        }
+
+        Ok(())
+    }
+
+    pub fn write_to_file(&self, config_path: String) -> Result<(), std::io::Error> {
+        let mut config = HashMap::new();
+        config.insert(ENV_WORKSPACE_ID.to_string(), self.work_space_id.clone());
+        config.insert(
+            ENV_WORKSPACE_PEER.to_string(),
+            Option::from(self.admin_peer.clone().unwrap()),
+        );
+        config.insert(
+            ENV_WORKSPACE_PORT.to_string(),
+            Option::from(self.port.unwrap().to_string()),
+        );
+        config.insert(
+            ENV_WORKSPACE_IP.to_string(),
+            Option::from(self.admin_ip.clone().unwrap_or("127.0.0.1".to_string())),
+        );
+        let config_content = config
+            .iter()
+            .map(|(k, v)| format!("{}={}", k, v.clone().unwrap()))
+            .collect::<Vec<String>>()
+            .join("\n");
+        fs::write(config_path, config_content)
+    }
+}
+
 pub struct UnifiedAgent {
-    pub config: UnifiedAgentConfig,
+    _config: UnifiedAgentConfig,
     _processor: Arc<Mutex<Arc<dyn Processor>>>,
     _on_message: Arc<Mutex<Arc<dyn MessageHandler>>>,
     _on_event: Arc<Mutex<Arc<dyn EventHandler>>>,
@@ -48,7 +106,8 @@ pub struct UnifiedAgent {
 
 impl UnifiedAgent {
     pub fn new(
-        config: UnifiedAgentConfig,
+        config: Option<UnifiedAgentConfig>,
+        config_path: Option<String>,
         on_message: Arc<dyn MessageHandler>,
         processor: Arc<dyn Processor>,
         on_event: Arc<dyn EventHandler>,
@@ -59,8 +118,44 @@ impl UnifiedAgent {
 
         let (shutdown_send, shutdown_recv) = mpsc::unbounded_channel();
 
+        info!("Config0: {:?} {:?}", config, id);
+        let mut _config = UnifiedAgentConfig::default();
+        // if let Some(config) = config {
+        //     _config = config;
+        //
+        //     if _config.mode == PeerMode::Admin {
+        //         _config.admin_peer = Some(id.clone());
+        //         _config
+        //             .write_to_file("./.ceylon_network".to_string())
+        //             .unwrap();
+        //     }
+        // } else {
+        //     _config
+        //         .update_from_file("./.ceylon_network".to_string())
+        //         .unwrap();
+        // }
+        // info!("Config2: {:?}", _config);
+        // if _config.mode == PeerMode::Client && _config.admin_peer.is_none() {
+        //     _config
+        //         .update_from_file("./.ceylon_network".to_string())
+        //         .unwrap();
+        // }
+        // info!("Config3: {:?}", _config);
+        // if let Some(config_path) = config_path {
+        //     _config.update_from_file(config_path).unwrap();
+        // }
+        //
+        // info!("Config4: {:?}", _config);
+        let conf = config.clone().unwrap();
+        if conf.mode == PeerMode::Admin {
+            _config.admin_peer = Some(id.clone());
+            _config.port = conf.port;
+            _config.admin_ip = conf.admin_ip;
+        }
+
+        info!("Config1: {:?}", _config);
         Self {
-            config,
+            _config,
             _processor: Arc::new(Mutex::new(processor)),
             _on_message: Arc::new(Mutex::new(on_message)),
             _on_event: Arc::new(Mutex::new(on_event)),
@@ -107,9 +202,9 @@ impl UnifiedAgent {
 
     pub fn details(&self) -> AgentDetail {
         AgentDetail {
-            name: self.config.name.clone(),
+            name: self._config.name.clone(),
             id: self._peer_id.clone(),
-            role: self.config.role.clone(),
+            role: self._config.role.clone().unwrap_or("".to_string()),
         }
     }
 
@@ -122,19 +217,25 @@ impl UnifiedAgent {
         let handle = runtime.handle().clone();
         let cancel_token = CancellationToken::new();
 
-        let peer_config = match self.config.mode {
+        let peer_config = match self._config.mode {
             PeerMode::Admin => UnifiedPeerConfig::new_admin(
-                self.config.work_space_id.clone(),
-                self.config.port.unwrap_or(0),
-                self.config.buffer_size,
+                self._config
+                    .work_space_id
+                    .clone()
+                    .unwrap_or("CEYLON-AI-AGENT-NETWORK".to_string()),
+                self._config.port.unwrap_or(0),
+                self._config.buffer_size,
             ),
             PeerMode::Client => UnifiedPeerConfig::new_member(
-                self.config.name.clone(),
-                self.config.work_space_id.clone(),
-                self.config.admin_peer.clone().unwrap(),
-                self.config.port.unwrap_or(0),
-                self.config.admin_ip.clone().unwrap_or_default(),
-                self.config.buffer_size,
+                self._config.name.clone(),
+                self._config
+                    .work_space_id
+                    .clone()
+                    .unwrap_or("CEYLON-AI-AGENT-NETWORK".to_string()),
+                self._config.admin_peer.clone().unwrap(),
+                self._config.port.unwrap_or(0),
+                self._config.admin_ip.clone().unwrap_or_default(),
+                self._config.buffer_size,
             ),
         };
 
@@ -275,7 +376,7 @@ impl UnifiedAgent {
     }
 
     pub async fn stop(&self) {
-        info!("Agent {} stop called", self.config.name);
+        info!("Agent {} stop called", self._config.name);
         self.shutdown_send.send(self._peer_id.clone()).unwrap();
     }
 }
