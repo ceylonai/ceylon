@@ -131,6 +131,8 @@ pub struct UnifiedAgent {
 
     pub shutdown_send: mpsc::UnboundedSender<String>,
     pub shutdown_recv: Arc<Mutex<mpsc::UnboundedReceiver<String>>>,
+
+    _connected_agents: Arc<RwLock<HashMap<String, AgentDetail>>>,
 }
 
 impl UnifiedAgent {
@@ -180,6 +182,8 @@ impl UnifiedAgent {
 
             shutdown_send,
             shutdown_recv: Arc::new(Mutex::new(shutdown_recv)),
+
+            _connected_agents: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -218,6 +222,11 @@ impl UnifiedAgent {
             id: self._peer_id.clone(),
             role: self._config.role.clone().unwrap_or("".to_string()),
         }
+    }
+
+    pub async fn get_connected_agents(&self) -> Vec<AgentDetail> {
+        let agents = self._connected_agents.read().await;
+        agents.values().cloned().collect()
     }
 
     pub async fn start(&self, inputs: Vec<u8>, agents: Option<Vec<Arc<UnifiedAgent>>>) {
@@ -319,13 +328,15 @@ impl UnifiedAgent {
             ),
         };
 
-        let worker_details: RwLock<HashMap<String, AgentDetail>> = RwLock::new(HashMap::new());
+        // let worker_details: RwLock<HashMap<String, AgentDetail>> = RwLock::new(HashMap::new());
         // Create peer and listener
         let peer_key = create_key_from_bytes(self._key.clone());
         let (mut peer, mut peer_listener) =
             UnifiedPeerImpl::create(peer_config.clone(), peer_key).await;
 
-        let worker_details: RwLock<HashMap<String, AgentDetail>> = RwLock::new(HashMap::new());
+
+        let worker_details: Arc<RwLock<HashMap<String, AgentDetail>>> = self._connected_agents.clone();
+        let peer_emitter_clone = peer.emitter().clone();
 
         // Spawn peer runner with proper cancellation
         let cancel_token_clone = cancel_token.clone();
@@ -339,6 +350,7 @@ impl UnifiedAgent {
                 }
             }
         });
+
 
         let on_message = self._on_message.clone();
         let on_event = self._on_event.clone();
@@ -416,9 +428,20 @@ impl UnifiedAgent {
                                             peer_id,
                                             topic,
                                         }=>{
-                                            let agent = agent_details.clone();
-                                                    on_event.lock().await.on_agent_connected(topic,agent)
-                                                    .await;
+                                            // let agent = agent_details.clone();
+                                            //         on_event.lock().await.on_agent_connected(topic,agent)
+                                            //         .await;
+
+                                            let agent_intro_message = AgentMessage::AgentIntroduction {
+                                                id: agent_details.id.clone(),
+                                                name: agent_details.name.clone(),
+                                                role:agent_details.role.clone(),
+                                                topic,
+                                            };
+                                            peer_emitter_clone.send(
+                                                (agent_details.id.clone(),agent_intro_message.to_bytes(),None)
+                                            ).await.unwrap();
+
                                         }
                                         _ => {
                                             info!("Admin Received Event {:?}", event);

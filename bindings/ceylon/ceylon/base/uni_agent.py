@@ -74,13 +74,6 @@ class BaseAgent(UnifiedAgent, MessageHandler, EventHandler, Processor):
         logger.info(f"Starting {self.name} agent in {self.mode.name} mode")
         await self.start(inputs, workers)
 
-    async def stop_agent(self) -> None:
-        """
-        Stop the agent. Wrapper around the base stop() method for clarity.
-        """
-        logger.info(f"Stopping {self.name} agent")
-        await self.stop()
-
     async def broadcast_message(self, message: Any) -> None:
         """
         Broadcast a message to all connected agents with automatic serialization.
@@ -105,89 +98,18 @@ class BaseAgent(UnifiedAgent, MessageHandler, EventHandler, Processor):
         except Exception as e:
             logger.error(f"Error sending direct message: {e}")
 
-    def add_message_handler(self, handler: callable) -> None:
-        """
-        Add a custom message handler function.
-        Handler should be async and accept (agent_id: str, message: Any, timestamp: int).
-        """
-        self._message_handlers.append(handler)
-
-    def add_event_handler(self, handler: callable) -> None:
-        """
-        Add a custom event handler function.
-        Handler should be async and accept (topic: str, agent: AgentDetail).
-        """
-        self._event_handlers.append(handler)
-
-    def get_connected_agents(self) -> List[AgentDetail]:
-        """Get list of all connected agents"""
-        return list(self.connected_agents.values())
+    # def get_connected_agents(self) -> List[AgentDetail]:
+    #     """Get list of all connected agents"""
+    #     return list(self.connected_agents.values())
 
     def get_agent_by_id(self, agent_id: str) -> Optional[AgentDetail]:
         """Get agent details by ID"""
         return self.connected_agents.get(agent_id)
 
-    def get_agents_by_role(self, role: str) -> List[AgentDetail]:
-        """Get all agents with a specific role"""
-        return [
-            agent for agent in self.connected_agents.values()
-            if agent.role == role
-        ]
-
     # MessageHandler interface implementation
-    async def on_message(self, agent_id: str, data: bytes, time: int) -> None:
-        """
-        Handle incoming messages and distribute to registered handlers.
-        Attempts to deserialize message data if possible.
-        """
-        try:
-            # Try to deserialize the message
-            try:
-                message = pickle.loads(data)
-            except:
-                message = data
 
-            logger.debug(f"Received message from {agent_id}: {message}")
+    async def on_message(self, agent_id: str, data: bytes, time: int):
+        pass
 
-            # Call all registered message handlers
-            for handler in self._message_handlers:
-                try:
-                    await handler(agent_id, message, time)
-                except Exception as e:
-                    logger.error(f"Error in message handler: {e}")
-
-        except Exception as e:
-            logger.error(f"Error handling message: {e}")
-
-    # EventHandler interface implementation
-    async def on_agent_connected(self, topic: str, agent: AgentDetail) -> None:
-        """
-        Handle agent connection events and distribute to registered handlers.
-        """
-        # Update connected agents
-        self.connected_agents[agent.id] = agent
+    async def on_agent_connected(self, topic: str, agent: AgentDetail):
         logger.info(f"Agent connected: {agent.name} ({agent.id}) - Role: {agent.role}")
-
-        # Call all registered event handlers
-        for handler in self._event_handlers:
-            try:
-                await handler(topic, agent)
-            except Exception as e:
-                logger.error(f"Error in event handler: {e}")
-
-    # Processor interface implementation
-    async def run(self, inputs: bytes) -> None:
-        """
-        Process incoming data.
-        Override this method to implement custom processing logic.
-        """
-        try:
-            # Try to deserialize the input data
-            try:
-                data = pickle.loads(inputs)
-            except:
-                data = inputs
-            logger.debug(f"Processing data: {data}")
-            # Implement your processing logic here
-        except Exception as e:
-            logger.error(f"Error processing data: {e}")

@@ -15,7 +15,7 @@ from ceylon.base.uni_agent import BaseAgent
 from ceylon.ceylon import PeerMode
 from ceylon.static_val import DEFAULT_WORKSPACE_ID
 
-enable_log("INFO")
+# enable_log("INFO")
 
 
 @dataclass
@@ -59,11 +59,13 @@ class Auctioneer(BaseAgent):
 
     async def on_agent_connected(self, topic: str, agent: AgentDetail):
         logger.info(
-            f"Bidder {agent.name} connected. {len(self.get_connected_agents())}/{self.expected_bidders} bidders connected.")
+            f"Bidder {agent.name} connected with {self.details().name}. {len(await self.get_connected_agents())}/{self.expected_bidders} bidders connected.")
 
-        if len(self.get_connected_agents()) == self.expected_bidders:
+        if len(await self.get_connected_agents()) == self.expected_bidders:
             logger.info("All bidders connected. Starting the auction.")
             await self.start_auction()
+        else:
+            logger.info("Waiting for more bidders to connect...")
 
     async def start_auction(self):
         logger.info(f"Starting auction for {self.item.name} with starting price ${self.item.starting_price}")
