@@ -70,7 +70,7 @@ class Participant(Worker):
     def __init__(self, name, available_times):
         self.name = name
         self.available_times = available_times
-        super().__init__(name=name, workspace_id=workspace_id, admin_peer=admin_peer, admin_port=admin_port)
+        super().__init__(name=name,role="participant")
 
     async def on_message(self, agent_id: "str", data: "bytes", time: "int"):
         data = pickle.loads(data)
@@ -153,7 +153,7 @@ async def main():
     agent5 = Participant("Kevin", [TimeSlot("2024-07-21", 10, 13), TimeSlot("2024-07-21", 15, 17)])
 
     coordinator = Coordinator()
-    await coordinator.arun_admin(
+    await coordinator.start_agent(
         inputs=pickle.dumps(
             RunnerInput(
                 request=Meeting(name="Meeting 1", duration=2, date="2024-07-21", minimum_participants=3)
