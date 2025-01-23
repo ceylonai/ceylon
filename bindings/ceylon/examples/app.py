@@ -6,14 +6,17 @@ from pydantic.dataclasses import dataclass
 from ceylon import AgentDetail
 from ceylon.base.agents import Worker, Admin
 
-ag = Admin(name="admin", port=8888, role="admin")
-ag_w = Worker(name="worker_agent1", role="worker1")
-ag_w1 = Worker(name="worker_agent2", role="worker_2")
+import asyncio
 
 
 @dataclass
 class BaseData:
     name: str
+
+
+ag = Admin(name="admin", port=8888, role="admin")
+ag_w = Worker(name="worker_agent1", role="worker1")
+ag_w1 = Worker(name="worker_agent2", role="worker_2")
 
 
 @ag.on(BaseData)
@@ -41,6 +44,4 @@ async def on_connect_admin2(topic: str, agent: AgentDetail):
 
 
 if __name__ == '__main__':
-    import asyncio
-
     asyncio.run(ag.start_agent(b"", [ag_w, ag_w1]))
