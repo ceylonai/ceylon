@@ -10,6 +10,7 @@ from typing import List
 from loguru import logger
 
 from ceylon import AgentDetail, enable_log
+from ceylon.base.agents import Worker, Admin
 from ceylon.base.uni_agent import BaseAgent
 from ceylon.ceylon import PeerMode
 
@@ -44,12 +45,10 @@ class AuctionEnd:
     pass
 
 
-class AuctioneerAgent(BaseAgent):
+class AuctioneerAgent(Admin):
     def __init__(self, item: Item, expected_bidders: int, name="auctioneer", port=8888):
         super().__init__(
             name=name,
-            mode=PeerMode.ADMIN,
-            role="auctioneer",
             port=port
         )
         self.item = item
@@ -60,9 +59,9 @@ class AuctioneerAgent(BaseAgent):
     async def on_agent_connected(self, topic: str, agent: AgentDetail) -> None:
         await super().on_agent_connected(topic, agent)
         logger.info(
-            f"Bidder {agent.name} connected. {len(self.get_connected_agents())}/{self.expected_bidders} bidders connected.")
+            f"Bidder {agent.name} connected. {len(await self.get_connected_agents())}/{self.expected_bidders} bidders connected.")
 
-        if len(self.get_connected_agents()) == self.expected_bidders:
+        if len(await self.get_connected_agents()) == self.expected_bidders:
             logger.info("All bidders connected. Starting the auction.")
             await self.start_auction()
 
@@ -112,20 +111,13 @@ class AuctioneerAgent(BaseAgent):
             await asyncio.sleep(1)
 
 
-class BidderAgent(BaseAgent):
+class BidderAgent(Worker):
     def __init__(self,
                  name: str,
-                 budget: float,
-                 admin_peer: str = None,
-                 admin_port: int = 8888,
-                 admin_ip: str = "127.0.0.1"):
+                 budget: float,):
         super().__init__(
             name=name,
-            mode=PeerMode.CLIENT,
             role="bidder",
-            admin_peer=admin_peer,
-            port=admin_port,
-            admin_ip=admin_ip
         )
         self.budget = budget
         self.has_bid = False
@@ -140,43 +132,46 @@ class BidderAgent(BaseAgent):
                     random_multiplier = random.randint(100, 1000) / 100
                     bid_amount = min(self.budget, message.item.starting_price * random_multiplier)
 
-                    bid = Bid(bidder=self.get_agent_details().name, amount=bid_amount)
-                    await self.send_direct(agent_id, bid)
+                    bid = Bid(bidder=self.details().name, amount=bid_amount)
+                    await self.send_message(agent_id, bid)
                     self.has_bid = True
-                    logger.info(f"{self.get_agent_details().name} placed bid: ${bid_amount:.2f}")
+                    logger.info(f"{self.details().name} placed bid: ${bid_amount:.2f}")
 
             elif isinstance(message, AuctionResult):
-                if message.winner == self.get_agent_details().name:
+                if message.winner == self.details().name:
                     self.budget -= message.winning_bid
-                    logger.info(f"{self.get_agent_details().name} won the auction for ${message.winning_bid:.2f}")
+                    logger.info(f"{self.details().name} won the auction for ${message.winning_bid:.2f}")
                 else:
-                    logger.info(f"{self.get_agent_details().name} lost the auction")
+                    logger.info(f"{self.details().name} lost the auction")
 
             elif isinstance(message, AuctionEnd):
-                logger.info(f"{self.get_agent_details().name} acknowledging auction end")
+                logger.info(f"{self.details().name} acknowledging auction end")
                 await self.stop()
 
         except Exception as e:
             logger.error(f"Error processing message: {e}")
 
     async def run(self, inputs: bytes) -> None:
-        logger.info(f"Bidder started - {self.get_agent_details().name}")
+        logger.info(f"Bidder started - {self.details().name}")
         while True:
             await asyncio.sleep(1)
 
 
 async def main():
     # Create auction item
-    item = Item("Rare Painting", 1000.0)
+    item = Item("Rare Painting", 200.0)
 
     # Create auctioneer
-    auctioneer = AuctioneerAgent(item, expected_bidders=3, port=5454)
+    auctioneer = AuctioneerAgent(item, expected_bidders=5, port=5454)
 
     # Create bidders
     bidders = [
         BidderAgent("Alice", 1500.0),
         BidderAgent("Bob", 1200.0),
-        BidderAgent("Charlie", 2000.0)
+        BidderAgent("Charlie", 2000.0),
+        BidderAgent("Charlie2", 1800.0),
+        BidderAgent("Charlie3", 2450.0),
+        BidderAgent("Charlie4", 2100.0),
     ]
 
     await auctioneer.start_agent(b"", bidders)
