@@ -9,9 +9,7 @@ use crate::workspace::agent::{
 };
 use crate::workspace::agent::{EventHandler, MessageHandler, Processor};
 use crate::workspace::message::{AgentMessage, MessageType};
-use crate::WorkerAgent;
 use futures::future::join_all;
-use log::log_enabled;
 use sangedama::peer::message::data::{EventType, NodeMessage, NodeMessageTransporter};
 use sangedama::peer::node::node::{UnifiedPeerConfig, UnifiedPeerImpl};
 use sangedama::peer::node::peer_builder::{create_key, create_key_from_bytes, get_peer_id};
@@ -19,15 +17,14 @@ use sangedama::peer::PeerMode;
 use std::collections::HashMap;
 use std::fs;
 use std::sync::Arc;
-use std::time::Duration;
-use tokio::io::AsyncReadExt;
-use tokio::runtime::{Handle, Runtime};
+use tokio::runtime::{Handle};
 use tokio::sync::Mutex;
 use tokio::sync::{mpsc, RwLock};
 use tokio::task::JoinHandle;
 use tokio::{select, signal};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
+const CHANNEL_BUFFER_SIZE: usize = 1024; // Increased from default
 
 #[derive(Clone, Default, Debug)]
 pub struct UnifiedAgentConfig {
@@ -145,7 +142,13 @@ impl UnifiedAgent {
         processor: Arc<dyn Processor>,
         on_event: Arc<dyn EventHandler>,
     ) -> Self {
-        let (broadcast_emitter, broadcast_receiver) = mpsc::channel(2);
+        let (broadcast_emitter, broadcast_receiver) = mpsc::channel(
+            config
+                .clone()
+                .unwrap_or_default()
+                .buffer_size
+                .unwrap_or(CHANNEL_BUFFER_SIZE as u16) as usize,
+        );
         let admin_peer_key = create_key();
         let id = get_peer_id(&admin_peer_key).to_string();
 
