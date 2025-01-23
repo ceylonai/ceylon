@@ -8,8 +8,11 @@ from dataclasses import dataclass
 from typing import List
 
 from loguru import logger
-from ceylon.base.agents import Admin, Worker
+
+from ceylon import PeerMode
+from ceylon.base.uni_agent import BaseAgent
 from ceylon.static_val import DEFAULT_WORKSPACE_ID
+
 
 # Data Structures
 @dataclass
@@ -18,9 +21,11 @@ class Task:
     description: str
     difficulty: int  # 1-10 scale
 
+
 @dataclass
 class TaskAssignment:
     task: Task
+
 
 @dataclass
 class TaskResult:
@@ -28,8 +33,9 @@ class TaskResult:
     worker: str
     success: bool
 
+
 # Worker Agent
-class WorkerAgent(Worker):
+class WorkerAgent(BaseAgent):
     def __init__(self, name: str, skill_level: int,
                  workspace_id=DEFAULT_WORKSPACE_ID,
                  admin_peer="",
@@ -41,7 +47,7 @@ class WorkerAgent(Worker):
             name=name,
             workspace_id=workspace_id,
             admin_peer=admin_peer,
-            admin_port=admin_port
+            mode=PeerMode.CLIENT
         )
         logger.info(f"Worker {name} initialized with skill level {skill_level}")
 
@@ -70,11 +76,12 @@ class WorkerAgent(Worker):
         while True:
             await asyncio.sleep(0.1)
 
+
 # Task Manager
-class TaskManager(Admin):
+class TaskManager(BaseAgent):
     def __init__(self, tasks: List[Task], expected_workers: int,
                  name="task_manager", port=8000):
-        super().__init__(name=name, port=port)
+        super().__init__(name=name, port=port, mode=PeerMode.ADMIN, role="task_manager")
         self.tasks = tasks
         self.expected_workers = expected_workers
         self.task_results = []
@@ -82,8 +89,7 @@ class TaskManager(Admin):
         logger.info(f"Task Manager initialized with {len(tasks)} tasks")
 
     async def on_agent_connected(self, topic: str, agent_id: str):
-        await super().on_agent_connected(topic, agent_id)
-        connected_count = len(self.get_connected_agents())
+        connected_count = len(await self.get_connected_agents())
         logger.info(f"Worker connected. {connected_count}/{self.expected_workers} workers connected.")
 
         if connected_count == self.expected_workers and not self.tasks_assigned:
@@ -95,7 +101,7 @@ class TaskManager(Admin):
             return
 
         self.tasks_assigned = True
-        connected_workers = self.get_connected_agents()
+        connected_workers = await self.get_connected_agents()
 
         for task, worker in zip(self.tasks, connected_workers):
             assignment = TaskAssignment(task=task)
@@ -138,6 +144,7 @@ class TaskManager(Admin):
                 break
             await asyncio.sleep(0.1)
 
+
 async def main():
     # Create tasks
     tasks = [
@@ -159,11 +166,12 @@ async def main():
 
     try:
         logger.info("Starting task management system...")
-        await task_manager.arun_admin(b"", workers)
+        await task_manager.start_agent(b"", workers)
     except KeyboardInterrupt:
         logger.info("Shutting down task management system...")
     finally:
         pass
+
 
 if __name__ == "__main__":
     logger.info("Initializing task management system...")
