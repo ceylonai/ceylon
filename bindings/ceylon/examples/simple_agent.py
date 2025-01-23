@@ -2,6 +2,9 @@
 #  Licensed under the Apache License, Version 2.0 (See LICENSE.md or http://www.apache.org/licenses/LICENSE-2.0).
 #
 import asyncio
+import pickle
+
+import random
 
 from loguru import logger
 
@@ -46,5 +49,70 @@ async def main():
     await admin.start_agent(b"", [worker])
 
 
+#
+# if __name__ == '__main__':
+#     asyncio.run(main())
+
+
+import asyncio
+
+from ceylon.base.agents import Admin, Worker
+from loguru import logger
+
+
+class AgentManager(Admin):
+
+    def __init__(self):
+        super().__init__(
+            name="admin",
+            port=7555
+        )
+        self.agent = None
+
+    async def run(self, inputs: bytes):
+        while True:
+            logger.info("running")
+            await self.broadcast_message({"type": "admin_status", "name": self.details().name, "messages_received": 1})
+            await asyncio.sleep(random.randint(1, 10))
+
+    async def on_message(self, agent_id: str, data: bytes, time: int):
+        logger.info(f"{self.details().name} Received message from {agent_id}: {pickle.loads(data)}")
+
+
+class SupportAgent(Worker):
+
+    async def run(self, inputs: bytes):
+        while True:
+            logger.info("running worker")
+            await self.broadcast_message({"type": "worker_status", "name": self.details().name, "messages_received": 1})
+            await asyncio.sleep(random.randint(1, 10))
+
+    async def on_message(self, agent_id: str, data: bytes, time: int):
+        logger.info(f"{self.details().name} Received message from {agent_id}: {pickle.loads(data)}")
+
+
+class ClarkAgent(Worker):
+
+    async def run(self, inputs: bytes):
+        while True:
+            logger.info("running worker")
+            await self.broadcast_message({"type": "worker_status", "name": self.details().name, "messages_received": 1})
+            await asyncio.sleep(random.randint(1, 10))
+
+    async def on_message(self, agent_id: str, data: bytes, time: int):
+        logger.info(f"{self.details().name} Received message from {agent_id}: {pickle.loads(data)}")
+
+
 if __name__ == '__main__':
-    asyncio.run(main())
+    asyncio.run(AgentManager().start_agent(b"", [
+        SupportAgent(
+            name="support",
+            role="support"),
+        SupportAgent(
+            name="support2",
+            role="support2"),
+        ClarkAgent(
+            name="ClarkAgent",
+            role="ClarkAgent")
+
+    ]))
