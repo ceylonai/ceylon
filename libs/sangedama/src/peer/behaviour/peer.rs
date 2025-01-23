@@ -8,10 +8,16 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io;
 use std::time::Duration;
 
-use crate::peer::behaviour::PeerBehaviour;
 use libp2p::swarm::NetworkBehaviour;
 use libp2p::{gossipsub, identify, identity, ping, rendezvous};
 use serde::{Deserialize, Serialize};
+
+pub trait PeerBehaviour
+where
+    Self: NetworkBehaviour,
+{
+    fn new(local_public_key: libp2p::identity::Keypair) -> Self;
+}
 
 // Custom enum to handle both client and server rendezvous behaviors
 #[derive(NetworkBehaviour)]
@@ -158,16 +164,15 @@ pub fn message_id_fn(message: &gossipsub::Message) -> gossipsub::MessageId {
 
 pub fn create_gossip_sub_config() -> gossipsub::Config {
     gossipsub::ConfigBuilder::default()
-        .heartbeat_interval(Duration::from_millis(500))
-        .mesh_n_low(4)
-        .mesh_n(6)
-        .mesh_n_high(8)
-        .history_length(10)
-        .history_gossip(10)
-        .max_transmit_size(1024 * 1024 * 100)
-        .validation_mode(gossipsub::ValidationMode::Permissive)
+        .heartbeat_interval(Duration::from_millis(100)) // Reduced for faster updates
+        .mesh_n_low(16) // Increased mesh size
+        .mesh_n(32)
+        .mesh_n_high(64)
+        .history_length(128) // Reduced to lower memory overhead
+        .history_gossip(128)
+        .max_transmit_size(1024 * 1024 * 512) // Increased max size
+        .validation_mode(gossipsub::ValidationMode::Strict)
         .message_id_fn(message_id_fn)
         .build()
-        .map_err(|msg| io::Error::new(io::ErrorKind::Other, msg))
         .unwrap()
 }

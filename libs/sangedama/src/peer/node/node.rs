@@ -363,7 +363,9 @@ impl UnifiedPeerImpl {
             }
             (
                 PeerMode::Admin,
-                RendezvousEvent::Server(rendezvous::server::Event::PeerRegistered { peer, .. }),
+                RendezvousEvent::Server(
+                    rendezvous::server::Event::PeerRegistered { peer, .. }
+                ),
             ) => {
                 debug!("RendezvousServerConnected: {:?}", peer);
                 let topic = gossipsub::IdentTopic::new(self.config.workspace_id.clone());

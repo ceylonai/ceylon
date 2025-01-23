@@ -5,5 +5,3 @@
  */
 
 pub mod peer;
-mod base;
-pub use base::PeerBehaviour;
