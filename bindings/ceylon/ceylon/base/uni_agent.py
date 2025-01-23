@@ -66,6 +66,13 @@ class BaseAgent(UnifiedAgent, MessageHandler, EventHandler, Processor):
         self._message_handlers: List[callable] = []
         self._event_handlers: List[callable] = []
 
+        self._handlers = {}
+
+    def add_handler(self, data_type, handler):
+        if not hasattr(self, '_handlers'):
+            self._handlers = {}
+        self._handlers[data_type] = handler
+
     async def start_agent(self, inputs: bytes = b"", workers: Optional[List[UnifiedAgent]] = None) -> None:
         uniffi_set_event_loop(asyncio.get_event_loop())
         """
@@ -107,8 +114,23 @@ class BaseAgent(UnifiedAgent, MessageHandler, EventHandler, Processor):
 
     # MessageHandler interface implementation
 
+    def on(self, data_type):
+        def decorator(func):
+            self.add_handler(data_type, func)
+            return func
+
+        return decorator
+
     async def on_message(self, agent_id: str, data: bytes, time: int):
-        pass
+        try:
+            decoded_data = pickle.loads(data)
+            data_type = type(decoded_data)
+
+            if hasattr(self, '_handlers') and data_type in self._handlers:
+                agent = self.get_agent_by_id(agent_id)
+                await self._handlers[data_type](decoded_data, time, agent)
+        except Exception as e:
+            logger.error(f"Error processing message: {e}")
 
     async def on_agent_connected(self, topic: str, agent: AgentDetail):
         pass
