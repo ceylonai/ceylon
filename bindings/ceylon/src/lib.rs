@@ -23,8 +23,8 @@ fn enable_log(level: String) {
 }
 
 use ceylon_core::{
-    AdminAgent, AdminAgentConfig, AgentDetail, EventHandler, MessageHandler, PeerMode, Processor,
-    UnifiedAgent, UnifiedAgentConfig, WorkerAgent, WorkerAgentConfig,
+    AgentDetail, EventHandler, MessageHandler, PeerMode, Processor, UnifiedAgent,
+    UnifiedAgentConfig,
 };
 use std::str::FromStr;
 use tracing::{info, Level};

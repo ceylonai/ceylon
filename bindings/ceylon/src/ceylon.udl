@@ -5,63 +5,10 @@ namespace ceylon {
   void cprint(string message);
 };
 
-dictionary AdminAgentConfig {
-    string name;
-    u16 port;
-    u16 buffer_size;
-};
-
 dictionary AgentDetail{
     string name;
     string id;
     string role;
-};
-
-
-interface AdminAgent{
-    constructor(AdminAgentConfig config,MessageHandler on_message, Processor processor, EventHandler on_event);
-    [Async]
-    void start(bytes inputs, sequence<WorkerAgent> workers);
-
-    [Async]
-    void stop();
-
-
-    [Async]
-    void broadcast(bytes message);
-
-    [Async]
-    void send_direct(string to_peer, bytes message);
-
-    AgentDetail details();
-};
-
-dictionary WorkerAgentConfig {
-    string name;
-    string? conf_file =".ceylon_network";
-    string work_space_id;
-    string admin_peer;
-    string role;
-    u16 admin_port;
-    string admin_ip;
-    u16 buffer_size;
-};
-interface WorkerAgent{
-    constructor(WorkerAgentConfig config,MessageHandler on_message, Processor processor, EventHandler on_event);
-    [Async]
-    void start(bytes inputs);
-
-    [Async]
-    void stop();
-
-    [Async]
-    void broadcast(bytes message);
-
-    [Async]
-    void send_direct(string to_peer, bytes message);
-
-    AgentDetail details();
-
 };
 
 // Handle Agents behaviours
