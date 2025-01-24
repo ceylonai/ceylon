@@ -1,4 +1,4 @@
-# Ceylon: Multi-Agent Framework
+# Introduction
 
 > Empowering Collaboration, Simplifying Complexity
 

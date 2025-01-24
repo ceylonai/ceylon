@@ -1,4 +1,4 @@
-# Advanced Meeting Scheduler Tutorial
+# Meeting Scheduler
 
 ## Introduction
 

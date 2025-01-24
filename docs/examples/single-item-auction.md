@@ -1,4 +1,4 @@
-# Single-Item Auction System with Ceylon
+## Single Item Auction
 
 ## Introduction
 

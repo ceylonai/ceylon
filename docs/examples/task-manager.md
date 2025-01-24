@@ -1,4 +1,4 @@
-## Building a Distributed Task Management System with Ceylon
+## Distributed Task Manager
 
 ### Overview
 

@@ -1,4 +1,4 @@
-# Tutorial: Setting Up Remote Admin and Worker Agents
+# Remote Agent Networking
 
 This tutorial will guide you through setting up a remote admin agent and a worker agent on separate computers using the
 Ceylon framework. We'll explain the process step-by-step and provide insights into how the system works.

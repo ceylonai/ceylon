@@ -1,4 +1,4 @@
-# Ceylon Agent Framework - Getting Started Guide
+# Getting Start Guide
 
 ## Installation
 
