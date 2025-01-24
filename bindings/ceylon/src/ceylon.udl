@@ -15,7 +15,7 @@ dictionary AgentDetail{
 [Trait,WithForeign]
 interface MessageHandler {
     [Async]
-    void on_message(string agent_id, bytes data, u64 time);
+    void on_message(AgentDetail agent, bytes data, u64 time);
 };
 
 [Trait,WithForeign]

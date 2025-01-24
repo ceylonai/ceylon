@@ -148,15 +148,14 @@ class BaseAgent(UnifiedAgent, MessageHandler, EventHandler, Processor, AgentComm
 
         return decorator
 
-    async def on_message(self, agent_id: str, data: bytes, time: int):
+    async def on_message(self, agent: AgentDetail, data: bytes, time: int):
         try:
-            all_runners = [asyncio.create_task(self.onmessage_handler(agent_id, data, time))]
+            all_runners = [asyncio.create_task(self.onmessage_handler(agent, data, time))]
 
             decoded_data = pickle.loads(data)
             data_type = type(decoded_data)
 
             if hasattr(self, '_handlers') and data_type in self._handlers:
-                agent = self.get_agent_by_id(agent_id)
                 all_runners.append(asyncio.create_task(self._handlers[data_type](decoded_data, agent, time)))
 
             await asyncio.gather(*all_runners)

@@ -17,7 +17,7 @@ use sangedama::peer::PeerMode;
 use std::collections::HashMap;
 use std::fs;
 use std::sync::Arc;
-use tokio::runtime::{Handle};
+use tokio::runtime::Handle;
 use tokio::sync::Mutex;
 use tokio::sync::{mpsc, RwLock};
 use tokio::task::JoinHandle;
@@ -195,7 +195,8 @@ impl UnifiedAgent {
     }
 
     pub async fn send_direct(&self, to_peer: String, message: Vec<u8>) {
-        let node_message = AgentMessage::create_direct_message(message, to_peer.clone());
+        let node_message =
+            AgentMessage::create_direct_message(message, to_peer.clone(), self.details().clone());
         debug!("Sending direct message to {}", to_peer);
         match self
             .broadcast_emitter
@@ -210,7 +211,7 @@ impl UnifiedAgent {
     }
 
     pub async fn broadcast(&self, message: Vec<u8>) {
-        let node_message = AgentMessage::create_broadcast_message(message);
+        let node_message = AgentMessage::create_broadcast_message(message, self.details().clone());
         match self
             .broadcast_emitter
             .send((self.details().id, node_message.to_bytes(), None))
@@ -417,13 +418,13 @@ impl UnifiedAgent {
                                     let agent_message = AgentMessage::from_bytes(data);
                                     debug!( "Agent message from data: {:#?}", agent_message);
                                     match agent_message {
-                                        AgentMessage::NodeMessage { message, message_type, .. } => {
+                                        AgentMessage::NodeMessage { message, message_type,sender, .. } => {
                                             debug!( "Agent message: {:#?}", message);
                                             match message_type {
                                                 MessageType::Direct { to_peer } => {
                                                     if to_peer == peer_id {
                                                         on_message.lock().await.on_message(
-                                                            created_by,
+                                                            sender,
                                                             message,
                                                             time,
                                                         ).await;
@@ -431,7 +432,7 @@ impl UnifiedAgent {
                                                 }
                                                 MessageType::Broadcast => {
                                                     on_message.lock().await.on_message(
-                                                        created_by,
+                                                        sender,
                                                         message,
                                                         time,
                                                     ).await;

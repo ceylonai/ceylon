@@ -54,7 +54,7 @@ class Participant(Worker):
         return earliest_end - latest_start >= duration
 
     @on(AvailabilityRequest)
-    async def handle_availability_request(self, data: AvailabilityRequest, time: int, agent_id: str):
+    async def handle_availability_request(self, data: AvailabilityRequest, time: int, agent: AgentDetail):
         print(f"Participant {self.details().name} received availability request {data.time_slot}")
         is_available = any(self.is_overlap(slot, data.time_slot, data.time_slot.duration)
                            for slot in self.available_times)
@@ -74,6 +74,7 @@ class Coordinator(Admin):
 
 
 admin = Coordinator(name="admin", port=8888)
+
 
 @admin.on_run()
 async def handle_run(inputs: Meeting):

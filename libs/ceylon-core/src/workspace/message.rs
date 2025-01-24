@@ -5,6 +5,7 @@
  */
 
 // In message.rs
+use crate::AgentDetail;
 use sangedama::peer::message::data::NodeMessage;
 use serde::{Deserialize, Serialize};
 
@@ -22,6 +23,7 @@ pub enum AgentMessage {
     },
     NodeMessage {
         id: u64,
+        sender: AgentDetail,
         message: Vec<u8>,
         message_type: MessageType,
     },
@@ -46,24 +48,26 @@ impl AgentMessage {
         serde_json::from_slice(&bytes).unwrap()
     }
 
-    pub fn create_direct_message(message: Vec<u8>, to_peer: String) -> Self {
+    pub fn create_direct_message(message: Vec<u8>, to_peer: String,sender: AgentDetail) -> Self {
         AgentMessage::NodeMessage {
             id: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_nanos() as u64,
             message,
+            sender,
             message_type: MessageType::Direct { to_peer },
         }
     }
 
-    pub fn create_broadcast_message(message: Vec<u8>) -> Self {
+    pub fn create_broadcast_message(message: Vec<u8>,sender: AgentDetail) -> Self {
         AgentMessage::NodeMessage {
             id: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_nanos() as u64,
             message,
+            sender,
             message_type: MessageType::Broadcast,
         }
     }
@@ -81,11 +85,8 @@ impl AgentMessage {
             topic,
         }
     }
-    
+
     pub fn create_registration_ack_message(peer: String, status: bool) -> Self {
-        AgentMessage::AgentRegistrationAck {
-            id: peer,
-            status,
-        }
+        AgentMessage::AgentRegistrationAck { id: peer, status }
     }
 }

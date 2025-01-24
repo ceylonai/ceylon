@@ -6,6 +6,8 @@ import pickle
 from typing import Dict, Callable, Optional, Any
 from loguru import logger
 
+from ceylon import AgentDetail
+
 message_handlers: Dict[str, Callable] = {}
 run_handlers: Dict[str, Callable] = {}
 connect_handlers: Dict[str, Dict[str, Callable]] = {}
@@ -48,7 +50,7 @@ def has_param(func, param):
 
 
 class AgentCommon:
-    async def onmessage_handler(self, agent_id: str, data: bytes, time: int):
+    async def onmessage_handler(self, agent: AgentDetail, data: bytes, time: int):
         message = pickle.loads(data)
         message_type = type(message)
         class_hierarchy = inspect.getmro(self.__class__)
@@ -61,10 +63,10 @@ class AgentCommon:
                 break
 
         if handler:
-            if has_param(handler, "agent_id") and has_param(handler, "time"):
-                await handler(self, message, agent_id=agent_id, time=time)
-            elif has_param(handler, "agent_id"):
-                await handler(self, message, agent_id=agent_id)
+            if has_param(handler, "agent") and has_param(handler, "time"):
+                await handler(self, message, agent=agent, time=time)
+            elif has_param(handler, "agent"):
+                await handler(self, message, agent=agent)
             elif has_param(handler, "time"):
                 await handler(self, message, time=time)
             else:

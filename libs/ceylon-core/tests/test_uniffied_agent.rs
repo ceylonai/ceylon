@@ -17,7 +17,7 @@ enum AgentCommand {
 
 #[derive(Debug)]
 struct TestMessageHandler {
-    messages: Mutex<Vec<(String, Vec<u8>, u64)>>,
+    messages: Mutex<Vec<(AgentDetail, Vec<u8>, u64)>>,
 }
 
 impl TestMessageHandler {
@@ -27,15 +27,15 @@ impl TestMessageHandler {
         }
     }
 
-    async fn get_messages(&self) -> Vec<(String, Vec<u8>, u64)> {
+    async fn get_messages(&self) -> Vec<(AgentDetail, Vec<u8>, u64)> {
         self.messages.lock().await.clone()
     }
 }
 
 #[async_trait::async_trait]
 impl MessageHandler for TestMessageHandler {
-    async fn on_message(&self, agent_id: String, data: Vec<u8>, time: u64) {
-        self.messages.lock().await.push((agent_id, data, time));
+    async fn on_message(&self, agent: AgentDetail, data: Vec<u8>, time: u64) {
+        self.messages.lock().await.push((agent, data, time));
     }
 }
 

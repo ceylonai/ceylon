@@ -22,7 +22,7 @@ pub trait AgentBase {
 
 #[async_trait::async_trait]
 pub trait MessageHandler: Send + Sync + Debug {
-    async fn on_message(&self, agent_id: String, data: Vec<u8>, time: u64);
+    async fn on_message(&self, agent: AgentDetail, data: Vec<u8>, time: u64);
 }
 
 #[async_trait::async_trait]
