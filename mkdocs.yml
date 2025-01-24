@@ -1,6 +1,7 @@
 site_name: "Ceylon AI"
 site_url: "https://ceylon.ai"
-
+repo_url: https://github.com/ceylonai/ceylon
+repo_name: ceylonai/ceylon
 copyright: Copyright 2025 Syigen LTD
 extra:
   # hide the "Made with Material for MkDocs" message
