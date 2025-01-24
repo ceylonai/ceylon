@@ -53,8 +53,31 @@ theme:
   locale: en
   highlightjs: true
 
+extra_css:
+  - "extra/tweaks.css"
+
+
 use_directory_urls: false
 
 plugins:
   - search
   - tags
+
+markdown_extensions:
+  - tables
+  - admonition
+  - attr_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.caret
+  - pymdownx.critic
+  - pymdownx.mark
+  - pymdownx.superfences
+  - pymdownx.snippets
+  - pymdownx.tilde
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - sane_lists # this means you can start a list from any number

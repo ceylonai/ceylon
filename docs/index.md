@@ -1,8 +1,9 @@
-# Introduction
+# Introduction {.hide}
 
-> Empowering Collaboration, Simplifying Complexity
+--8<-- "docs/.partials/index-header.html"
 
-![PyPI - Version](https://img.shields.io/pypi/v/ceylon.svg) ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/ceylon.svg) ![PyPI Downloads](https://img.shields.io/pypi/dm/ceylon)
+
+[//]: # (![PyPI - Version]&#40;https://img.shields.io/pypi/v/ceylon.svg&#41; ![PyPI - Python Version]&#40;https://img.shields.io/pypi/pyversions/ceylon.svg&#41; ![PyPI Downloads]&#40;https://img.shields.io/pypi/dm/ceylon&#41;)
 
 ## Introduction
 
