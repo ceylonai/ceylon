@@ -1,119 +1,126 @@
-# Time Scheduling Agent Framework
+# Time Scheduler System
 
-This project demonstrates a multi-agent system for scheduling meetings using the Ceylon framework. It simulates a group
-of participants trying to find a common time slot for a meeting based on their individual availabilities.
+A distributed system for scheduling meetings using multi-agent coordination.
 
-## Overview
+## Features
 
-The system consists of two main types of agents:
+### Automatic Time Slot Negotiation
+- Intelligently proposes time slots based on participant availability
+- Handles scheduling conflicts by advancing to next available slot
+- Optimizes for maximum participant attendance
 
-1. **Participants**: Represent individuals with their own schedules and availabilities.
-2. **Coordinator**: Manages the overall scheduling process and coordinates between participants.
+### Smart Availability Management
+- Tracks individual participant time preferences and constraints
+- Supports multiple available time slots per participant
+- Detects overlapping availability windows efficiently
+- Validates duration requirements against available slots
 
-The goal is to find a time slot that satisfies the meeting requirements (duration and minimum number of participants)
-based on the availabilities of all participants.
+### Flexible Meeting Requirements
+- Configurable minimum participant thresholds
+- Dynamic participant joining and leaving
+- Meeting duration enforcement
+- Date-specific scheduling support
 
-## Key Components
+### Asynchronous Communication
+- Non-blocking availability checks
+- Real-time participant responses
+- Event-driven architecture using decorators
+- Scalable multi-agent message passing
 
-### Data Classes
+## Quick Start
 
-- `Meeting`: Represents the meeting to be scheduled, including:
-   - name: Name of the meeting
-   - date: Date for the meeting
-   - duration: Length of the meeting in hours
-   - minimum_participants: Minimum number of participants required
-- `TimeSlot`: Represents a specific time slot with:
-   - date: Date of the slot
-   - start_time: Start hour (0-23)
-   - end_time: End hour
-   - duration: Property that calculates slot length
-- `AvailabilityRequest`: Used by the Coordinator to request availability for a specific time slot
-- `AvailabilityResponse`: Used by Participants to respond with their availability, including:
-   - owner: Participant name
-   - time_slot: The proposed time slot
-   - accepted: Whether the participant is available
-- `RunnerInput`: Wrapper class for the meeting request input
+```python
+async def main():
+    # Create meeting request
+    meeting = Meeting(
+        name="Team Sync",
+        date="2024-07-21",
+        duration=1,
+        minimum_participants=3
+    )
 
-### Agents
+    # Initialize scheduler
+    scheduler = Scheduler(meeting)
+    scheduler_details = scheduler.details()
 
-1. **Participant (Worker)**
-   - Manages individual schedules with predefined available time slots
-   - Methods:
-      - `on_message`: Handles availability requests and responds with acceptance/rejection
-      - `is_overlap`: Checks if a proposed time slot overlaps with available times
-   - Maintains a list of available TimeSlots for the participant
+    # Create participants
+    participants = [
+        Participant("Alice", [
+            TimeSlot("2024-07-21", 9, 12),
+            TimeSlot("2024-07-21", 14, 18)
+        ], admin_peer=scheduler_details.id),
+        # Add more participants...
+    ]
 
-2. **Coordinator (Admin)**
-   - Manages the overall scheduling process
-   - State tracking:
-      - meeting: Current meeting being scheduled
-      - agreed_slots: Dictionary tracking participant agreements for each time slot
-      - next_time_slot: Next time slot to be proposed
-   - Methods:
-      - `run`: Initializes the scheduling process with a meeting request
-      - `on_agent_connected`: Triggers initial availability request when agents connect
-      - `on_message`: Processes availability responses and proposes new time slots
-      - `is_overlap`: Utility method to check time slot overlaps
+    # Start scheduling
+    await scheduler.start_agent(b"", participants)
 
-## How It Works
+asyncio.run(main())
+```
 
-1. The Coordinator is initialized with a Meeting request (name, duration, date, minimum participants)
-2. Participants are created with their individual available time slots
-3. When all participants connect, the Coordinator starts proposing time slots beginning at hour 0
-4. For each proposed time slot:
-   - Coordinator sends an AvailabilityRequest to all participants
-   - Participants check their schedules and respond with AvailabilityResponse
-   - Coordinator tracks agreements and proposes the next time slot if needed
-5. The process continues until either:
-   - A time slot with enough agreeing participants is found
-   - All possible time slots for the day are exhausted
+## Components
 
-## Running the Code
+### TimeSlot
+```python
+@dataclass
+class TimeSlot:
+    date: str
+    start_time: int
+    end_time: int
+```
 
-1. Install required dependencies:
-   ```
-   pip install asyncio pydantic ceylon
-   ```
+### Meeting
+```python
+@dataclass
+class Meeting:
+    name: str
+    date: str
+    duration: int
+    minimum_participants: int
+```
 
-2. Run the script:
-   ```
-   python time_scheduling.py
-   ```
+### Participant Agent
+Handles availability requests and responses:
+```python
+@on(AvailabilityRequest)
+async def handle_request(self, data: AvailabilityRequest, time: int, agent: AgentDetail):
+    is_available = any(
+        self.has_overlap(slot, data.time_slot, data.time_slot.duration)
+        for slot in self.available_slots
+    )
+    # Send response...
+```
 
-## Default Configuration
-
-The example includes:
-- Meeting "Meeting 1" with 2-hour duration and minimum 3 participants
-- Five participants (Alice, Bob, Charlie, David, Kevin) with different availability windows
-- Each participant has two available time slots during the day
-- Date set to "2024-07-21"
+### Scheduler Agent
+Coordinates meeting scheduling:
+```python
+@on(AvailabilityResponse)
+async def handle_response(self, data: AvailabilityResponse, time: int, agent: AgentDetail):
+    if not data.available:
+        # Try next time slot
+        next_slot = TimeSlot(...)
+        await self.broadcast_message(...)
+    else:
+        # Track agreements
+        if len(agreed_participants) >= minimum_required:
+    # Finalize meeting
+```
 
 ## Customization
 
-You can customize the simulation by modifying the `main` function:
+Add priority scheduling:
+```python
+@dataclass
+class Meeting:
+    priority: int = 1  # Add priority field
+```
 
-- Adjust the Meeting parameters (duration, minimum participants)
-- Add or remove Participants
-- Modify Participant availability windows
-- Change the date of the meeting
+Add participant preferences:
+```python
+@dataclass
+class AvailabilityResponse:
+    preference_score: int = 0  # Add preference rating
+```
 
-## Note
-
-This implementation uses:
-- Ceylon framework for agent communication
-- Pydantic for data validation and serialization
-- Pickle for message serialization
-- Asyncio for asynchronous execution
-
-## Limitations and Potential Improvements
-
-- Currently only supports single-day scheduling
-- Time slots are integer-based (hour granularity)
-- No support for recurring meetings
-- No consideration of time zones
-- Limited to searching sequential time slots
-- No preference weighting for participants
-- No support for required vs optional participants
-- No persistence of schedules between runs
-
-These limitations provide opportunities for extending the system for more realistic scheduling scenarios.
+## License
+Copyright 2024, All rights reserved.

@@ -1,133 +1,91 @@
-# Distributed Task Management System
+# Task Management System Tutorial
 
-This project implements a distributed task management system using the Ceylon framework. It simulates a workforce of
-agents with different skill levels performing tasks of varying difficulty.
+A distributed system for automatically assigning tasks to workers based on skill requirements.
 
-## Overview
+## Use Case
 
-The system consists of two main types of agents:
+This system simulates a skill-based task assignment scenario where:
+- Tasks have different difficulty levels
+- Workers have varying skill levels
+- Tasks are automatically assigned to available workers
+- Task completion success depends on worker skill vs task difficulty
 
-1. **Workers**: Agents with different skill levels who can perform tasks
-2. **Task Manager**: Central coordinator that distributes tasks and monitors completion
+## Quick Start
 
-The system demonstrates skill-based task execution where success depends on the worker's skill level matching or
-exceeding the task's difficulty.
+```python
+import asyncio
+from task_manager import TaskManager, WorkerAgent, Task
 
-## Components
+async def main():
+    # Create tasks with varying difficulty
+    tasks = [
+        Task(id=1, description="Simple calculation", difficulty=2),
+        Task(id=2, description="Data analysis", difficulty=5),
+        Task(id=3, description="ML model training", difficulty=8),
+    ]
 
-### Data Classes
+    # Initialize task manager
+    task_manager = TaskManager(tasks, expected_workers=3)
+    admin_details = task_manager.details()
 
-- `Task`: Represents a task to be performed
-    - id: Unique identifier
-    - description: Task description
-    - difficulty: Integer value from 1-10 indicating task complexity
+    # Create workers with different skill levels
+    workers = [
+        WorkerAgent("Junior", skill_level=3, admin_peer=admin_details.id),
+        WorkerAgent("Intermediate", skill_level=6, admin_peer=admin_details.id),
+        WorkerAgent("Senior", skill_level=9, admin_peer=admin_details.id),
+    ]
 
-- `TaskAssignment`: Message containing a task to be assigned
-    - task: The Task to be performed
+    # Start the system
+    await task_manager.start_agent(b"", workers)
 
-- `TaskResult`: Message containing the outcome of a task
-    - task_id: ID of the completed task
-    - worker: Name of the worker who performed the task
-    - success: Boolean indicating task completion success
+asyncio.run(main())
+```
 
-### Agents
+## System Flow
 
-1. **WorkerAgent (Worker)**
-    - Represents an individual worker with specific skills
-    - Properties:
-        - name: Worker's identifier
-        - skill_level: Integer (1-10) representing worker's capabilities
-        - has_task: Boolean tracking if worker is currently assigned a task
-    - Methods:
-        - `on_message`: Handles task assignments and simulates task execution
-        - `run`: Maintains the worker's event loop
-
-2. **TaskManager (Admin)**
-    - Coordinates task distribution and monitors completion
-    - Properties:
-        - tasks: List of tasks to be assigned
-        - expected_workers: Number of workers expected to connect
-        - task_results: Collection of completed task results
-        - tasks_assigned: Boolean tracking if tasks have been distributed
-    - Methods:
-        - `on_agent_connected`: Triggers task distribution when all workers connect
-        - `assign_tasks`: Distributes tasks to connected workers
-        - `on_message`: Processes task completion results
-        - `end_task_management`: Summarizes task completion statistics
-
-## How It Works
-
-1. The TaskManager initializes with a list of tasks and expected number of workers
-2. Workers connect to the system, each with their own skill level
-3. Once all workers are connected, the TaskManager distributes tasks
-4. Workers receive tasks and attempt to complete them based on their skill level
-    - Success occurs if worker's skill_level >= task difficulty
-    - Task execution time is simulated based on task difficulty
-5. Workers report task completion results back to the TaskManager
-6. The TaskManager collects all results and generates a completion report
-
-## Running the Code
-
-1. Install required dependencies:
-   ```
-   pip install asyncio loguru ceylon
+1. **Task Manager Initialization**
+   ```python
+   task_manager = TaskManager(tasks, expected_workers=3)
    ```
 
-2. Run the script:
+2. **Worker Registration**
+   ```python
+   WorkerAgent("Junior", skill_level=3, admin_peer=admin_details.id)
    ```
-   python task_manager.py
+
+3. **Task Assignment**
+   ```python
+   @on_connect("*")
+   async def handle_connection(self, topic: str, agent: AgentDetail):
+       if connected_count == self.expected_workers:
+           await self.assign_tasks()
    ```
 
-## Default Configuration
-
-The example includes:
-
-- Three tasks of increasing difficulty:
-    1. Simple calculation (difficulty: 2)
-    2. Data analysis (difficulty: 5)
-    3. Machine learning model training (difficulty: 8)
-- Three workers with different skill levels:
-    1. Junior (skill level: 3)
-    2. Intermediate (skill level: 6)
-    3. Senior (skill level: 9)
-
-## Output
-
-The system provides detailed logging of:
-
-- Worker initialization and connections
-- Task assignments
-- Task completions with success/failure status
-- Final success rate and detailed results using checkmarks (✓) and crosses (✗)
+4. **Task Execution**
+   ```python
+   @on(TaskAssignment)
+   async def handle_task(self, data: TaskAssignment, time: int, agent: AgentDetail):
+       success = self.skill_level >= data.task.difficulty
+   ```
 
 ## Customization
 
-You can customize the simulation by modifying the `main` function:
+Add task priorities:
+```python
+@dataclass
+class Task:
+    id: int
+    description: str
+    difficulty: int
+    priority: int = 1
+```
 
-- Add or remove tasks with different difficulties
-- Change the number of workers and their skill levels
-- Modify task descriptions and complexities
-- Adjust the task execution simulation time
+Implement worker specialization:
+```python
+class WorkerAgent(BaseAgent):
+    def __init__(self, name: str, skill_level: int, specialties: List[str]):
+        self.specialties = specialties
+```
 
-## Note
-
-This implementation uses:
-
-- Ceylon framework for agent communication
-- Loguru for enhanced logging
-- Pickle for message serialization
-- Asyncio for asynchronous execution
-
-## Limitations and Potential Improvements
-
-- Fixed one-to-one task assignment (each worker gets exactly one task)
-- No task prioritization or queuing system
-- No support for task dependencies or workflows
-- Limited to synchronous task completion (no parallel task execution)
-- No task reassignment on failure
-- No worker load balancing
-- No persistent storage of task results
-- No error recovery mechanism for failed tasks
-- No consideration of worker specializations beyond skill level
-
-These limitations provide opportunities for extending the system for more complex task management scenarios.
+## License
+Apache License, Version 2.0
