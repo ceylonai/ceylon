@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    {% if page and page.meta and page.meta.title %}
+    <title>{{ page.meta.title }}</title>
+    {% elif page and page.title and not page.is_homepage %}
+    <title>{{ page.title }} - {{ config.site_name }}</title>
+    {% else %}
+    <title>{{ config.site_name }}</title>
+    {% endif %}
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Your custom CSS -->
+    <link rel="stylesheet" href="{{ 'css/custom.css'|url }}">
+
+    <!-- Material theme CSS (if using material theme) -->
+    {% if config.theme.name == 'material' %}
+    <link rel="stylesheet" href="{{ 'assets/stylesheets/material.css'|url }}">
+    {% endif %}
+</head>
+<body>
+<header>
+    <nav>
+        <!-- Your custom navigation -->
+        <div class="nav-wrapper">
+            <a href="{{ nav.homepage.url|url }}" class="brand">{{ config.site_name }}</a>
+            <ul class="nav-links">
+                {% for nav_item in nav %}
+                <li {% if nav_item.active %}class="active" {% endif %}>
+                    <a href="{{ nav_item.url|url }}">{{ nav_item.title }}</a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </nav>
+</header>
+
+<main>
+    <div class="content-wrapper">
+        {% block content %}
+        {{ page.content }}
+        {% endblock %}
+    </div>
+</main>
+
+<footer>
+    <!-- Your custom footer -->
+    <div class="footer-content">
+        <p>&copy; {{ config.copyright }}</p>
+    </div>
+</footer>
+
+<!-- MkDocs JavaScript -->
+{% for path in config.extra_javascript %}
+<script src="{{ path|url }}"></script>
+{% endfor %}
+</body>
+</html>

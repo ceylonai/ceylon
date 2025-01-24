@@ -1,6 +1,50 @@
 site_name: "Ceylon: A Multi-Agent System (MAS)"
 site_url: "https://ceylon.ai"
+
+copyright: © SYIGEN LTD. 2023 to present
+extra:
+  # hide the "Made with Material for MkDocs" message
+  generator: false
 theme:
   name: "material"
+  #  custom_dir: docs/.overrides
+  palette:
+    - media: "(prefers-color-scheme)"
+      scheme: default
+      primary: purple
+      accent: pink
+      toggle:
+        icon: material/lightbulb
+        name: "Switch to light mode"
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: purple
+      accent: pink
+      toggle:
+        icon: material/lightbulb-outline
+        name: "Switch to dark mode"
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: dark-purple
+      accent: pink
+      toggle:
+        icon: material/lightbulb-auto-outline
+        name: "Switch to system preference"
+  features:
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.code.annotate
+    - content.code.copy
+    - content.code.select
+    - navigation.path
+    #    - navigation.expand
+    - navigation.indexes
+    - navigation.sections
+    - navigation.tracking
+    - toc.follow
+  #    - navigation.tabs  # don't use navbar tabs
+  logo: "img/logo.png"
+  favicon: "favicon.ico"
 
 use_directory_urls: false
