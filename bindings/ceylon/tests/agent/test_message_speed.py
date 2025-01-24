@@ -62,7 +62,7 @@ class NetworkManager(BaseAgent):
         self.message_timestamps[test_msg["message_id"]] = test_msg["timestamp"]
         await self.send_message(agent.id, test_msg)
 
-    async def on_message(self, agent_id: str, data: bytes, time_: int):
+    async def on_message(self, agent: AgentDetail, data: bytes, time_: int):
         try:
             message = pickle.loads(data)
             current_time = time.time()
@@ -85,7 +85,7 @@ class NetworkManager(BaseAgent):
                             "message_id": f"test_{self.metrics.total_messages}"
                         }
                         self.message_timestamps[next_msg["message_id"]] = current_time
-                        await self.send_message(agent_id, next_msg)
+                        await self.send_message(agent.id, next_msg)
 
         except Exception as e:
             traceback.print_exc()
@@ -115,7 +115,7 @@ class WorkingAgent(BaseAgent):
         self.messages_processed = 0
         self.start_time = time.time()
 
-    async def on_message(self, agent_id: str, data: bytes, time_: int):
+    async def on_message(self, agent: AgentDetail, data: bytes, time_: int):
         try:
             message = pickle.loads(data)
 
@@ -127,7 +127,7 @@ class WorkingAgent(BaseAgent):
                     "worker_name": self.details().name,
                     "processed_time": time.time()
                 }
-                await self.send_message(agent_id, response)
+                await self.send_message(agent.id, response)
 
                 self.messages_processed += 1
                 elapsed = time.time() - self.start_time

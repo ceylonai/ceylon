@@ -453,15 +453,13 @@ impl UnifiedAgent {
                                                 _ag.clone()
                                             ).await;
                                             worker_details.write().await.insert(id_key, _ag.clone());
-                                            if config.mode == PeerMode::Admin {
-                                                 let agent_intro_message = AgentMessage::create_registration_ack_message(
+                                            let agent_intro_message = AgentMessage::create_registration_ack_message(
                                                     peer_id.clone(),
                                                     true,
                                                 );
                                                 peer_emitter_clone.send(
                                                     (my_self_details.id.clone(),agent_intro_message.to_bytes(),None)
                                                 ).await.unwrap();
-                                            }
                                             debug!( "{:?} Worker details: {:#?}", my_self_details.clone().id, worker_details.read().await);
                                         }
                                         AgentMessage::AgentRegistrationAck { id,status } => {
@@ -533,7 +531,7 @@ impl UnifiedAgent {
                     debug!("Processor shutting down");
                     break;
                 }
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                tokio::time::sleep(tokio::time::Duration::from_nanos(100)).await;
             }
         });
 
