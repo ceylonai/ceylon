@@ -51,7 +51,8 @@ class BaseAgent(UnifiedAgent, MessageHandler, EventHandler, Processor, AgentComm
             on_message=self,
             on_event=self
         )
-
+        AgentCommon.__init__(self)
+        # super(AgentCommon, self).__init__()
         # Store initialization parameters
         self.name = name
         self.mode = mode
@@ -66,25 +67,6 @@ class BaseAgent(UnifiedAgent, MessageHandler, EventHandler, Processor, AgentComm
         self.connected_agents: Dict[str, AgentDetail] = {}
         self._message_handlers: List[callable] = []
         self._event_handlers: List[callable] = []
-
-        self._handlers = {}
-        self._run_handlers = {}
-        self._connection_handlers = {}
-
-    def add_handler(self, data_type, handler):
-        if not hasattr(self, '_handlers'):
-            self._handlers = {}
-        self._handlers[data_type] = handler
-
-    def add_run_handler(self, handler):
-        if not hasattr(self, '_run_handlers'):
-            self._run_handlers = {}
-        self._run_handlers[f"{handler.__name__}"] = handler
-
-    def add_connection_handler(self, topic, handler):
-        if not hasattr(self, '_connection_handlers'):
-            self._connection_handlers = {}
-        self._connection_handlers[topic] = handler
 
     async def start_agent(self, inputs: bytes = b"", workers: Optional[List[UnifiedAgent]] = None) -> None:
         uniffi_set_event_loop(asyncio.get_event_loop())
@@ -125,80 +107,13 @@ class BaseAgent(UnifiedAgent, MessageHandler, EventHandler, Processor, AgentComm
         """Get agent details by ID"""
         return self.connected_agents.get(agent_id)
 
+    async def on_message(self, agent: "AgentDetail", data: "bytes", time: "int"):
+        await self.common_on_message(agent, data, time)
+
+    async def on_agent_connected(self, topic: "str", agent: "AgentDetail"):
+        await self.common_on_agent_connected(topic, agent)
+
+    async def run(self, inputs: "bytes"):
+        await self.common_on_run(inputs)
+
     # MessageHandler interface implementation
-
-    def on(self, data_type):
-        def decorator(func):
-            self.add_handler(data_type, func)
-            return func
-
-        return decorator
-
-    def on_run(self):
-        def decorator(func):
-            self.add_run_handler(func)
-            return func
-
-        return decorator
-
-    def on_connect(self, topic: str):
-        def decorator(func):
-            self.add_connection_handler(topic, func)
-            return func
-
-        return decorator
-
-    async def on_message(self, agent: AgentDetail, data: bytes, time: int):
-        try:
-            all_runners = [asyncio.create_task(self.onmessage_handler(agent, data, time))]
-
-            decoded_data = pickle.loads(data)
-            data_type = type(decoded_data)
-
-            if hasattr(self, '_handlers') and data_type in self._handlers:
-                all_runners.append(asyncio.create_task(self._handlers[data_type](decoded_data, agent, time)))
-
-            await asyncio.gather(*all_runners)
-        except Exception as e:
-            logger.error(f"Error processing message: {e}")
-
-    async def on_agent_connected(self, topic: str, agent: AgentDetail):
-        try:
-            all_runners = [asyncio.create_task(self.onconnect_handler(topic, agent))]
-            if hasattr(self, '_connection_handlers'):
-                # Handle wildcard first
-                if '*' in self._connection_handlers:
-                    all_runners.append(asyncio.create_task(self._connection_handlers['*'](topic, agent)))
-
-                # Handle topic:role format
-                for handler_pattern, handler in self._connection_handlers.items():
-                    if handler_pattern == '*':
-                        continue
-
-                    if ':' in handler_pattern:
-                        pattern_topic, pattern_role = handler_pattern.split(':')
-                        if (pattern_topic == '*' or pattern_topic == topic) and \
-                                (pattern_role == '*' or pattern_role == agent.role):
-                            all_runners.append(asyncio.create_task(handler(topic, agent)))
-                    elif handler_pattern == topic:
-                        all_runners.append(asyncio.create_task(handler(topic, agent)))
-
-            await asyncio.gather(*all_runners)
-        except Exception as e:
-            logger.error(f"Error handling connection: {e}")
-
-    async def run(self, inputs: bytes):
-        try:
-            all_runners = [asyncio.create_task(self.onrun_handler(inputs))]
-
-            decoded_input = pickle.loads(inputs) if inputs else None
-            if hasattr(self, '_run_handlers'):
-                for handler in self._run_handlers.values():
-                    print(f"Running handler: {handler.__name__}")
-                    await handler(decoded_input)
-                    all_runners.append(asyncio.create_task(handler(decoded_input)))
-
-            await asyncio.gather(*all_runners)
-            # await self._handlers[data_type](decoded_input, 0, None)
-        except Exception as e:
-            logger.error(f"Error in run method: {e}")
