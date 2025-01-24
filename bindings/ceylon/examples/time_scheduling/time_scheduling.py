@@ -9,7 +9,7 @@ from typing import List, Any
 from pydantic import BaseModel
 from pydantic.dataclasses import dataclass
 
-from ceylon.base.agents import Worker, Admin
+from ceylon import Worker, Admin
 
 admin_port = 8000
 admin_peer = "Coordinator"

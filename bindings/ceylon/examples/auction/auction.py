@@ -9,10 +9,7 @@ from typing import List
 
 from loguru import logger
 
-from ceylon import AgentDetail, enable_log
-from ceylon.base.agents import Worker, Admin
-from ceylon.base.uni_agent import BaseAgent
-from ceylon.ceylon import PeerMode
+from ceylon import AgentDetail, enable_log, Admin, Worker
 
 enable_log("INFO")
 
@@ -114,7 +111,7 @@ class AuctioneerAgent(Admin):
 class BidderAgent(Worker):
     def __init__(self,
                  name: str,
-                 budget: float,):
+                 budget: float, ):
         super().__init__(
             name=name,
             role="bidder",

@@ -9,9 +9,7 @@ from typing import List
 
 from loguru import logger
 
-from ceylon import PeerMode
-from ceylon.base.uni_agent import BaseAgent
-from ceylon.static_val import DEFAULT_WORKSPACE_ID
+from ceylon import BaseAgent, DEFAULT_WORKSPACE_ID, PeerMode
 
 
 # Data Structures

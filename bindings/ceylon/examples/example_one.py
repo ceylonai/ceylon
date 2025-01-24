@@ -6,7 +6,7 @@ import pickle
 from pydantic.dataclasses import dataclass
 
 from ceylon import AgentDetail
-from ceylon.base.agents import Worker, Admin
+from ceylon import Worker, Admin
 
 
 @dataclass

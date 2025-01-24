@@ -10,11 +10,7 @@ from typing import List
 
 from loguru import logger
 
-from ceylon import AgentDetail, enable_log
-from ceylon.base.uni_agent import BaseAgent
-from ceylon.ceylon import PeerMode
-from ceylon.static_val import DEFAULT_WORKSPACE_ID
-
+from ceylon import AgentDetail, enable_log, BaseAgent, PeerMode, DEFAULT_WORKSPACE_ID
 
 enable_log("INFO")
 
