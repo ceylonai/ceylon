@@ -8,7 +8,6 @@ import pickle
 from loguru import logger
 
 from ceylon import AgentDetail
-from ceylon.base.agents import Admin, Worker
 from ceylon.base.uni_agent import BaseAgent
 from ceylon.ceylon import PeerMode
 from ceylon.static_val import DEFAULT_WORKSPACE_ID, DEFAULT_CONF_FILE, DEFAULT_WORKSPACE_PORT, DEFAULT_WORKSPACE_IP
