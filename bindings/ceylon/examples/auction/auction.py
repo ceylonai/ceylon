@@ -67,7 +67,7 @@ class AuctioneerAgent(Admin):
         start_msg = AuctionStart(item=self.item)
         await self.broadcast_message(start_msg)
 
-    async def on_message(self, agent_id: str, data: bytes, time: int) -> None:
+    async def on_message(self, agent: AgentDetail, data: bytes, time: int) -> None:
         if self.auction_ended:
             return
 
@@ -119,7 +119,7 @@ class BidderAgent(Worker):
         self.budget = budget
         self.has_bid = False
 
-    async def on_message(self, agent_id: str, data: bytes, time: int) -> None:
+    async def on_message(self, agent: AgentDetail, data: bytes, time: int) -> None:
         try:
             message = pickle.loads(data)
 
@@ -130,7 +130,7 @@ class BidderAgent(Worker):
                     bid_amount = min(self.budget, message.item.starting_price * random_multiplier)
 
                     bid = Bid(bidder=self.details().name, amount=bid_amount)
-                    await self.send_message(agent_id, bid)
+                    await self.send_message(agent.id, bid)
                     self.has_bid = True
                     logger.info(f"{self.details().name} placed bid: ${bid_amount:.2f}")
 

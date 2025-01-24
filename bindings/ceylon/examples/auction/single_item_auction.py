@@ -123,7 +123,7 @@ class Bidder(BaseAgent):
         self.budget = budget
         self.has_bid = False
 
-    async def on_message(self, agent_id: str, data: bytes, time: int):
+    async def on_message(self, agent: AgentDetail, data: bytes, time: int):
         try:
             message = pickle.loads(data)
             # logger.debug(f"Received message from {agent_id}: {message}")
@@ -135,7 +135,7 @@ class Bidder(BaseAgent):
                     bid_amount = min(self.budget, message.item.starting_price * random_multiplier)
 
                     bid = Bid(bidder=self.details().name, amount=bid_amount)
-                    await self.send_message(agent_id, bid)
+                    await self.send_message(agent.id, bid)
                     self.has_bid = True
                     logger.info(f"{self.details().name} placed bid: ${bid_amount:.2f}")
 
