@@ -8,11 +8,12 @@ from ceylon import (
     MessageHandler, EventHandler, Processor,
     AgentDetail
 )
+from ceylon.base.support import AgentCommon
 from ceylon.ceylon import UnifiedAgent, PeerMode, UnifiedAgentConfig
 from ceylon.ceylon.ceylon import uniffi_set_event_loop
 
 
-class BaseAgent(UnifiedAgent, MessageHandler, EventHandler, Processor):
+class BaseAgent(UnifiedAgent, MessageHandler, EventHandler, Processor, AgentCommon):
     """
     Extended UnifiedAgent with additional functionality and built-in message/event handling.
     Inherits directly from UnifiedAgent and implements required handler interfaces.
@@ -149,21 +150,26 @@ class BaseAgent(UnifiedAgent, MessageHandler, EventHandler, Processor):
 
     async def on_message(self, agent_id: str, data: bytes, time: int):
         try:
+            all_runners = [asyncio.create_task(self.onmessage_handler(agent_id, data, time))]
+
             decoded_data = pickle.loads(data)
             data_type = type(decoded_data)
 
             if hasattr(self, '_handlers') and data_type in self._handlers:
                 agent = self.get_agent_by_id(agent_id)
-                await self._handlers[data_type](decoded_data, time, agent)
+                all_runners.append(asyncio.create_task(self._handlers[data_type](decoded_data, agent, time)))
+
+            await asyncio.gather(*all_runners)
         except Exception as e:
             logger.error(f"Error processing message: {e}")
 
     async def on_agent_connected(self, topic: str, agent: AgentDetail):
         try:
+            all_runners = [asyncio.create_task(self.onconnect_handler(topic, agent))]
             if hasattr(self, '_connection_handlers'):
                 # Handle wildcard first
                 if '*' in self._connection_handlers:
-                    await self._connection_handlers['*'](topic, agent)
+                    all_runners.append(asyncio.create_task(self._connection_handlers['*'](topic, agent)))
 
                 # Handle topic:role format
                 for handler_pattern, handler in self._connection_handlers.items():
@@ -174,23 +180,26 @@ class BaseAgent(UnifiedAgent, MessageHandler, EventHandler, Processor):
                         pattern_topic, pattern_role = handler_pattern.split(':')
                         if (pattern_topic == '*' or pattern_topic == topic) and \
                                 (pattern_role == '*' or pattern_role == agent.role):
-                            await handler(topic, agent)
+                            all_runners.append(asyncio.create_task(handler(topic, agent)))
                     elif handler_pattern == topic:
-                        await handler(topic, agent)
+                        all_runners.append(asyncio.create_task(handler(topic, agent)))
+
+            await asyncio.gather(*all_runners)
         except Exception as e:
             logger.error(f"Error handling connection: {e}")
 
     async def run(self, inputs: bytes):
         try:
+            all_runners = [asyncio.create_task(self.onrun_handler(inputs))]
+
             decoded_input = pickle.loads(inputs) if inputs else None
             if hasattr(self, '_run_handlers'):
-                all_runners = []
                 for handler in self._run_handlers.values():
                     print(f"Running handler: {handler.__name__}")
                     await handler(decoded_input)
                     all_runners.append(asyncio.create_task(handler(decoded_input)))
 
-                await asyncio.gather(*all_runners)
-                # await self._handlers[data_type](decoded_input, 0, None)
+            await asyncio.gather(*all_runners)
+            # await self._handlers[data_type](decoded_input, 0, None)
         except Exception as e:
             logger.error(f"Error in run method: {e}")

@@ -72,7 +72,7 @@ Ceylon provides a range of tutorials and examples to help you get started and ma
 
 ## 🚦 Getting Started
 
-To get started with Ceylon, refer to our detailed [Getting Started Guide](./docs/GettingStart.md). This guide walks you
+To get started with Ceylon, refer to our detailed [Getting Started Guide](./docs/advance_agents). This guide walks you
 through setting up a basic multi-agent system with easy-to-follow steps.
 
 ## 🚧 Roadmap
