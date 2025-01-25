@@ -1,30 +1,31 @@
-## Distributed Task Manager
+# Task Manager
 
-### Overview
+## Introduction
+This tutorial walks through building a distributed task management system using Ceylon. The system assigns tasks to workers based on skill levels and monitors completion success.
 
-In this tutorial, you'll learn how to create a distributed task management system using Python. This system will distribute tasks to worker agents based on their skill levels, execute the tasks asynchronously, and collect the results. We will use several Python libraries including `asyncio`, `ceylon`, and `loguru` for logging.
+## Prerequisites
+- Python 3.7+
+- Ceylon framework
+- Basic understanding of async programming
 
-### Prerequisites
+## Part 1: Data Models
 
-Before starting, ensure you have the following Python packages installed:
-
-```bash
-pip install loguru ceylon
-```
-
-### Step 1: Define Data Structures
-
-We'll start by defining the data structures that will represent tasks, task assignments, and task results using Python's dataclasses.
-
+### Task Definition
 ```python
-from dataclasses import dataclass
-
 @dataclass
 class Task:
     id: int
     description: str
-    difficulty: int  # 1-10 scale
+    difficulty: int
+```
 
+Tasks have three key attributes:
+- `id`: Unique identifier
+- `description`: Task details
+- `difficulty`: Required skill level (1-10)
+
+### Message Types
+```python
 @dataclass
 class TaskAssignment:
     task: Task
@@ -36,21 +37,17 @@ class TaskResult:
     success: bool
 ```
 
-### Step 2: Create the Worker Agent
+These classes handle:
+- Task assignments to workers
+- Results reporting back to manager
 
-The `WorkerAgent` class represents a worker that performs tasks. Each worker has a name and a skill level that determines its ability to complete tasks of varying difficulties. We inherit from Ceylon's `Worker` class.
+## Part 2: Worker Implementation
 
 ```python
-import asyncio
-import pickle
-from ceylon.base.agents import Worker
-from loguru import logger
-
-class WorkerAgent(Worker):
-    def __init__(self, name: str, skill_level: int, 
+class WorkerAgent(BaseAgent):
+    def __init__(self, name: str, skill_level: int,
                  workspace_id=DEFAULT_WORKSPACE_ID,
-                 admin_peer="",
-                 admin_port=8000):
+                 admin_peer=""):
         self.name = name
         self.skill_level = skill_level
         self.has_task = False
@@ -58,158 +55,284 @@ class WorkerAgent(Worker):
             name=name,
             workspace_id=workspace_id,
             admin_peer=admin_peer,
-            admin_port=admin_port
+            mode=PeerMode.CLIENT
         )
-        logger.info(f"Worker {name} initialized with skill level {skill_level}")
-
-    async def on_message(self, agent_id: str, data: bytes, time: int):
-        try:
-            message = pickle.loads(data)
-            
-            if isinstance(message, TaskAssignment) and not self.has_task:
-                logger.info(f"{self.name} received task: {message.task.description}")
-                self.has_task = True
-                
-                # Simulate task execution
-                await asyncio.sleep(message.task.difficulty)
-                success = self.skill_level >= message.task.difficulty
-                
-                result = TaskResult(task_id=message.task.id, worker=self.name, success=success)
-                await self.broadcast(pickle.dumps(result))
-                logger.info(f"{self.name} completed task {message.task.id} with success={success}")
-                
-        except Exception as e:
-            logger.error(f"Error processing message in worker: {e}")
 ```
 
-### Step 3: Create the Task Manager
+Key worker features:
+1. Skill level determines task success probability
+2. Track task assignment status
+3. Connect to task manager via admin_peer
 
-The `TaskManager` class is responsible for assigning tasks to workers and collecting the results. We inherit from Ceylon's `Admin` class.
+### Task Handling
+```python
+@on(TaskAssignment)
+async def handle_task(self, data: TaskAssignment, time: int, agent: AgentDetail):
+    if self.has_task:
+        return
+
+    self.has_task = True
+    await asyncio.sleep(data.task.difficulty)  # Simulate work
+    success = self.skill_level >= data.task.difficulty
+
+    result = TaskResult(
+        task_id=data.task.id,
+        worker=self.name,
+        success=success
+    )
+    await self.broadcast(pickle.dumps(result))
+```
+
+This method:
+1. Checks if worker is available
+2. Simulates work duration based on difficulty
+3. Determines success based on skill level
+4. Reports result back to manager
+
+## Part 3: Task Manager Implementation
 
 ```python
-from ceylon.base.agents import Admin
-
-class TaskManager(Admin):
-    def __init__(self, tasks: List[Task], expected_workers: int, 
+class TaskManager(BaseAgent):
+    def __init__(self, tasks: List[Task], expected_workers: int,
                  name="task_manager", port=8000):
-        super().__init__(name=name, port=port)
+        super().__init__(
+            name=name,
+            port=port,
+            mode=PeerMode.ADMIN,
+            role="task_manager"
+        )
         self.tasks = tasks
         self.expected_workers = expected_workers
         self.task_results = []
         self.tasks_assigned = False
-        logger.info(f"Task Manager initialized with {len(tasks)} tasks")
-
-    async def on_agent_connected(self, topic: str, agent_id: str):
-        await super().on_agent_connected(topic, agent_id)
-        connected_count = len(self.get_connected_agents())
-        logger.info(f"Worker connected. {connected_count}/{self.expected_workers} workers connected.")
-
-        if connected_count == self.expected_workers and not self.tasks_assigned:
-            logger.info("All workers connected. Starting task distribution.")
-            await self.assign_tasks()
-
-    async def assign_tasks(self):
-        if self.tasks_assigned:
-            return
-            
-        self.tasks_assigned = True
-        connected_workers = self.get_connected_agents()
-        
-        for task, worker in zip(self.tasks, connected_workers):
-            assignment = TaskAssignment(task=task)
-            await self.broadcast(pickle.dumps(assignment))
-            logger.info(f"Assigned task {task.id} to worker {worker.name}")
-
-    async def on_message(self, agent_id: str, data: bytes, time: int):
-        try:
-            message = pickle.loads(data)
-            if isinstance(message, TaskResult):
-                self.task_results.append(message)
-                logger.info(
-                    f"Received result for task {message.task_id} from {message.worker}: "
-                    f"{'Success' if message.success else 'Failure'}"
-                )
-                
-                if len(self.task_results) == len(self.tasks):
-                    await self.end_task_management()
-                    
-        except Exception as e:
-            logger.error(f"Error processing message in manager: {e}")
 ```
 
-### Step 4: Main Execution Script
+Manager responsibilities:
+1. Track available tasks
+2. Monitor connected workers
+3. Collect and process results
 
-Finally, we need a script to create tasks, instantiate workers, and run the task manager.
+### Connection Handling
+```python
+@on_connect("*")
+async def handle_connection(self, topic: str, agent: AgentDetail):
+    connected_count = len(await self.get_connected_agents())
+    if connected_count == self.expected_workers and not self.tasks_assigned:
+        await self.assign_tasks()
+```
+
+Starts task assignment when all workers connect.
+
+### Task Assignment
+```python
+async def assign_tasks(self):
+    if self.tasks_assigned:
+        return
+
+    self.tasks_assigned = True
+    connected_workers = await self.get_connected_agents()
+    for task, worker in zip(self.tasks, connected_workers):
+        await self.broadcast(pickle.dumps(TaskAssignment(task=task)))
+```
+
+Distribution logic:
+1. Checks if tasks already assigned
+2. Gets connected worker list
+3. Pairs tasks with workers
+4. Broadcasts assignments
+
+### Result Processing
+```python
+@on(TaskResult)
+async def handle_result(self, data: TaskResult, time: int, agent: AgentDetail):
+    self.task_results.append(data)
+    if len(self.task_results) == len(self.tasks):
+        print("All tasks completed")
+        for result in self.task_results:
+            print(f"Task {result.task_id} assigned to {result.worker} - "
+                  f"{'Success' if result.success else 'Failure'}")
+        await self.end_task_management()
+```
+
+Tracks completion and calculates success rate.
+
+## Part 4: System Setup
 
 ```python
 async def main():
-    # Create tasks
+    # Define tasks
     tasks = [
         Task(id=1, description="Simple calculation", difficulty=2),
         Task(id=2, description="Data analysis", difficulty=5),
-        Task(id=3, description="Machine learning model training", difficulty=8),
+        Task(id=3, description="ML model training", difficulty=8),
     ]
 
-    # Create task manager
+    # Create manager
     task_manager = TaskManager(tasks, expected_workers=3)
     admin_details = task_manager.details()
 
-    # Create workers with proper admin_peer
+    # Create workers with varying skills
     workers = [
         WorkerAgent("Junior", skill_level=3, admin_peer=admin_details.id),
         WorkerAgent("Intermediate", skill_level=6, admin_peer=admin_details.id),
         WorkerAgent("Senior", skill_level=9, admin_peer=admin_details.id),
     ]
 
-    try:
-        logger.info("Starting task management system...")
-        await task_manager.arun_admin(b"", workers)
-    except KeyboardInterrupt:
-        logger.info("Shutting down task management system...")
-
-if __name__ == "__main__":
-    logger.info("Initializing task management system...")
-    asyncio.run(main())
+    # Start system
+    await task_manager.start_agent(b"", workers)
 ```
 
-### Running the System
+## Running the System
 
-To run the distributed task management system:
+1. Create task list with varying difficulties
+2. Initialize task manager
+3. Create workers with appropriate skill levels
+4. Launch system with manager and workers
 
-1. Save the code as `task_management.py`
-2. Ensure you have the required dependencies installed
-3. Run the script:
-```bash
-python task_management.py
+## Example Output
+```
+All tasks completed
+Task 1 assigned to Junior - Success
+Task 2 assigned to Intermediate - Success
+Task 3 assigned to Senior - Success
+Success rate: 100.00%
 ```
 
-The system will:
-- Create three workers with different skill levels
-- Assign tasks of varying difficulty
-- Execute tasks asynchronously
-- Show detailed results including success/failure status for each task
-- Calculate and display the overall success rate
+## Customization Options
 
-### Key Features
+### Priority-based Tasks
+```python
+@dataclass
+class PriorityTask(Task):
+    priority: int
 
-- Asynchronous task execution
-- Skill-based task assignment
-- Proper message serialization using pickle
-- Robust error handling
-- Detailed logging of system events
-- Connection state tracking
-- Task completion monitoring
-- Success rate calculation
+    def get_processing_time(self):
+        return self.difficulty * (1/self.priority)
+```
 
-### Implementation Notes
+### Specialized Workers
+```python
+class SpecializedWorker(WorkerAgent):
+    def __init__(self, name, skill_level, specialties):
+        super().__init__(name, skill_level)
+        self.specialties = specialties
 
-- Workers use broadcast messaging for task results
-- Task Manager tracks worker connections
-- Task assignments are only made once all workers are connected
-- Each worker tracks its task state to prevent duplicate processing
-- System uses proper serialization for message passing
+    async def handle_task(self, data: TaskAssignment):
+        specialty_bonus = 2 if data.task.type in self.specialties else 0
+        success = (self.skill_level + specialty_bonus) >= data.task.difficulty
+        # Rest of implementation...
+```
 
----
+## Best Practices
 
-Copyright 2024-Present, Syigen Ltd. and Syigen Private Limited. All rights reserved.
-Licensed under the Apache License, Version 2.0 (See LICENSE or http://www.apache.org/licenses/LICENSE-2.0).
+1. Task Design
+    - Set appropriate difficulty levels
+    - Balance task distribution
+    - Consider task dependencies
+
+2. Worker Configuration
+    - Match skill levels to task range
+    - Provide adequate worker count
+    - Consider specializations
+
+3. Error Handling
+    - Handle worker disconnections
+    - Implement task timeouts
+    - Plan for task failures
+
+## Troubleshooting
+
+Common issues and solutions:
+1. Workers not connecting
+    - Check admin_peer ID
+    - Verify network configuration
+    - Ensure port availability
+
+2. Task assignment failures
+    - Verify task format
+    - Check worker availability
+    - Monitor connection status
+
+3. Performance issues
+    - Adjust task difficulty
+    - Balance worker load
+    - Monitor system resources
+
+## Use Cases
+
+### All are well
+
+````mermaid
+sequenceDiagram
+    participant M as Main
+    participant TM as TaskManager
+    participant JW as Junior Worker
+    participant IW as Intermediate Worker
+    participant SW as Senior Worker
+
+    M->>TM: Initialize(tasks=[T1,T2,T3])
+    M->>JW: Create(skill=3)
+    M->>IW: Create(skill=6)
+    M->>SW: Create(skill=9)
+
+    JW-->>TM: Connect
+    IW-->>TM: Connect
+    SW-->>TM: Connect
+
+    Note over TM: All workers connected<br/>Begin task assignment
+
+    par Assign Tasks
+        TM->>JW: TaskAssignment(T1, difficulty=2)
+        TM->>IW: TaskAssignment(T2, difficulty=5)
+        TM->>SW: TaskAssignment(T3, difficulty=8)
+    end
+
+    Note over JW: Process T1<br/>skill(3) >= difficulty(2)
+    Note over IW: Process T2<br/>skill(6) >= difficulty(5)
+    Note over SW: Process T3<br/>skill(9) >= difficulty(8)
+
+    JW->>TM: TaskResult(T1, success=true)
+    IW->>TM: TaskResult(T2, success=true)
+    SW->>TM: TaskResult(T3, success=true)
+
+    Note over TM: All tasks completed<br/>Calculate success rate
+
+    TM-->>JW: Stop
+    TM-->>IW: Stop
+    TM-->>SW: Stop
+    TM-->>M: System Shutdown
+````
+
+### With some Failures
+
+````mermaid
+sequenceDiagram
+    participant TM as TaskManager
+    participant JW as Junior Worker<br/>(skill=3)
+    participant IW as Intermediate Worker<br/>(skill=6)
+    participant SW as Senior Worker<br/>(skill=9)
+
+    JW-->>TM: Connect
+    IW-->>TM: Connect
+    SW-->>TM: Connect
+
+    Note over TM: Workers connected<br/>Begin assignment
+
+    TM->>JW: TaskAssignment(T3, difficulty=8)
+    TM->>IW: TaskAssignment(T2, difficulty=5)
+    TM->>SW: TaskAssignment(T1, difficulty=2)
+
+    Note over JW: Process T3<br/>FAIL: skill(3) < difficulty(8)
+    Note over IW: Process T2<br/>SUCCESS: skill(6) >= difficulty(5)
+    Note over SW: Process T1<br/>SUCCESS: skill(9) >= difficulty(2)
+
+    JW->>TM: TaskResult(T3, success=false)
+    IW->>TM: TaskResult(T2, success=true)
+    SW->>TM: TaskResult(T1, success=true)
+
+    Note over TM: Tasks completed<br/>Success rate: 66.7%
+
+    TM-->>JW: Stop
+    TM-->>IW: Stop
+    TM-->>SW: Stop
+````

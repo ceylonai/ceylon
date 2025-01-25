@@ -1,5 +1,6 @@
 # Meeting Scheduler
 
+
 ## Introduction
 
 This tutorial will show you how to create a distributed meeting scheduler using Python with Ceylon framework. The scheduler finds optimal meeting times by coordinating between multiple participants using an agent-based approach.
@@ -240,5 +241,126 @@ if __name__ == '__main__':
 
 ---
 
+## Multiple case scenarios
+
+### All participants are available at a given time
+````mermaid
+sequenceDiagram
+    participant C as Coordinator
+    participant A as Alice
+    participant B as Bob
+    participant D as Charlie
+
+    Note over C,D: All participants connect to coordinator
+
+    C->>A: AvailabilityRequest(slot=9:00)
+    C->>B: AvailabilityRequest(slot=9:00)
+    C->>D: AvailabilityRequest(slot=9:00)
+
+    A->>C: AvailabilityResponse(accepted=true)
+    B->>C: AvailabilityResponse(accepted=true)
+    D->>C: AvailabilityResponse(accepted=true)
+
+    Note over C: Minimum participants reached<br/>(3 acceptances for 9:00 slot)
+
+    C->>A: Meeting Confirmed
+    C->>B: Meeting Confirmed  
+    C->>D: Meeting Confirmed
+
+    Note over C: Coordinator stops<br/>scheduling process
+````
+### Someone is unavailable at a given time
+````mermaid
+sequenceDiagram
+    participant C as Coordinator
+    participant A as Alice
+    participant B as Bob
+    participant D as Charlie
+
+    Note over C,D: Initial connection phase
+
+    C->>A: AvailabilityRequest(slot=9:00)
+    C->>B: AvailabilityRequest(slot=9:00)
+    C->>D: AvailabilityRequest(slot=9:00)
+
+    A->>C: AvailabilityResponse(accepted=true)
+    B->>C: AvailabilityResponse(accepted=false)
+    D->>C: AvailabilityResponse(accepted=true)
+
+    Note over C: Not enough acceptances,<br/>try next slot
+
+    C->>A: AvailabilityRequest(slot=10:00)
+    C->>B: AvailabilityRequest(slot=10:00)
+    C->>D: AvailabilityRequest(slot=10:00)
+
+    A->>C: AvailabilityResponse(accepted=true)
+    B->>C: AvailabilityResponse(accepted=true)
+    D->>C: AvailabilityResponse(accepted=true)
+
+    Note over C: Minimum participants reached<br/>(3 acceptances for 10:00 slot)
+
+    C->>A: Meeting Confirmed
+    C->>B: Meeting Confirmed
+    C->>D: Meeting Confirmed
+
+    Note over C: Coordinator stops<br/>scheduling process
+````
+
+### Advance
+
+````mermaid
+sequenceDiagram
+    participant M as Main
+    participant C as Coordinator
+    participant A as Alice
+    participant B as Bob
+    participant Ch as Charlie
+
+    M->>C: start_agent(Meeting)
+    M->>A: Initialize
+    M->>B: Initialize
+    M->>Ch: Initialize
+    
+    A-->>C: Connect
+    B-->>C: Connect
+    Ch-->>C: Connect
+    
+    Note over C: Create TimeSlot<br/>(start=8:00)
+
+    par Broadcast Availability Request
+        C->>A: AvailabilityRequest(slot=8:00)
+        C->>B: AvailabilityRequest(slot=8:00)
+        C->>Ch: AvailabilityRequest(slot=8:00)
+    end
+
+    Note over A: Check is_overlap()
+    Note over B: Check is_overlap()
+    Note over Ch: Check is_overlap()
+
+    A->>C: AvailabilityResponse(accepted=false)
+    B->>C: AvailabilityResponse(accepted=false)
+    Ch->>C: AvailabilityResponse(accepted=false)
+
+    Note over C: Calculate next slot<br/>(start=9:00)
+
+    par Broadcast Next Slot
+        C->>A: AvailabilityRequest(slot=9:00)
+        C->>B: AvailabilityRequest(slot=9:00)
+        C->>Ch: AvailabilityRequest(slot=9:00)
+    end
+
+    A->>C: AvailabilityResponse(accepted=true)
+    B->>C: AvailabilityResponse(accepted=true)
+    Ch->>C: AvailabilityResponse(accepted=true)
+
+    Note over C: Minimum participants reached
+    
+    C-->>A: Stop
+    C-->>B: Stop
+    C-->>Ch: Stop
+    C-->>M: Meeting Scheduled
+````
+
+## License
 Copyright 2024-Present, Syigen Ltd. and Syigen Private Limited. All rights reserved.
 Licensed under the Apache License, Version 2.0 (See LICENSE or http://www.apache.org/licenses/LICENSE-2.0).

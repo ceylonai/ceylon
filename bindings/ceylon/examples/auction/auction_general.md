@@ -1,4 +1,14 @@
-# Building a Multi-Agent Meeting Scheduler System
+# Building a Distributed Auction System with Ceylon
+
+This tutorial demonstrates how to build a distributed auction system using the Ceylon multi-agent framework. The system consists of an auctioneer agent managing the auction process and multiple bidder agents competing for items.
+
+## System Overview
+
+The auction system implements:
+- Single-item auctions with multiple bidders
+- Automatic bid placement based on budget constraints
+- Real-time auction status updates
+- Distributed communication between auctioneer and bidders
 
 ## Core Components
 
@@ -6,178 +16,181 @@
 
 ```python
 @dataclass
-class TimeSlot:
-    date: str
-    start_time: int
-    end_time: int
-
-    @property
-    def duration(self):
-        return self.end_time - self.start_time
-
-
-@dataclass
-class Meeting:
+class Item:
     name: str
-    date: str
-    duration: int
-    minimum_participants: int
-
+    starting_price: float
 
 @dataclass
-class AvailabilityRequest:
-    time_slot: TimeSlot
-
+class Bid:
+    bidder: str
+    amount: float
 
 @dataclass
-class AvailabilityResponse:
-    owner: str
-    time_slot: TimeSlot
-    accepted: bool
+class AuctionStart:
+    item: Item
+
+@dataclass
+class AuctionResult:
+    winner: str
+    winning_bid: float
+
+@dataclass
+class AuctionEnd:
+    pass
 ```
 
-### Participant Agent
+### Auctioneer Agent
+
+The auctioneer manages the auction process:
 
 ```python
-class Participant(Worker):
-    def __init__(self, name: str, available_times: list[TimeSlot]):
-        super().__init__(name=name, role="participant")
-        self.available_times = available_times
-
-    @staticmethod
-    def is_overlap(slot1: TimeSlot, slot2: TimeSlot, duration: int) -> bool:
-        latest_start = max(slot1.start_time, slot2.start_time)
-        earliest_end = min(slot1.end_time, slot2.end_time)
-        return earliest_end - latest_start >= duration
-
-    @on(AvailabilityRequest)
-    async def handle_availability_request(self, data: AvailabilityRequest,
-                                          time: int, agent: AgentDetail):
-        is_available = any(self.is_overlap(slot, data.time_slot,
-                                           data.time_slot.duration)
-                           for slot in self.available_times)
-        await self.broadcast_message(AvailabilityResponse(
-            owner=self.details().name,
-            time_slot=data.time_slot,
-            accepted=is_available
-        ))
-```
-
-### Coordinator Agent
-
-```python
-class Coordinator(Admin):
-    def __init__(self, name: str, port: int):
-        super().__init__(name=name, port=port)
-        self.meeting_request = None
-        self.agreed_slots = {}
-        self.next_time_slot = None
-
-    @on_run()
-    async def handle_run(self, inputs: Meeting):
-        self.meeting_request = inputs
-
-    @on_connect("*")
-    async def handle_connection(self, topic: str, agent: AgentDetail):
-        start_time = 8
-        self.next_time_slot = TimeSlot(
-            self.meeting_request.date,
-            start_time,
-            start_time + self.meeting_request.duration
+class Auctioneer(BaseAgent):
+    def __init__(self, item: Item, expected_bidders: int, name="auctioneer", port=8888):
+        super().__init__(
+            name=name,
+            mode=PeerMode.ADMIN,
+            role="auctioneer",
+            port=port
         )
-        await self.broadcast_message(
-            AvailabilityRequest(time_slot=self.next_time_slot)
-        )
-
-    @on(AvailabilityResponse)
-    async def handle_availability_response(self, data: AvailabilityResponse,
-                                           time: int, agent: AgentDetail):
-        if not data.accepted:
-            current_slot = data.time_slot
-            next_slot = TimeSlot(
-                self.meeting_request.date,
-                current_slot.start_time + 1,
-                current_slot.start_time + 1 + self.meeting_request.duration
-            )
-            if next_slot.end_time > self.next_time_slot.end_time:
-                self.next_time_slot = next_slot
-                await self.broadcast_message(
-                    AvailabilityRequest(time_slot=self.next_time_slot)
-                )
-            return
-
-        time_slot_key = str(data.time_slot)
-        slots = self.agreed_slots.get(time_slot_key, [])
-        if data.owner not in slots:
-            slots.append(data.owner)
-            self.agreed_slots[time_slot_key] = slots
-            if len(slots) >= self.meeting_request.minimum_participants:
-                await self.stop()
+        self.item = item
+        self.expected_bidders = expected_bidders
+        self.bids: List[Bid] = []
+        self.auction_ended = False
 ```
 
-## System Usage
+Key methods:
+- `handle_connection`: Monitors bidder connections and starts auction when all bidders join
+- `handle_bid`: Processes incoming bids
+- `end_auction`: Determines winner and broadcasts results
+
+### Bidder Agent
+
+Each bidder participates in the auction:
 
 ```python
-async def main():
-    participants = [
-        Participant("Alice", [
-            TimeSlot("2024-07-21", 9, 12),
-            TimeSlot("2024-07-21", 14, 18)
-        ]),
-        Participant("Bob", [
-            TimeSlot("2024-07-21", 10, 13),
-            TimeSlot("2024-07-21", 15, 17)
-        ]),
-    ]
-
-    admin = Coordinator(name="admin", port=8888)
-    meeting = Meeting(
-        name="Meeting 1",
-        duration=1,
-        date="2024-07-21",
-        minimum_participants=3
-    )
-
-    await admin.start_agent(
-        inputs=pickle.dumps(meeting),
-        workers=participants
-    )
-
-
-if __name__ == '__main__':
-    asyncio.run(main())
+class Bidder(BaseAgent):
+    def __init__(self, name: str, budget: float,
+                 workspace_id=DEFAULT_WORKSPACE_ID,
+                 admin_peer="",
+                 admin_port=8888):
+        super().__init__(
+            name=name,
+            mode=PeerMode.CLIENT,
+            role="bidder"
+        )
+        self.budget = budget
+        self.has_bid = False
 ```
 
-## Key Features
+Key methods:
+- `handle_auction_start`: Places bid when auction begins
+- `handle_auction_result`: Processes auction results
+- `handle_auction_end`: Acknowledges auction completion
 
-1. Time slot management with overlap detection
-2. Asynchronous availability requests/responses
-3. Automatic meeting slot negotiation
-4. Minimum participant requirement tracking
-5. Decentralized participant coordination
+## Bidding Strategy
+
+Bidders use a simple random strategy:
+```python
+random_multiplier = random.randint(100, 1000) / 100
+bid_amount = min(self.budget, auction_start.item.starting_price * random_multiplier)
+```
+
+## Running the System
+
+1. Create auction item and auctioneer:
+```python
+item = Item("Rare Painting", 1000.0)
+auctioneer = Auctioneer(item, expected_bidders=3, port=8455)
+admin_details = auctioneer.details()
+```
+
+2. Create bidders:
+```python
+bidders = [
+    Bidder("Alice", 1500.0, admin_peer=admin_details.id),
+    Bidder("Bob", 1200.0, admin_peer=admin_details.id),
+    Bidder("Charlie", 2000.0, admin_peer=admin_details.id)
+]
+```
+
+3. Start the system:
+```python
+await auctioneer.start_agent(b"", bidders)
+```
+
+## Sample Output
+
+```
+ceylon version: 0.22.1
+visit https://ceylon.ai for more information
+2025-01-26 00:04:41.323 | INFO     | __main__:<module>:161 - Initializing auction system...
+2025-01-26 00:04:41.327 | INFO     | __main__:main:155 - Starting auction system...
+2025-01-26 00:04:41.327 | INFO     | ceylon.base.uni_agent:start_agent:76 - Starting auctioneer agent in ADMIN mode
+2025-01-26 00:04:41.389 | INFO     | __main__:handle_run:91 - Auctioneer started - auctioneer
+2025-01-26 00:04:41.389 | INFO     | __main__:handle_run:138 - Bidder started - Alice
+2025-01-26 00:04:41.389 | INFO     | __main__:handle_run:138 - Bidder started - Bob
+2025-01-26 00:04:41.389 | INFO     | __main__:handle_run:138 - Bidder started - Charlie
+2025-01-26 00:04:41.389 | INFO     | __main__:handle_run:138 - Bidder started - Jon
+2025-01-26 00:04:41.548 | INFO     | __main__:handle_connection:50 - Bidder Alice connected with auctioneer. 0/3 bidders connected.
+2025-01-26 00:04:41.548 | INFO     | __main__:handle_connection:57 - Waiting for more bidders to connect...
+2025-01-26 00:04:41.549 | INFO     | __main__:handle_connection:50 - Bidder Bob connected with auctioneer. 1/3 bidders connected.
+2025-01-26 00:04:41.549 | INFO     | __main__:handle_connection:57 - Waiting for more bidders to connect...
+2025-01-26 00:04:41.589 | INFO     | __main__:handle_connection:50 - Bidder Jon connected with auctioneer. 2/3 bidders connected.
+2025-01-26 00:04:41.589 | INFO     | __main__:handle_connection:57 - Waiting for more bidders to connect...
+2025-01-26 00:04:41.591 | INFO     | __main__:handle_connection:50 - Bidder Charlie connected with auctioneer. 3/3 bidders connected.
+2025-01-26 00:04:41.591 | INFO     | __main__:handle_connection:54 - All bidders connected. Starting the auction.
+2025-01-26 00:04:41.591 | INFO     | __main__:start_auction:60 - Starting auction for Rare Painting with starting price $1000.0
+2025-01-26 00:04:41.654 | INFO     | __main__:handle_auction_start:122 - Bob placed bid: $1200.00
+2025-01-26 00:04:41.654 | INFO     | __main__:handle_auction_start:122 - Alice placed bid: $1500.00
+2025-01-26 00:04:41.665 | INFO     | __main__:handle_auction_start:122 - Jon placed bid: $2800.00
+2025-01-26 00:04:41.669 | INFO     | __main__:handle_auction_start:122 - Charlie placed bid: $2000.00
+2025-01-26 00:04:41.685 | INFO     | __main__:handle_bid:70 - Received bid from Jon for $2800.00
+2025-01-26 00:04:41.687 | INFO     | __main__:handle_bid:70 - Received bid from Charlie for $2000.00
+2025-01-26 00:04:41.695 | INFO     | __main__:handle_bid:70 - Received bid from Bob for $1200.00
+2025-01-26 00:04:41.695 | INFO     | __main__:end_auction:84 - Auction ended. Winner: Jon, Winning Bid: $2800.00
+```
 
 ## Customization Options
 
-1. Add priority-based scheduling:
+- Modify bidding strategy by adjusting the random multiplier range
+- Add minimum bid increments
+- Implement multiple auction rounds
+- Add timeout mechanisms for bidder responses
+- Implement different auction types (Dutch, English, etc.)
 
-```python
-@dataclass
-class Meeting:
-    priority: int  # Add priority field
-```
+## Sequence Diagram
 
-2. Implement preferred time slots:
+````mermaid
+sequenceDiagram
+    participant A as Auctioneer
+    participant B1 as Bidder1
+    participant B2 as Bidder2
+    participant B3 as Bidder3
 
-```python
-@dataclass
-class AvailabilityResponse:
-    preference_score: int  # Add preference rating
-```
+    Note over A,B3: Connection Phase
+    B1->>A: Connect
+    A->>B1: Connection Confirmed
+    B2->>A: Connect
+    A->>B2: Connection Confirmed
+    B3->>A: Connect
+    A->>B3: Connection Confirmed
 
-3. Add recurring meeting support:
+    Note over A,B3: Auction Start
+    A->>B1: AuctionStart(item)
+    A->>B2: AuctionStart(item)
+    A->>B3: AuctionStart(item)
 
-```python
-@dataclass
-class Meeting:
-    recurrence: str  # weekly, monthly, etc.
-```
+    Note over A,B3: Bidding Phase
+    B1-->>A: Bid(amount)
+    B2-->>A: Bid(amount)
+    B3-->>A: Bid(amount)
+
+    Note over A,B3: Auction End
+    A->>B1: AuctionResult(winner, amount)
+    A->>B2: AuctionResult(winner, amount)
+    A->>B3: AuctionResult(winner, amount)
+
+    A->>B1: AuctionEnd
+    A->>B2: AuctionEnd
+    A->>B3: AuctionEnd
+````
