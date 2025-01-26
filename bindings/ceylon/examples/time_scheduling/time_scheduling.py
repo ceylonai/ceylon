@@ -36,8 +36,8 @@ class AvailabilityResponse:
 
 
 class Participant(Worker):
-    def __init__(self, name: str, available_slots: List[TimeSlot], admin_peer: str):
-        super().__init__(name=name, admin_peer=admin_peer)
+    def __init__(self, name: str, available_slots: List[TimeSlot]):
+        super().__init__(name=name)
         self.available_slots = available_slots
 
     @staticmethod
@@ -122,21 +122,20 @@ async def main():
     )
 
     scheduler = Scheduler(meeting)
-    scheduler_details = scheduler.details()
 
     participants = [
         Participant("Alice", [
             TimeSlot("2024-07-21", 9, 12),
             TimeSlot("2024-07-21", 14, 18)
-        ], admin_peer=scheduler_details.id),
+        ]),
         Participant("Bob", [
             TimeSlot("2024-07-21", 10, 13),
             TimeSlot("2024-07-21", 15, 17)
-        ], admin_peer=scheduler_details.id),
+        ]),
         Participant("Charlie", [
             TimeSlot("2024-07-21", 11, 14),
             TimeSlot("2024-07-21", 16, 18)
-        ], admin_peer=scheduler_details.id)
+        ])
     ]
 
     await scheduler.start_agent(b"", participants)
