@@ -170,7 +170,8 @@ async def main():
     bidders = [
         Bidder("Alice", 1500.0, admin_peer=admin_details.id),
         Bidder("Bob", 1200.0, admin_peer=admin_details.id),
-        Bidder("Charlie", 2000.0, admin_peer=admin_details.id)
+        Bidder("Charlie", 2000.0, admin_peer=admin_details.id),
+        Bidder("Jon", 10000.0, admin_peer=admin_details.id)
     ]
 
     try:

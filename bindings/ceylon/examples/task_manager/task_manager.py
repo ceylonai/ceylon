@@ -44,6 +44,7 @@ class WorkerAgent(BaseAgent):
 
     @on(TaskAssignment)
     async def handle_task(self, data: TaskAssignment, time: int,  agent: AgentDetail):
+        print(f"Task {data.task.id} assigned to {self.name}")
         if self.has_task:
             return
 
@@ -81,7 +82,10 @@ class TaskManager(BaseAgent):
     @on_connect("*")
     async def handle_connection(self, topic: str, agent: AgentDetail):
         connected_count = len(await self.get_connected_agents())
+        print(f"Worker connected: {agent.name} ({agent.name}) - Role: {agent.role} ({topic})")
+        print(f"Connected workers: {connected_count} of {self.expected_workers} expected {self.tasks_assigned}")
         if connected_count == self.expected_workers and not self.tasks_assigned:
+            print("All workers connected")
             await self.assign_tasks()
 
     @on(TaskResult)
@@ -100,6 +104,7 @@ class TaskManager(BaseAgent):
         self.tasks_assigned = True
         connected_workers = await self.get_connected_agents()
         for task, worker in zip(self.tasks, connected_workers):
+            print(f"Assigning task {task.id} to {worker.name}")
             await self.broadcast(pickle.dumps(TaskAssignment(task=task)))
 
     async def end_task_management(self):
@@ -129,6 +134,7 @@ async def main():
         WorkerAgent("Junior", skill_level=3, admin_peer=admin_details.id),
         WorkerAgent("Intermediate", skill_level=6, admin_peer=admin_details.id),
         WorkerAgent("Senior", skill_level=9, admin_peer=admin_details.id),
+        WorkerAgent("Senior2", skill_level=8, admin_peer=admin_details.id),
     ]
 
     await task_manager.start_agent(b"", workers)
