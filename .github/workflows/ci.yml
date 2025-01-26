@@ -2,7 +2,6 @@ name: ci
 on:
   push:
     branches:
-      - next-v22
       - master
 permissions:
   contents: write
