@@ -1,6 +1,6 @@
 [package]
 name = "ceylon"
-version = "0.22.1"
+version = "0.22.2"
 edition = "2021"
 authors = ["Syigen Ltd. <dewmal@syigen.com>"]
 license = "Apache-2.0"
@@ -16,7 +16,7 @@ crate-type = ["cdylib", "rlib"]
 uniffi = { version = "0.28.1", features = ["tokio", "bindgen", "default"] }
 
 [dependencies]
-ceylon-core = { path = "../../libs/ceylon-core", version = "0.1.0" }
+ceylon-core = { path = "../../libs/ceylon-core", version = "0.2.0" }
 tokio = { version = "1.43.0", features = ["full"] }
 tracing-subscriber = "0.3.19"
 tracing = "0.1.41"
