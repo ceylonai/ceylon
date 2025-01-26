@@ -60,6 +60,7 @@ class WorkerAgent(BaseAgent):
 ```
 
 Key worker features:
+
 1. Skill level determines task success probability
 2. Track task assignment status
 3. Connect to task manager via admin_peer
@@ -84,6 +85,7 @@ async def handle_task(self, data: TaskAssignment, time: int, agent: AgentDetail)
 ```
 
 This method:
+
 1. Checks if worker is available
 2. Simulates work duration based on difficulty
 3. Determines success based on skill level
@@ -108,6 +110,7 @@ class TaskManager(BaseAgent):
 ```
 
 Manager responsibilities:
+
 1. Track available tasks
 2. Monitor connected workers
 3. Collect and process results
@@ -136,6 +139,7 @@ async def assign_tasks(self):
 ```
 
 Distribution logic:
+
 1. Checks if tasks already assigned
 2. Gets connected worker list
 3. Pairs tasks with workers
