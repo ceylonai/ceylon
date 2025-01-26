@@ -448,10 +448,6 @@ impl UnifiedAgent {
                                                 id,
                                                 role
                                             };
-                                            on_event.lock().await.on_agent_connected(
-                                                topic.clone(),
-                                                _ag.clone()
-                                            ).await;
                                             worker_details.write().await.insert(id_key, _ag.clone());
                                             let agent_intro_message = AgentMessage::create_registration_ack_message(
                                                     peer_id.clone(),
@@ -460,6 +456,13 @@ impl UnifiedAgent {
                                                 peer_emitter_clone.send(
                                                     (my_self_details.id.clone(),agent_intro_message.to_bytes(),None)
                                                 ).await.unwrap();
+
+
+                                            on_event.lock().await.on_agent_connected(
+                                                topic.clone(),
+                                                _ag.clone()
+                                            ).await;
+
                                             debug!( "{:?} Worker details: {:#?}", my_self_details.clone().id, worker_details.read().await);
                                         }
                                         AgentMessage::AgentRegistrationAck { id,status } => {
