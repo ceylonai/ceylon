@@ -1,47 +1,56 @@
-# Task Manager
+# Distributed Task Management System
 
-## Introduction
-This tutorial walks through building a distributed task management system using Ceylon. The system assigns tasks to workers based on skill levels and monitors completion success.
+## System Architecture
 
-## Prerequisites
-- Python 3.7+
-- Ceylon framework
-- Basic understanding of async programming
+### Core Components
+1. Task Manager (Admin Node)
+   - Task distribution controller
+   - Worker state management
+   - Result aggregation
 
-## Part 1: Data Models
+2. Worker Nodes
+   - Task execution
+   - Progress reporting
+   - Skill-based routing
 
-### Task Definition
+3. Message Protocol
+   - Task assignments
+   - Status updates
+   - Completion reports
+
+## Implementation Details
+
+### 1. Data Models
+
 ```python
+from dataclasses import dataclass
+from typing import List, Optional
+
 @dataclass
 class Task:
     id: int
     description: str
     difficulty: int
-```
+    
+    def validate(self) -> bool:
+        return 1 <= self.difficulty <= 10
 
-Tasks have three key attributes:
-- `id`: Unique identifier
-- `description`: Task details
-- `difficulty`: Required skill level (1-10)
-
-### Message Types
-```python
 @dataclass
 class TaskAssignment:
     task: Task
+    assigned_at: int  # Unix timestamp
+    timeout: Optional[int] = None
 
 @dataclass
 class TaskResult:
     task_id: int
     worker: str
     success: bool
+    execution_time: float
+    error_message: Optional[str] = None
 ```
 
-These classes handle:
-- Task assignments to workers
-- Results reporting back to manager
-
-## Part 2: Worker Implementation
+### 2. Enhanced Worker Implementation
 
 ```python
 class WorkerAgent(BaseAgent):
@@ -51,47 +60,63 @@ class WorkerAgent(BaseAgent):
         self.name = name
         self.skill_level = skill_level
         self.has_task = False
+        self.current_task: Optional[Task] = None
+        self.task_history: List[TaskResult] = []
+        
         super().__init__(
             name=name,
             workspace_id=workspace_id,
             admin_peer=admin_peer,
             mode=PeerMode.CLIENT
         )
+
+    @on(TaskAssignment)
+    async def handle_task(self, data: TaskAssignment, 
+                         time: int, agent: AgentDetail):
+        try:
+            if self.has_task:
+                logger.warning(f"Worker {self.name} already has task")
+                return
+
+            self.has_task = True
+            self.current_task = data.task
+            start_time = time.time()
+
+            # Simulate work with proper error handling
+            try:
+                await asyncio.sleep(data.task.difficulty)
+                success = self.skill_level >= data.task.difficulty
+            except asyncio.CancelledError:
+                success = False
+                error_msg = "Task cancelled"
+            
+            execution_time = time.time() - start_time
+            
+            result = TaskResult(
+                task_id=data.task.id,
+                worker=self.name,
+                success=success,
+                execution_time=execution_time,
+                error_message=error_msg if not success else None
+            )
+            
+            self.task_history.append(result)
+            await self.broadcast(pickle.dumps(result))
+            
+        except Exception as e:
+            logger.error(f"Error in task handling: {e}")
+            # Send failure result
+        finally:
+            self.has_task = False
+            self.current_task = None
+
+    @on_connect("*")  
+    async def handle_connection(self, topic: str, 
+                              agent: AgentDetail):
+        logger.info(f"Connected to {agent.name} on {topic}")
 ```
 
-Key worker features:
-
-1. Skill level determines task success probability
-2. Track task assignment status
-3. Connect to task manager via admin_peer
-
-### Task Handling
-```python
-@on(TaskAssignment)
-async def handle_task(self, data: TaskAssignment, time: int, agent: AgentDetail):
-    if self.has_task:
-        return
-
-    self.has_task = True
-    await asyncio.sleep(data.task.difficulty)  # Simulate work
-    success = self.skill_level >= data.task.difficulty
-
-    result = TaskResult(
-        task_id=data.task.id,
-        worker=self.name,
-        success=success
-    )
-    await self.broadcast(pickle.dumps(result))
-```
-
-This method:
-
-1. Checks if worker is available
-2. Simulates work duration based on difficulty
-3. Determines success based on skill level
-4. Reports result back to manager
-
-## Part 3: Task Manager Implementation
+### 3. Task Manager Implementation
 
 ```python
 class TaskManager(BaseAgent):
@@ -107,236 +132,254 @@ class TaskManager(BaseAgent):
         self.expected_workers = expected_workers
         self.task_results = []
         self.tasks_assigned = False
+        self.worker_stats = {}
+        self.task_timeouts = {}
+
+    async def assign_tasks(self):
+        if self.tasks_assigned:
+            return
+
+        self.tasks_assigned = True
+        connected_workers = await self.get_connected_agents()
+        
+        # Intelligent task distribution
+        worker_tasks = self._match_tasks_to_workers(
+            self.tasks, connected_workers)
+        
+        for worker, task in worker_tasks:
+            assignment = TaskAssignment(
+                task=task,
+                assigned_at=int(time.time()),
+                timeout=task.difficulty * 2
+            )
+            await self.broadcast(pickle.dumps(assignment))
+            
+            # Set timeout handler
+            self.task_timeouts[task.id] = asyncio.create_task(
+                self._handle_timeout(task.id, assignment.timeout)
+            )
+
+    async def _handle_timeout(self, task_id: int, timeout: int):
+        await asyncio.sleep(timeout)
+        if task_id not in self.completed_tasks:
+            logger.warning(f"Task {task_id} timed out")
+            # Implement timeout handling
+
+    def _match_tasks_to_workers(self, tasks, workers):
+        # Intelligent matching algorithm
+        matches = []
+        sorted_tasks = sorted(tasks, 
+                            key=lambda t: t.difficulty,
+                            reverse=True)
+        sorted_workers = sorted(workers,
+                              key=lambda w: self._get_worker_score(w))
+        
+        for task, worker in zip(sorted_tasks, sorted_workers):
+            matches.append((worker, task))
+        return matches
+
+    def _get_worker_score(self, worker):
+        stats = self.worker_stats.get(worker.name, {})
+        success_rate = stats.get('success_rate', 0.5)
+        completed_tasks = stats.get('completed_tasks', 0)
+        return success_rate * 0.7 + completed_tasks * 0.3
+
+    @on(TaskResult)
+    async def handle_result(self, data: TaskResult, 
+                          time: int, agent: AgentDetail):
+        # Cancel timeout handler
+        if data.task_id in self.task_timeouts:
+            self.task_timeouts[data.task_id].cancel()
+            
+        self.task_results.append(data)
+        self._update_worker_stats(data)
+        
+        if len(self.task_results) == len(self.tasks):
+            await self._generate_final_report()
+            await self.end_task_management()
+
+    def _update_worker_stats(self, result: TaskResult):
+        if result.worker not in self.worker_stats:
+            self.worker_stats[result.worker] = {
+                'completed_tasks': 0,
+                'successful_tasks': 0,
+                'total_time': 0
+            }
+            
+        stats = self.worker_stats[result.worker]
+        stats['completed_tasks'] += 1
+        if result.success:
+            stats['successful_tasks'] += 1
+        stats['total_time'] += result.execution_time
+        stats['success_rate'] = (stats['successful_tasks'] / 
+                               stats['completed_tasks'])
 ```
 
-Manager responsibilities:
+## System Flow Diagrams
 
-1. Track available tasks
-2. Monitor connected workers
-3. Collect and process results
-
-### Connection Handling
-```python
-@on_connect("*")
-async def handle_connection(self, topic: str, agent: AgentDetail):
-    connected_count = len(await self.get_connected_agents())
-    if connected_count == self.expected_workers and not self.tasks_assigned:
-        await self.assign_tasks()
-```
-
-Starts task assignment when all workers connect.
-
-### Task Assignment
-```python
-async def assign_tasks(self):
-    if self.tasks_assigned:
-        return
-
-    self.tasks_assigned = True
-    connected_workers = await self.get_connected_agents()
-    for task, worker in zip(self.tasks, connected_workers):
-        await self.broadcast(pickle.dumps(TaskAssignment(task=task)))
-```
-
-Distribution logic:
-
-1. Checks if tasks already assigned
-2. Gets connected worker list
-3. Pairs tasks with workers
-4. Broadcasts assignments
-
-### Result Processing
-```python
-@on(TaskResult)
-async def handle_result(self, data: TaskResult, time: int, agent: AgentDetail):
-    self.task_results.append(data)
-    if len(self.task_results) == len(self.tasks):
-        print("All tasks completed")
-        for result in self.task_results:
-            print(f"Task {result.task_id} assigned to {result.worker} - "
-                  f"{'Success' if result.success else 'Failure'}")
-        await self.end_task_management()
-```
-
-Tracks completion and calculates success rate.
-
-## Part 4: System Setup
-
-```python
-async def main():
-    # Define tasks
-    tasks = [
-        Task(id=1, description="Simple calculation", difficulty=2),
-        Task(id=2, description="Data analysis", difficulty=5),
-        Task(id=3, description="ML model training", difficulty=8),
-    ]
-
-    # Create manager
-    task_manager = TaskManager(tasks, expected_workers=3)
-    admin_details = task_manager.details()
-
-    # Create workers with varying skills
-    workers = [
-        WorkerAgent("Junior", skill_level=3, admin_peer=admin_details.id),
-        WorkerAgent("Intermediate", skill_level=6, admin_peer=admin_details.id),
-        WorkerAgent("Senior", skill_level=9, admin_peer=admin_details.id),
-    ]
-
-    # Start system
-    await task_manager.start_agent(b"", workers)
-```
-
-## Running the System
-
-1. Create task list with varying difficulties
-2. Initialize task manager
-3. Create workers with appropriate skill levels
-4. Launch system with manager and workers
-
-## Example Output
-```
-All tasks completed
-Task 1 assigned to Junior - Success
-Task 2 assigned to Intermediate - Success
-Task 3 assigned to Senior - Success
-Success rate: 100.00%
-```
-
-## Customization Options
-
-### Priority-based Tasks
-```python
-@dataclass
-class PriorityTask(Task):
-    priority: int
-
-    def get_processing_time(self):
-        return self.difficulty * (1/self.priority)
-```
-
-### Specialized Workers
-```python
-class SpecializedWorker(WorkerAgent):
-    def __init__(self, name, skill_level, specialties):
-        super().__init__(name, skill_level)
-        self.specialties = specialties
-
-    async def handle_task(self, data: TaskAssignment):
-        specialty_bonus = 2 if data.task.type in self.specialties else 0
-        success = (self.skill_level + specialty_bonus) >= data.task.difficulty
-        # Rest of implementation...
-```
-
-## Best Practices
-
-1. Task Design
-    - Set appropriate difficulty levels
-    - Balance task distribution
-    - Consider task dependencies
-
-2. Worker Configuration
-    - Match skill levels to task range
-    - Provide adequate worker count
-    - Consider specializations
-
-3. Error Handling
-    - Handle worker disconnections
-    - Implement task timeouts
-    - Plan for task failures
-
-## Troubleshooting
-
-Common issues and solutions:
-1. Workers not connecting
-    - Check admin_peer ID
-    - Verify network configuration
-    - Ensure port availability
-
-2. Task assignment failures
-    - Verify task format
-    - Check worker availability
-    - Monitor connection status
-
-3. Performance issues
-    - Adjust task difficulty
-    - Balance worker load
-    - Monitor system resources
-
-## Use Cases
-
-### All are well
-
-````mermaid
+### 1. Normal Operation Flow
+```mermaid
 sequenceDiagram
-    participant M as Main
     participant TM as TaskManager
-    participant JW as Junior Worker
-    participant IW as Intermediate Worker
-    participant SW as Senior Worker
-
-    M->>TM: Initialize(tasks=[T1,T2,T3])
-    M->>JW: Create(skill=3)
-    M->>IW: Create(skill=6)
-    M->>SW: Create(skill=9)
-
-    JW-->>TM: Connect
-    IW-->>TM: Connect
-    SW-->>TM: Connect
-
-    Note over TM: All workers connected<br/>Begin task assignment
-
-    par Assign Tasks
-        TM->>JW: TaskAssignment(T1, difficulty=2)
-        TM->>IW: TaskAssignment(T2, difficulty=5)
-        TM->>SW: TaskAssignment(T3, difficulty=8)
+    participant W1 as Worker(skill=5)
+    participant W2 as Worker(skill=8)
+    
+    W1->>TM: Connect
+    W2->>TM: Connect
+    
+    Note over TM: All workers connected
+    
+    par Task Assignment
+        TM->>W1: TaskAssignment(id=1, difficulty=4)
+        TM->>W2: TaskAssignment(id=2, difficulty=7)
     end
+    
+    Note over W1: Processing (4s)
+    Note over W2: Processing (7s)
+    
+    W1->>TM: TaskResult(success=true)
+    W2->>TM: TaskResult(success=true)
+    
+    Note over TM: Generate Report
+    
+    TM->>W1: Shutdown
+    TM->>W2: Shutdown
+```
 
-    Note over JW: Process T1<br/>skill(3) >= difficulty(2)
-    Note over IW: Process T2<br/>skill(6) >= difficulty(5)
-    Note over SW: Process T3<br/>skill(9) >= difficulty(8)
-
-    JW->>TM: TaskResult(T1, success=true)
-    IW->>TM: TaskResult(T2, success=true)
-    SW->>TM: TaskResult(T3, success=true)
-
-    Note over TM: All tasks completed<br/>Calculate success rate
-
-    TM-->>JW: Stop
-    TM-->>IW: Stop
-    TM-->>SW: Stop
-    TM-->>M: System Shutdown
-````
-
-### With some Failures
-
-````mermaid
+### 2. Error Handling Flow
+```mermaid
 sequenceDiagram
     participant TM as TaskManager
-    participant JW as Junior Worker<br/>(skill=3)
-    participant IW as Intermediate Worker<br/>(skill=6)
-    participant SW as Senior Worker<br/>(skill=9)
+    participant W1 as Worker(skill=3)
+    participant W2 as Worker(skill=7)
+    
+    W1->>TM: Connect
+    W2->>TM: Connect
+    
+    TM->>W1: TaskAssignment(difficulty=6)
+    TM->>W2: TaskAssignment(difficulty=4)
+    
+    Note over W1: Task too difficult
+    Note over W2: Processing
+    
+    W1->>TM: TaskResult(success=false)
+    W2->>TM: TaskResult(success=true)
+    
+    Note over TM: Update worker stats
+    Note over TM: Worker1 success_rate = 0%
+    Note over TM: Worker2 success_rate = 100%
+```
 
-    JW-->>TM: Connect
-    IW-->>TM: Connect
-    SW-->>TM: Connect
+### 3. Timeout Handling
+```mermaid
+sequenceDiagram
+    participant TM as TaskManager
+    participant W1 as Worker
+    
+    W1->>TM: Connect
+    
+    TM->>W1: TaskAssignment(timeout=10s)
+    
+    Note over TM: Start timeout timer
+    
+    Note over W1: Task processing stuck
+    
+    Note over TM: Timeout reached
+    TM->>W1: Cancel task
+    
+    Note over TM: Mark task as failed
+    Note over TM: Update worker stats
+```
 
-    Note over TM: Workers connected<br/>Begin assignment
+## Best Practices and Error Handling
 
-    TM->>JW: TaskAssignment(T3, difficulty=8)
-    TM->>IW: TaskAssignment(T2, difficulty=5)
-    TM->>SW: TaskAssignment(T1, difficulty=2)
+1. Task Validation
+```python
+def validate_task(task: Task) -> bool:
+    return (1 <= task.difficulty <= 10 and
+            task.description.strip() and
+            task.id > 0)
+```
 
-    Note over JW: Process T3<br/>FAIL: skill(3) < difficulty(8)
-    Note over IW: Process T2<br/>SUCCESS: skill(6) >= difficulty(5)
-    Note over SW: Process T1<br/>SUCCESS: skill(9) >= difficulty(2)
+2. Worker Health Monitoring
+```python
+async def check_worker_health(worker: WorkerAgent):
+    while True:
+        try:
+            await worker.ping()
+            await asyncio.sleep(30)
+        except ConnectionError:
+            logger.error(f"Worker {worker.name} disconnected")
+```
 
-    JW->>TM: TaskResult(T3, success=false)
-    IW->>TM: TaskResult(T2, success=true)
-    SW->>TM: TaskResult(T1, success=true)
+3. Task Recovery
+```python
+async def recover_failed_task(task: Task, 
+                            result: TaskResult):
+    if result.success:
+        return
+        
+    available_workers = [w for w in workers 
+                        if not w.has_task]
+    if not available_workers:
+        logger.error("No workers available for recovery")
+        return
+        
+    # Select best worker for recovery
+    worker = max(available_workers,
+                key=lambda w: w.skill_level)
+    await reassign_task(task, worker)
+```
 
-    Note over TM: Tasks completed<br/>Success rate: 66.7%
+## Performance Optimization
 
-    TM-->>JW: Stop
-    TM-->>IW: Stop
-    TM-->>SW: Stop
-````
+1. Task Batching
+```python
+async def batch_assign_tasks(tasks: List[Task], 
+                           batch_size: int = 3):
+    for batch in chunks(tasks, batch_size):
+        await asyncio.gather(
+            *[assign_task(t) for t in batch]
+        )
+```
+
+2. Worker Scaling
+```python
+async def scale_workers(current_load: float,
+                       target_load: float = 0.7):
+    if current_load > target_load:
+        await spawn_new_worker()
+    elif current_load < target_load * 0.5:
+        await remove_idle_worker()
+```
+
+## Monitoring and Metrics
+
+1. System Metrics
+```python
+class SystemMetrics:
+    def __init__(self):
+        self.task_completion_times = []
+        self.worker_utilization = {}
+        self.error_counts = defaultdict(int)
+        
+    async def collect_metrics(self):
+        while True:
+            self.update_metrics()
+            await asyncio.sleep(60)
+```
+
+2. Performance Reporting
+```python
+def generate_performance_report():
+    avg_completion_time = sum(completion_times) / len(completion_times)
+    worker_success_rates = {
+        w: stats['success_rate']
+        for w, stats in worker_stats.items()
+    }
+    return PerformanceReport(
+        avg_completion_time=avg_completion_time,
+        worker_stats=worker_success_rates,
+        error_rates=error_counts
+    )
+```

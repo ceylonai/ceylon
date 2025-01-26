@@ -62,6 +62,7 @@ use_directory_urls: false
 plugins:
   - search
   - tags
+  - offline
 
 markdown_extensions:
   - tables
@@ -86,3 +87,20 @@ markdown_extensions:
         - name: mermaid
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Installation: getting-started.md
+      - Quickstart: quickstart.md
+      - Technology: technology.md
+      - Core Concepts: core-concepts.md
+  - How to:
+      - Overview: tutorials.md
+      - Best Practices: best-practices.md
+      - Examples:
+          - Time Scheduling: examples/time-scheduling.md
+          - Single Item Auction: examples/auction.md
+          - Task Manager: examples/task-manager.md
+          - Distributed Agents: examples/connect-through-network.md
+
