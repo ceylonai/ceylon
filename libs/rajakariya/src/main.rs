@@ -1,7 +1,9 @@
+use rajakariya::prelude::*;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use rajakariya::{ParallelWorkflow, Task, TaskState, WorkflowState};
+
+mod workflow;
 
 // Define a basic task structure
 #[derive(Debug)]
@@ -54,11 +56,7 @@ fn main() -> Result<(), String> {
     let mut workflow = ParallelWorkflow::new("data_processing".to_string());
 
     // Create tasks with dependencies
-    let task1 = ProcessingTask::new(
-        "load_data",
-        Duration::from_secs(2),
-        vec![],
-    );
+    let task1 = ProcessingTask::new("load_data", Duration::from_secs(2), vec![]);
 
     let task2 = ProcessingTask::new(
         "validate_data",
@@ -128,7 +126,8 @@ fn main() -> Result<(), String> {
                     if success {
                         workflow.mark_completed(task_id);
                     } else {
-                        workflow.set_state(WorkflowState::Failed(format!("Task {} failed", task_id)));
+                        workflow
+                            .set_state(WorkflowState::Failed(format!("Task {} failed", task_id)));
                         return Err(format!("Workflow failed at task {}", task_id));
                     }
                 }
