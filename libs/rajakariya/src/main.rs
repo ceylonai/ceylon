@@ -1,14 +1,18 @@
 use std::fs;
 use std::path::Path;
-use rajakariya::{Task, TaskState, Workflow};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use rajakariya::{TaskState, ParallelWorkflow};
+use rajakariya::Task; // Assuming this is from our previous implementation
 
-// Data validation task
+// Data validation task with thread-safe status tracking
 struct DataValidationTask {
     id: String,
     state: TaskState,
     input_path: String,
     required_fields: Vec<String>,
     deps: Vec<String>,
+    is_running: Arc<AtomicBool>,
 }
 
 impl DataValidationTask {
@@ -19,6 +23,7 @@ impl DataValidationTask {
             input_path,
             required_fields,
             deps: Vec::new(),
+            is_running: Arc::new(AtomicBool::new(false)),
         }
     }
 }
@@ -27,15 +32,19 @@ impl Task for DataValidationTask {
     fn id(&self) -> &str { &self.id }
 
     fn run(&mut self) -> Result<(), String> {
-        println!("🔍 Validating data in: {}", self.input_path);
+        self.is_running.store(true, Ordering::SeqCst);
+        println!("🔍 [{}] Validating data in: {}", self.id, self.input_path);
 
-        // Simulate file reading and validation
         if !Path::new(&self.input_path).exists() {
+            self.is_running.store(false, Ordering::SeqCst);
             return Err(format!("Input file {} not found", self.input_path));
         }
 
-        // Simulate field validation
-        println!("✓ Verified required fields: {:?}", self.required_fields);
+        // Simulate field validation with some delay to show parallel execution
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        println!("✓ [{}] Verified required fields: {:?}", self.id, self.required_fields);
+
+        self.is_running.store(false, Ordering::SeqCst);
         Ok(())
     }
 
@@ -44,13 +53,14 @@ impl Task for DataValidationTask {
     fn dependencies(&self) -> &[String] { &self.deps }
 }
 
-// Data transformation task
+// Data transformation task with thread-safe status tracking
 struct DataTransformTask {
     id: String,
     state: TaskState,
     input_path: String,
     output_path: String,
     deps: Vec<String>,
+    is_running: Arc<AtomicBool>,
 }
 
 impl DataTransformTask {
@@ -61,6 +71,7 @@ impl DataTransformTask {
             input_path,
             output_path,
             deps,
+            is_running: Arc::new(AtomicBool::new(false)),
         }
     }
 }
@@ -69,13 +80,18 @@ impl Task for DataTransformTask {
     fn id(&self) -> &str { &self.id }
 
     fn run(&mut self) -> Result<(), String> {
-        println!("🔄 Transforming data from {} to {}", self.input_path, self.output_path);
+        self.is_running.store(true, Ordering::SeqCst);
+        println!("🔄 [{}] Transforming data from {} to {}",
+                 self.id, self.input_path, self.output_path);
 
-        // Simulate data transformation
-        fs::write(&self.output_path, "transformed data")
+        // Simulate transformation work with delay to show parallel execution
+        std::thread::sleep(std::time::Duration::from_secs(2));
+
+        fs::write(&self.output_path, format!("transformed data for {}", self.id))
             .map_err(|e| format!("Failed to write output: {}", e))?;
 
-        println!("✓ Data transformed successfully");
+        println!("✓ [{}] Data transformed successfully", self.id);
+        self.is_running.store(false, Ordering::SeqCst);
         Ok(())
     }
 
@@ -84,13 +100,14 @@ impl Task for DataTransformTask {
     fn dependencies(&self) -> &[String] { &self.deps }
 }
 
-// Report generation task
+// Report generation task with thread-safe status tracking
 struct ReportTask {
     id: String,
     state: TaskState,
     input_paths: Vec<String>,
     output_path: String,
     deps: Vec<String>,
+    is_running: Arc<AtomicBool>,
 }
 
 impl ReportTask {
@@ -101,6 +118,7 @@ impl ReportTask {
             input_paths,
             output_path,
             deps,
+            is_running: Arc::new(AtomicBool::new(false)),
         }
     }
 }
@@ -109,20 +127,25 @@ impl Task for ReportTask {
     fn id(&self) -> &str { &self.id }
 
     fn run(&mut self) -> Result<(), String> {
-        println!("📊 Generating report from {:?}", self.input_paths);
+        self.is_running.store(true, Ordering::SeqCst);
+        println!("📊 [{}] Generating report from {:?}", self.id, self.input_paths);
 
         // Verify all input files exist
         for path in &self.input_paths {
             if !Path::new(path).exists() {
+                self.is_running.store(false, Ordering::SeqCst);
                 return Err(format!("Input file {} not found", path));
             }
         }
 
-        // Simulate report generation
+        // Simulate report generation with delay
+        std::thread::sleep(std::time::Duration::from_secs(3));
+
         fs::write(&self.output_path, "report content")
             .map_err(|e| format!("Failed to write report: {}", e))?;
 
-        println!("✓ Report generated at {}", self.output_path);
+        println!("✓ [{}] Report generated at {}", self.id, self.output_path);
+        self.is_running.store(false, Ordering::SeqCst);
         Ok(())
     }
 
@@ -142,8 +165,8 @@ fn main() -> Result<(), String> {
     fs::write(input_path, "test data")
         .map_err(|e| format!("Failed to create test file: {}", e))?;
 
-    // Initialize workflow
-    let mut workflow = Workflow::new("data_processing".to_string());
+    // Initialize parallel workflow
+    let mut workflow = ParallelWorkflow::new("data_processing".to_string());
 
     // Add validation task
     let validation_task = DataValidationTask::new(
@@ -179,8 +202,8 @@ fn main() -> Result<(), String> {
     );
     workflow.add_task(Box::new(report_task))?;
 
-    // Run the workflow
-    println!("Starting workflow execution...\n");
+    // Run the parallel workflow
+    println!("Starting parallel workflow execution...\n");
     match workflow.run() {
         Ok(()) => {
             println!("\n✅ Workflow completed successfully!");
@@ -189,17 +212,18 @@ fn main() -> Result<(), String> {
         Err(e) => {
             println!("\n❌ Workflow failed: {}", e);
             // Cleanup temporary files
-            for path in [input_path, transformed_path_1, transformed_path_2, report_path] {
-                let _ = fs::remove_file(path);
-            }
+            cleanup_files(&[input_path, transformed_path_1, transformed_path_2, report_path]);
             return Err(e);
         }
     }
 
     // Cleanup temporary files
-    for path in [input_path, transformed_path_1, transformed_path_2, report_path] {
+    cleanup_files(&[input_path, transformed_path_1, transformed_path_2, report_path]);
+    Ok(())
+}
+
+fn cleanup_files(paths: &[&str]) {
+    for path in paths {
         let _ = fs::remove_file(path);
     }
-
-    Ok(())
 }
