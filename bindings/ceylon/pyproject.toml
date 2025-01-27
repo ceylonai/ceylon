@@ -28,15 +28,14 @@ classifiers = [
 
 dependencies = [
     "networkx==3.4.2",
-    "pydantic==2.10.5",
+    "pydantic==2.10.6",
     "toml==0.10.2",
     "loguru==0.7.3",
-    "mkdocs-material==9.5.49"
 ]
 
 [project.urls]
 Homepage = "https://ceylon.ai"
-Documentation = "https://ceylon.ai"
+Documentation = "https://docs.ceylon.ai"
 Repository = "https://github.com/ceylonai/ceylon"
 Issues = "https://github.com/ceylonai/ceylon/issues"
 Changelog = "https://github.com/ceylonai/ceylon/blob/master/CHANGELOG.md"
