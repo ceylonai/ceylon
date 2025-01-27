@@ -1,301 +1,367 @@
 use std::collections::{HashMap, HashSet};
-use std::error::Error;
-use std::fmt;
 
-// Enhanced state management
+// Core task states that represent the lifecycle
 #[derive(Debug, Clone, PartialEq)]
 pub enum TaskState {
-    Pending,
+    Ready,
     Running,
-    Completed,
-    Failed,
-    Cancelled,
-    Blocked,      // New state for dependency management
-    Skipped,      // New state for conditional tasks
+    Complete,
+    Failed(String),
+    Skipped,
 }
 
+// Core workflow states
 #[derive(Debug, Clone, PartialEq)]
 pub enum WorkflowState {
-    Created,
+    New,
     Running,
-    Completed,
-    Failed,
-    Cancelled,
-    PartiallyCompleted,  // New state for conditional workflows
+    Complete,
+    Failed(String),
 }
 
-// Enhanced error types
-#[derive(Debug)]
-pub enum WorkflowError {
-    TaskError(String),
-    InvalidState(String),
-    DependencyError(String),
-    ValidationError(String),
-    ConditionError(String),
-}
-
-impl fmt::Display for WorkflowError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            WorkflowError::TaskError(msg) => write!(f, "Task error: {}", msg),
-            WorkflowError::InvalidState(msg) => write!(f, "Invalid state: {}", msg),
-            WorkflowError::DependencyError(msg) => write!(f, "Dependency error: {}", msg),
-            WorkflowError::ValidationError(msg) => write!(f, "Validation error: {}", msg),
-            WorkflowError::ConditionError(msg) => write!(f, "Condition error: {}", msg),
-        }
-    }
-}
-
-impl Error for WorkflowError {}
-
-// Enhanced Task trait with validation and conditions
+// Core task definition that others can extend
 pub trait Task {
-    fn execute(&mut self) -> Result<(), WorkflowError>;
-    fn validate(&self) -> Result<(), WorkflowError> {
-        Ok(()) // Default implementation
-    }
-    fn get_state(&self) -> &TaskState;
+    fn id(&self) -> &str;
+    fn run(&mut self) -> Result<(), String>;
+    fn state(&self) -> &TaskState;
     fn set_state(&mut self, state: TaskState);
-    fn get_id(&self) -> &str;
-    fn get_dependencies(&self) -> Vec<String> {
-        Vec::new() // Default: no dependencies
-    }
-    fn should_execute(&self) -> bool {
-        true // Default: always execute
-    }
+    fn dependencies(&self) -> &[String] { &[] }
 }
 
-// Data processing task
-#[derive(Debug)]
-pub struct DataProcessingTask {
-    id: String,
-    state: TaskState,
-    data: Vec<i32>,
-    threshold: i32,
-}
-
-impl DataProcessingTask {
-    pub fn new(id: String, data: Vec<i32>, threshold: i32) -> Self {
-        DataProcessingTask {
-            id,
-            state: TaskState::Pending,
-            data,
-            threshold,
-        }
-    }
-}
-
-impl Task for DataProcessingTask {
-    fn execute(&mut self) -> Result<(), WorkflowError> {
-        println!("Processing data for task: {}", self.id);
-
-        let sum: i32 = self.data.iter().sum();
-        if sum > self.threshold {
-            println!("Data sum {} exceeds threshold {}", sum, self.threshold);
-            Ok(())
-        } else {
-            Err(WorkflowError::TaskError(format!(
-                "Data sum {} below threshold {}", sum, self.threshold
-            )))
-        }
-    }
-
-    fn validate(&self) -> Result<(), WorkflowError> {
-        if self.data.is_empty() {
-            return Err(WorkflowError::ValidationError("Empty data set".to_string()));
-        }
-        Ok(())
-    }
-
-    fn get_state(&self) -> &TaskState {
-        &self.state
-    }
-
-    fn set_state(&mut self, state: TaskState) {
-        self.state = state;
-    }
-
-    fn get_id(&self) -> &str {
-        &self.id
-    }
-}
-
-// Conditional task
-#[derive()]
-pub struct ConditionalTask {
-    id: String,
-    state: TaskState,
-    condition: Box<dyn Fn() -> bool>,
-    dependencies: Vec<String>,
-}
-
-impl ConditionalTask {
-    pub fn new(id: String, condition: Box<dyn Fn() -> bool>, dependencies: Vec<String>) -> Self {
-        ConditionalTask {
-            id,
-            state: TaskState::Pending,
-            condition,
-            dependencies,
-        }
-    }
-}
-
-impl Task for ConditionalTask {
-    fn execute(&mut self) -> Result<(), WorkflowError> {
-        println!("Executing conditional task: {}", self.id);
-        Ok(())
-    }
-
-    fn should_execute(&self) -> bool {
-        (self.condition)()
-    }
-
-    fn get_state(&self) -> &TaskState {
-        &self.state
-    }
-
-    fn set_state(&mut self, state: TaskState) {
-        self.state = state;
-    }
-
-    fn get_id(&self) -> &str {
-        &self.id
-    }
-
-    fn get_dependencies(&self) -> Vec<String> {
-        self.dependencies.clone()
-    }
-}
-
-// Enhanced workflow with dependency management
-#[derive()]
+// Core workflow engine that manages task execution
 pub struct Workflow {
     id: String,
-    name: String,
     state: WorkflowState,
-    tasks: Vec<Box<dyn Task>>,
-    completed_tasks: HashSet<String>,
+    tasks: HashMap<String, Box<dyn Task>>,
+    completed: HashSet<String>,
 }
 
 impl Workflow {
-    pub fn new(id: String, name: String) -> Self {
+    pub fn new(id: String) -> Self {
         Workflow {
             id,
-            name,
-            state: WorkflowState::Created,
-            tasks: Vec::new(),
-            completed_tasks: HashSet::new(),
+            state: WorkflowState::New,
+            tasks: HashMap::new(),
+            completed: HashSet::new(),
         }
     }
 
-    pub fn add_task(&mut self, task: Box<dyn Task>) {
-        self.tasks.push(task);
-    }
+    pub fn add_task(&mut self, task: Box<dyn Task>) -> Result<(), String> {
+        let task_id = task.id().to_string();
 
-    pub fn validate(&self) -> Result<(), WorkflowError> {
-        // Validate individual tasks
-        for task in &self.tasks {
-            task.validate()?;
-        }
+        // Add the task
+        self.tasks.insert(task_id.clone(), task);
 
-        // Check for circular dependencies
-        let mut task_map: HashMap<&str, Vec<String>> = HashMap::new();
-        for task in &self.tasks {
-            task_map.insert(task.get_id(), task.get_dependencies());
-        }
+        // Create temporary dependency map including the new task
+        let dep_map: HashMap<String, Vec<String>> = self.tasks.iter()
+            .map(|(id, task)| (id.clone(), task.dependencies().to_vec()))
+            .collect();
 
-        for task in &self.tasks {
+        // Check for cycles with all current tasks
+        for start_task in dep_map.keys() {
             let mut visited = HashSet::new();
-            let mut stack = Vec::new();
-            if self.has_circular_dependencies(task.get_id(), &task_map, &mut visited, &mut stack) {
-                return Err(WorkflowError::DependencyError(
-                    format!("Circular dependency detected for task {}", task.get_id())
-                ));
+            let mut stack = HashSet::new();
+
+            if self.has_cycle_from_node(start_task, &dep_map, &mut visited, &mut stack) {
+                // Remove the task if it creates a cycle
+                self.tasks.remove(&task_id);
+                return Err(format!("Adding task {} would create a dependency cycle", task_id));
             }
         }
 
         Ok(())
     }
 
-    fn has_circular_dependencies(
+    // Validates all dependencies exist and there are no cycles
+    pub fn validate(&self) -> Result<(), String> {
+        // Check all dependencies exist
+        for (id, task) in &self.tasks {
+            for dep in task.dependencies() {
+                if !self.tasks.contains_key(dep) {
+                    return Err(format!("Task {} depends on missing task {}", id, dep));
+                }
+            }
+        }
+
+        // Check for cycles
+        if self.has_cycles() {
+            return Err("Workflow contains dependency cycles".to_string());
+        }
+
+        Ok(())
+    }
+
+    fn has_cycles(&self) -> bool {
+        let dep_map: HashMap<String, Vec<String>> = self.tasks.iter()
+            .map(|(id, task)| (id.clone(), task.dependencies().to_vec()))
+            .collect();
+
+        // Check each task for cycles
+        for start_task in dep_map.keys() {
+            let mut visited = HashSet::new();
+            let mut stack = HashSet::new();
+
+            if self.has_cycle_from_node(start_task, &dep_map, &mut visited, &mut stack) {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn has_cycle_from_node(
         &self,
-        task_id: &str,
-        task_map: &HashMap<&str, Vec<String>>,
+        node: &str,
+        dep_map: &HashMap<String, Vec<String>>,
         visited: &mut HashSet<String>,
-        stack: &mut Vec<String>
+        stack: &mut HashSet<String>
     ) -> bool {
-        if stack.contains(&task_id.to_string()) {
+        if stack.contains(node) {
             return true;
         }
-        if visited.contains(&task_id.to_string()) {
+        if visited.contains(node) {
             return false;
         }
 
-        visited.insert(task_id.to_string());
-        stack.push(task_id.to_string());
+        visited.insert(node.to_string());
+        stack.insert(node.to_string());
 
-        if let Some(dependencies) = task_map.get(task_id) {
-            for dep in dependencies {
-                if self.has_circular_dependencies(dep, task_map, visited, stack) {
+        if let Some(deps) = dep_map.get(node) {
+            for dep in deps {
+                if self.has_cycle_from_node(dep, dep_map, visited, stack) {
                     return true;
                 }
             }
         }
 
-        stack.pop();
+        stack.remove(node);
         false
     }
 
-    pub fn execute(&mut self) -> Result<(), WorkflowError> {
-        self.validate()?;
-        self.state = WorkflowState::Running;
+    fn would_create_cycle(&self, new_task: &str, new_deps: &[String]) -> bool {
+        // Map to track task -> dependencies for existing tasks plus the new task
+        let mut dep_map: HashMap<String, Vec<String>> = self.tasks.iter()
+            .map(|(id, task)| (id.clone(), task.dependencies().to_vec()))
+            .collect();
 
-        // Track if any tasks were skipped
-        let mut any_skipped = false;
+        // Add the new task's dependencies
+        dep_map.insert(new_task.to_string(), new_deps.to_vec());
 
-        for task in &mut self.tasks {
-            // Check dependencies
-            let deps = task.get_dependencies();
-            let deps_met = deps.iter().all(|dep| self.completed_tasks.contains(dep));
+        // For each task (including the new one), check if it can reach itself
+        for start_task in dep_map.keys() {
+            let mut visited = HashSet::new();
+            let mut stack = vec![start_task.clone()];
 
-            if !deps_met {
-                task.set_state(TaskState::Blocked);
-                self.state = WorkflowState::Failed;
-                return Err(WorkflowError::DependencyError(
-                    format!("Unmet dependencies for task {}", task.get_id())
-                ));
-            }
-
-            // Check if task should execute
-            if !task.should_execute() {
-                task.set_state(TaskState::Skipped);
-                any_skipped = true;
-                continue;
-            }
-
-            task.set_state(TaskState::Running);
-
-            match task.execute() {
-                Ok(_) => {
-                    task.set_state(TaskState::Completed);
-                    self.completed_tasks.insert(task.get_id().to_string());
+            while let Some(current) = stack.pop() {
+                if !visited.insert(current.clone()) {
+                    // If we've seen this task before and it's our start task,
+                    // we've found a cycle
+                    if current == *start_task {
+                        return true;
+                    }
+                    continue;
                 }
-                Err(e) => {
-                    task.set_state(TaskState::Failed);
-                    self.state = WorkflowState::Failed;
-                    return Err(e);
+
+                // Add all dependencies of current task to stack
+                if let Some(deps) = dep_map.get(&current) {
+                    stack.extend(deps.iter().cloned());
                 }
             }
         }
+        false
+    }
 
-        self.state = if any_skipped {
-            WorkflowState::PartiallyCompleted
-        } else {
-            WorkflowState::Completed
-        };
+    pub fn run(&mut self) -> Result<(), String> {
+        // Validate dependencies before running
+        self.validate()?;
 
+        self.state = WorkflowState::Running;
+
+        // Keep running until all tasks are processed or failure
+        while !self.tasks.is_empty() {
+            let available = self.get_available_tasks();
+
+            if available.is_empty() && !self.tasks.is_empty() {
+                self.state = WorkflowState::Failed("Deadlock detected".to_string());
+                return Err("Workflow deadlocked - circular dependency or all tasks blocked".to_string());
+            }
+
+            // Run all available tasks
+            for task_id in available {
+                if let Some(task) = self.tasks.get_mut(&task_id) {
+                    task.set_state(TaskState::Running);
+
+                    match task.run() {
+                        Ok(()) => {
+                            task.set_state(TaskState::Complete);
+                            self.completed.insert(task_id.clone());
+                        }
+                        Err(e) => {
+                            task.set_state(TaskState::Failed(e.clone()));
+                            self.state = WorkflowState::Failed(format!("Task {} failed: {}", task_id, e));
+                            return Err(format!("Workflow failed at task {}: {}", task_id, e));
+                        }
+                    }
+                }
+            }
+
+            // Remove completed tasks
+            self.tasks.retain(|id, _| !self.completed.contains(id));
+        }
+
+        self.state = WorkflowState::Complete;
         Ok(())
+    }
+
+    fn get_available_tasks(&self) -> Vec<String> {
+        self.tasks.iter()
+            .filter(|(id, task)| {
+                matches!(task.state(), TaskState::Ready) &&
+                    task.dependencies().iter().all(|dep| self.completed.contains(dep))
+            })
+            .map(|(id, _)| id.clone())
+            .collect()
+    }
+
+    pub fn state(&self) -> &WorkflowState {
+        &self.state
     }
 }
 
-// Example usage
+// Example of how to extend the system with a custom task
+pub struct FileProcessingTask {
+    task_id: String,
+    state: TaskState,
+    filepath: String,
+    deps: Vec<String>,
+}
+
+impl FileProcessingTask {
+    pub fn new(id: String, filepath: String, dependencies: Vec<String>) -> Self {
+        FileProcessingTask {
+            task_id: id,
+            state: TaskState::Ready,
+            filepath,
+            deps: dependencies,
+        }
+    }
+}
+
+impl Task for FileProcessingTask {
+    fn id(&self) -> &str {
+        &self.task_id
+    }
+
+    fn run(&mut self) -> Result<(), String> {
+        // Example implementation
+        println!("Processing file: {}", self.filepath);
+        // Add actual file processing logic here
+        Ok(())
+    }
+
+    fn state(&self) -> &TaskState {
+        &self.state
+    }
+
+    fn set_state(&mut self, state: TaskState) {
+        self.state = state;
+    }
+
+    fn dependencies(&self) -> &[String] {
+        &self.deps
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct TestTask {
+        id: String,
+        state: TaskState,
+        should_fail: bool,
+    }
+
+    impl TestTask {
+        fn new(id: String, should_fail: bool) -> Self {
+            TestTask {
+                id,
+                state: TaskState::Ready,
+                should_fail,
+            }
+        }
+    }
+
+    impl Task for TestTask {
+        fn id(&self) -> &str {
+            &self.id
+        }
+
+        fn run(&mut self) -> Result<(), String> {
+            if self.should_fail {
+                Err("Task failed".to_string())
+            } else {
+                Ok(())
+            }
+        }
+
+        fn state(&self) -> &TaskState {
+            &self.state
+        }
+
+        fn set_state(&mut self, state: TaskState) {
+            self.state = state;
+        }
+    }
+
+    #[test]
+    fn test_basic_workflow() {
+        let mut workflow = Workflow::new("test".to_string());
+
+        workflow.add_task(Box::new(TestTask::new("task1".to_string(), false))).unwrap();
+        workflow.add_task(Box::new(TestTask::new("task2".to_string(), false))).unwrap();
+
+        assert!(workflow.run().is_ok());
+        assert_eq!(workflow.state(), &WorkflowState::Complete);
+    }
+
+    #[test]
+    fn test_failing_workflow() {
+        let mut workflow = Workflow::new("test".to_string());
+
+        workflow.add_task(Box::new(TestTask::new("task1".to_string(), true))).unwrap();
+
+        assert!(workflow.run().is_err());
+        assert!(matches!(workflow.state(), &WorkflowState::Failed(_)));
+    }
+
+    #[test]
+    fn test_dependency_cycle() {
+        let mut workflow = Workflow::new("test".to_string());
+
+        struct CyclicTask {
+            id: String,
+            state: TaskState,
+            deps: Vec<String>,
+        }
+
+        impl Task for CyclicTask {
+            fn id(&self) -> &str { &self.id }
+            fn run(&mut self) -> Result<(), String> { Ok(()) }
+            fn state(&self) -> &TaskState { &self.state }
+            fn set_state(&mut self, state: TaskState) { self.state = state; }
+            fn dependencies(&self) -> &[String] { &self.deps }
+        }
+
+        workflow.add_task(Box::new(CyclicTask {
+            id: "task1".to_string(),
+            state: TaskState::Ready,
+            deps: vec!["task2".to_string()],
+        })).unwrap();
+
+        assert!(workflow.add_task(Box::new(CyclicTask {
+            id: "task2".to_string(),
+            state: TaskState::Ready,
+            deps: vec!["task1".to_string()],
+        })).is_err());
+    }
+}

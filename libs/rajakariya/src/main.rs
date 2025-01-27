@@ -1,179 +1,205 @@
-/*
- * Copyright 2024-Present, Syigen Ltd. and Syigen Private Limited. All rights reserved.
- * Licensed under the Apache License, Version 2.0 (See LICENSE.md or http://www.apache.org/licenses/LICENSE-2.0).
- *
- */
-use rajakariya::{ConditionalTask, DataProcessingTask, Task, TaskState, Workflow, WorkflowError};
+use std::fs;
+use std::path::Path;
+use rajakariya::{Task, TaskState, Workflow};
 
-// Example usage
-fn main() -> Result<(), WorkflowError> {
-    // Create a complex data processing workflow
-    let mut workflow = Workflow::new(
-        "data_pipeline_001".to_string(),
-        "Complex Data Processing Pipeline".to_string(),
-    );
+// Data validation task
+struct DataValidationTask {
+    id: String,
+    state: TaskState,
+    input_path: String,
+    required_fields: Vec<String>,
+    deps: Vec<String>,
+}
 
-    // Task 1: Initial data validation
-    let validation_task = DataProcessingTask::new(
-        "validate_data".to_string(),
-        vec![10, 20, 30, 40, 50],
-        25, // Threshold for initial validation
-    );
-
-    // Task 2: Data normalization (depends on validation)
-    let normalization_task = DataProcessingTask::new(
-        "normalize_data".to_string(),
-        vec![100, 200, 300, 400, 500],
-        250, // Threshold for normalized data
-    );
-
-    // Task 3: Feature extraction (depends on normalization)
-    let feature_extraction_task = DataProcessingTask::new(
-        "extract_features".to_string(),
-        vec![15, 25, 35, 45, 55],
-        30, // Threshold for feature extraction
-    );
-
-    // Task 4A: Primary analysis (depends on feature extraction)
-    let primary_analysis_task = DataProcessingTask::new(
-        "primary_analysis".to_string(),
-        vec![60, 70, 80, 90, 100],
-        75, // Threshold for primary analysis
-    );
-
-    // Task 4B: Secondary analysis (depends on feature extraction)
-    let secondary_analysis_task = DataProcessingTask::new(
-        "secondary_analysis".to_string(),
-        vec![30, 40, 50, 60, 70],
-        45, // Threshold for secondary analysis
-    );
-
-    // Task 5: Final aggregation (depends on both analyses)
-    let final_aggregation_task = DataProcessingTask::new(
-        "final_aggregation".to_string(),
-        vec![150, 160, 170, 180, 190],
-        165, // Threshold for final aggregation
-    );
-
-    // Conditional task: Quality check (depends on both analyses)
-    let quality_check_task = ConditionalTask::new(
-        "quality_check".to_string(),
-        Box::new(|| {
-            // Simulate some condition based on external factors
-            let quality_threshold = 0.95;
-            let current_quality = 0.97;
-            current_quality >= quality_threshold
-        }),
-        vec![
-            "primary_analysis".to_string(),
-            "secondary_analysis".to_string(),
-        ],
-    );
-
-    // Create dependency chain using a custom implementation
-    struct DependentTask {
-        task: Box<dyn Task>,
-        dependencies: Vec<String>,
-    }
-
-    impl DependentTask {
-        fn new(task: Box<dyn Task>, dependencies: Vec<String>) -> Self {
-            Self { task, dependencies }
+impl DataValidationTask {
+    fn new(id: String, input_path: String, required_fields: Vec<String>) -> Self {
+        Self {
+            id,
+            state: TaskState::Ready,
+            input_path,
+            required_fields,
+            deps: Vec::new(),
         }
     }
+}
 
-    // Define tasks with their dependencies
-    let tasks = vec![
-        DependentTask::new(Box::new(validation_task), vec![]),
-        DependentTask::new(
-            Box::new(normalization_task),
-            vec!["validate_data".to_string()],
-        ),
-        DependentTask::new(
-            Box::new(feature_extraction_task),
-            vec!["normalize_data".to_string()],
-        ),
-        DependentTask::new(
-            Box::new(primary_analysis_task),
-            vec!["extract_features".to_string()],
-        ),
-        DependentTask::new(
-            Box::new(secondary_analysis_task),
-            vec!["extract_features".to_string()],
-        ),
-        DependentTask::new(
-            Box::new(quality_check_task),
-            vec![
-                "primary_analysis".to_string(),
-                "secondary_analysis".to_string(),
-            ],
-        ),
-        DependentTask::new(
-            Box::new(final_aggregation_task),
-            vec![
-                "primary_analysis".to_string(),
-                "secondary_analysis".to_string(),
-                "quality_check".to_string(),
-            ],
-        ),
-    ];
+impl Task for DataValidationTask {
+    fn id(&self) -> &str { &self.id }
 
-    // Add tasks to workflow
-    for dependent_task in tasks {
-        let mut task = dependent_task.task;
+    fn run(&mut self) -> Result<(), String> {
+        println!("🔍 Validating data in: {}", self.input_path);
 
-        // Create a wrapper that implements Task and includes dependencies
-        struct TaskWrapper {
-            inner: Box<dyn Task>,
-            deps: Vec<String>,
+        // Simulate file reading and validation
+        if !Path::new(&self.input_path).exists() {
+            return Err(format!("Input file {} not found", self.input_path));
         }
 
-        impl Task for TaskWrapper {
-            fn execute(&mut self) -> Result<(), WorkflowError> {
-                self.inner.execute()
-            }
+        // Simulate field validation
+        println!("✓ Verified required fields: {:?}", self.required_fields);
+        Ok(())
+    }
 
-            fn validate(&self) -> Result<(), WorkflowError> {
-                self.inner.validate()
-            }
+    fn state(&self) -> &TaskState { &self.state }
+    fn set_state(&mut self, state: TaskState) { self.state = state; }
+    fn dependencies(&self) -> &[String] { &self.deps }
+}
 
-            fn get_state(&self) -> &TaskState {
-                self.inner.get_state()
-            }
+// Data transformation task
+struct DataTransformTask {
+    id: String,
+    state: TaskState,
+    input_path: String,
+    output_path: String,
+    deps: Vec<String>,
+}
 
-            fn set_state(&mut self, state: TaskState) {
-                self.inner.set_state(state)
-            }
+impl DataTransformTask {
+    fn new(id: String, input_path: String, output_path: String, deps: Vec<String>) -> Self {
+        Self {
+            id,
+            state: TaskState::Ready,
+            input_path,
+            output_path,
+            deps,
+        }
+    }
+}
 
-            fn get_id(&self) -> &str {
-                self.inner.get_id()
-            }
+impl Task for DataTransformTask {
+    fn id(&self) -> &str { &self.id }
 
-            fn get_dependencies(&self) -> Vec<String> {
-                self.deps.clone()
-            }
+    fn run(&mut self) -> Result<(), String> {
+        println!("🔄 Transforming data from {} to {}", self.input_path, self.output_path);
 
-            fn should_execute(&self) -> bool {
-                self.inner.should_execute()
+        // Simulate data transformation
+        fs::write(&self.output_path, "transformed data")
+            .map_err(|e| format!("Failed to write output: {}", e))?;
+
+        println!("✓ Data transformed successfully");
+        Ok(())
+    }
+
+    fn state(&self) -> &TaskState { &self.state }
+    fn set_state(&mut self, state: TaskState) { self.state = state; }
+    fn dependencies(&self) -> &[String] { &self.deps }
+}
+
+// Report generation task
+struct ReportTask {
+    id: String,
+    state: TaskState,
+    input_paths: Vec<String>,
+    output_path: String,
+    deps: Vec<String>,
+}
+
+impl ReportTask {
+    fn new(id: String, input_paths: Vec<String>, output_path: String, deps: Vec<String>) -> Self {
+        Self {
+            id,
+            state: TaskState::Ready,
+            input_paths,
+            output_path,
+            deps,
+        }
+    }
+}
+
+impl Task for ReportTask {
+    fn id(&self) -> &str { &self.id }
+
+    fn run(&mut self) -> Result<(), String> {
+        println!("📊 Generating report from {:?}", self.input_paths);
+
+        // Verify all input files exist
+        for path in &self.input_paths {
+            if !Path::new(path).exists() {
+                return Err(format!("Input file {} not found", path));
             }
         }
 
-        workflow.add_task(Box::new(TaskWrapper {
-            inner: task,
-            deps: dependent_task.dependencies,
-        }));
+        // Simulate report generation
+        fs::write(&self.output_path, "report content")
+            .map_err(|e| format!("Failed to write report: {}", e))?;
+
+        println!("✓ Report generated at {}", self.output_path);
+        Ok(())
     }
 
-    // Execute the workflow
-    println!("Starting workflow execution...");
-    match workflow.execute() {
-        Ok(_) => {
-            println!("Workflow completed successfully!");
-            Ok(())
+    fn state(&self) -> &TaskState { &self.state }
+    fn set_state(&mut self, state: TaskState) { self.state = state; }
+    fn dependencies(&self) -> &[String] { &self.deps }
+}
+
+fn main() -> Result<(), String> {
+    // Create temporary paths for our example
+    let input_path = "data.csv";
+    let transformed_path_1 = "transformed_1.csv";
+    let transformed_path_2 = "transformed_2.csv";
+    let report_path = "final_report.pdf";
+
+    // Create a test input file
+    fs::write(input_path, "test data")
+        .map_err(|e| format!("Failed to create test file: {}", e))?;
+
+    // Initialize workflow
+    let mut workflow = Workflow::new("data_processing".to_string());
+
+    // Add validation task
+    let validation_task = DataValidationTask::new(
+        "validate_input".to_string(),
+        input_path.to_string(),
+        vec!["date".to_string(), "value".to_string(), "category".to_string()]
+    );
+    workflow.add_task(Box::new(validation_task))?;
+
+    // Add two parallel transformation tasks
+    let transform_task_1 = DataTransformTask::new(
+        "transform_1".to_string(),
+        input_path.to_string(),
+        transformed_path_1.to_string(),
+        vec!["validate_input".to_string()]
+    );
+    workflow.add_task(Box::new(transform_task_1))?;
+
+    let transform_task_2 = DataTransformTask::new(
+        "transform_2".to_string(),
+        input_path.to_string(),
+        transformed_path_2.to_string(),
+        vec!["validate_input".to_string()]
+    );
+    workflow.add_task(Box::new(transform_task_2))?;
+
+    // Add final report task that depends on both transformations
+    let report_task = ReportTask::new(
+        "generate_report".to_string(),
+        vec![transformed_path_1.to_string(), transformed_path_2.to_string()],
+        report_path.to_string(),
+        vec!["transform_1".to_string(), "transform_2".to_string()]
+    );
+    workflow.add_task(Box::new(report_task))?;
+
+    // Run the workflow
+    println!("Starting workflow execution...\n");
+    match workflow.run() {
+        Ok(()) => {
+            println!("\n✅ Workflow completed successfully!");
+            println!("Final report generated at: {}", report_path);
         }
         Err(e) => {
-            println!("Workflow failed: {}", e);
-            Err(e)
+            println!("\n❌ Workflow failed: {}", e);
+            // Cleanup temporary files
+            for path in [input_path, transformed_path_1, transformed_path_2, report_path] {
+                let _ = fs::remove_file(path);
+            }
+            return Err(e);
         }
     }
+
+    // Cleanup temporary files
+    for path in [input_path, transformed_path_1, transformed_path_2, report_path] {
+        let _ = fs::remove_file(path);
+    }
+
+    Ok(())
 }
