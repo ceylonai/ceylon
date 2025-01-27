@@ -55,6 +55,7 @@ Ceylon pushes the boundaries of what's possible in task automation and AI collab
 ## Contact & License
 
 - Support: [support@ceylon.ai](mailto:support@ceylon.ai)
+- Discord: [https://discord.gg/7u8qahuYMq](https://discord.gg/7u8qahuYMq)
 - License: Apache-2.0 ([LICENSE](LICENSE))
 
 ## Architecture Note

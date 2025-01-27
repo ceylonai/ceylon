@@ -50,9 +50,9 @@ Find more examples and tutorials at [docs.ceylon.ai/tutorials](https://docs.ceyl
 ## Support & License
 
 - Contact: [support@ceylon.ai](mailto:support@ceylon.ai)
+- Discord: [https://discord.gg/7u8qahuYMq](https://discord.gg/7u8qahuYMq)
 - License: Apache-2.0 ([LICENSE](LICENSE))
 
-**Note**: Ceylon implements P2P networking using libp2p Rust implementation, operating independently of blockchain technology.
-
+**Note**: Ceylon implements a pure P2P networking solution using libp2p Rust implementation. While using similar distributed networking principles as BitTorrent, it operates independently of any blockchain technology. The system provides autonomous agent communication through a high-performance P2P network layer.
 ---
 Copyright 2024-Present, Syigen Ltd. and Syigen Private Limited. All rights reserved.
