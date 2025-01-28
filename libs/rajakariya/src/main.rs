@@ -1,148 +1,114 @@
-use rajakariya::prelude::*;
-use std::sync::Arc;
-use std::thread;
+use async_trait::async_trait;
+use rajakariya::prelude::{AsyncGraph, AsyncTask};
+use std::error::Error;
 use std::time::Duration;
 
-mod workflow;
-
-// Define a basic task structure
+// Simulated task that processes data
 #[derive(Debug)]
-struct ProcessingTask {
+struct DataProcessingTask {
     id: String,
-    state: TaskState,
     dependencies: Vec<String>,
     processing_time: Duration,
 }
 
-impl ProcessingTask {
-    fn new(id: &str, processing_time: Duration, dependencies: Vec<String>) -> Self {
-        ProcessingTask {
-            id: id.to_string(),
-            state: TaskState::Ready,
-            dependencies,
-            processing_time,
-        }
-    }
-}
-
-// Implement the Task trait for ProcessingTask
-impl Task for ProcessingTask {
+#[async_trait]
+impl AsyncTask for DataProcessingTask {
     fn id(&self) -> &str {
         &self.id
-    }
-
-    fn run(&mut self) -> Result<(), String> {
-        println!("Starting task: {}", self.id);
-        thread::sleep(self.processing_time);
-        println!("Completed task: {}", self.id);
-        Ok(())
-    }
-
-    fn state(&self) -> &TaskState {
-        &self.state
-    }
-
-    fn set_state(&mut self, state: TaskState) {
-        self.state = state;
     }
 
     fn dependencies(&self) -> &[String] {
         &self.dependencies
     }
+
+    async fn execute(&self) -> Result<(), String> {
+        println!("Starting task: {}", self.id);
+        tokio::time::sleep(self.processing_time).await;
+        println!("Completed task: {}", self.id);
+        Ok(())
+    }
 }
 
-fn main() -> Result<(), String> {
-    // Create a new workflow
-    let mut workflow = ParallelWorkflow::new("data_processing".to_string());
+// Simulated task that makes an HTTP request
+#[derive(Debug)]
+struct APITask {
+    id: String,
+    dependencies: Vec<String>,
+    endpoint: String,
+}
 
-    // Create tasks with dependencies
-    let task1 = ProcessingTask::new("load_data", Duration::from_secs(2), vec![]);
-
-    let task2 = ProcessingTask::new(
-        "validate_data",
-        Duration::from_secs(1),
-        vec!["load_data".to_string()],
-    );
-
-    let task3 = ProcessingTask::new(
-        "process_data",
-        Duration::from_secs(3),
-        vec!["validate_data".to_string()],
-    );
-
-    let task4 = ProcessingTask::new(
-        "generate_report",
-        Duration::from_secs(2),
-        vec!["process_data".to_string()],
-    );
-
-    // Add tasks to workflow
-    workflow.add_task(Box::new(task1))?;
-    workflow.add_task(Box::new(task2))?;
-    workflow.add_task(Box::new(task3))?;
-    workflow.add_task(Box::new(task4))?;
-
-    // Validate the workflow
-    workflow.validate()?;
-
-    // Execute tasks in parallel based on dependencies
-    workflow.set_state(WorkflowState::Running);
-
-    while !workflow.is_empty() {
-        // Get tasks that are ready to run (no dependencies)
-        let ready_tasks = workflow.get_tasks_with_no_dependencies();
-
-        // Create threads for each ready task
-        let mut handles = vec![];
-
-        for task_id in ready_tasks {
-            if let Some(task) = workflow.get_task(&task_id) {
-                let task_clone = Arc::clone(task);
-
-                let handle = thread::spawn(move || {
-                    let mut task = task_clone.lock().unwrap();
-                    task.set_state(TaskState::Running);
-
-                    match task.run() {
-                        Ok(()) => {
-                            task.set_state(TaskState::Complete);
-                            true
-                        }
-                        Err(e) => {
-                            task.set_state(TaskState::Failed(e));
-                            false
-                        }
-                    }
-                });
-
-                handles.push((task_id, handle));
-            }
-        }
-
-        // Wait for all spawned tasks to complete
-        for (task_id, handle) in handles {
-            match handle.join() {
-                Ok(success) => {
-                    if success {
-                        workflow.mark_completed(task_id);
-                    } else {
-                        workflow
-                            .set_state(WorkflowState::Failed(format!("Task {} failed", task_id)));
-                        return Err(format!("Workflow failed at task {}", task_id));
-                    }
-                }
-                Err(_) => {
-                    workflow.set_state(WorkflowState::Failed("Thread panic occurred".to_string()));
-                    return Err("Thread panic occurred".to_string());
-                }
-            }
-        }
-
-        // Clean up completed tasks and update the dependency graph
-        workflow.cleanup_completed_tasks();
+#[async_trait]
+impl AsyncTask for APITask {
+    fn id(&self) -> &str {
+        &self.id
     }
 
-    workflow.set_state(WorkflowState::Complete);
-    println!("Workflow completed successfully!");
+    fn dependencies(&self) -> &[String] {
+        &self.dependencies
+    }
+
+    async fn execute(&self) -> Result<(), String> {
+        println!("Making API call to {} for task {}", self.endpoint, self.id);
+        // Simulate API call with random delay
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        println!("API call completed for task {}", self.id);
+        Ok(())
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    // Create a new graph
+    let mut graph = AsyncGraph::new();
+
+    // Add initial data loading tasks (no dependencies)
+    graph.add_task(Box::new(DataProcessingTask {
+        id: "load_user_data".to_string(),
+        dependencies: vec![],
+        processing_time: Duration::from_millis(1000),
+    }))?;
+
+    graph.add_task(Box::new(DataProcessingTask {
+        id: "load_product_data".to_string(),
+        dependencies: vec![],
+        processing_time: Duration::from_millis(800),
+    }))?;
+
+    // Add API tasks that depend on data loading
+    graph.add_task(Box::new(APITask {
+        id: "fetch_user_preferences".to_string(),
+        dependencies: vec!["load_user_data".to_string()],
+        endpoint: "api/preferences".to_string(),
+    }))?;
+
+    graph.add_task(Box::new(APITask {
+        id: "fetch_product_inventory".to_string(),
+        dependencies: vec!["load_product_data".to_string()],
+        endpoint: "api/inventory".to_string(),
+    }))?;
+
+    // Add final processing task that depends on all previous tasks
+    graph.add_task(Box::new(DataProcessingTask {
+        id: "generate_recommendations".to_string(),
+        dependencies: vec![
+            "fetch_user_preferences".to_string(),
+            "fetch_product_inventory".to_string(),
+        ],
+        processing_time: Duration::from_millis(1500),
+    }))?;
+
+    // Execute the graph
+    println!("Starting task execution...");
+    match graph.execute().await {
+        Ok(()) => {
+            println!("All tasks completed successfully!");
+            println!("Graph status: {:?}", graph.status());
+        }
+        Err(e) => {
+            println!("Error executing tasks: {}", e);
+            println!("Graph status: {:?}", graph.status());
+        }
+    }
+
     Ok(())
 }

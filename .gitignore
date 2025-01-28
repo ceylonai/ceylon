@@ -4,6 +4,7 @@ target
 .env
 !.env.sample
 /bindings/ceylon/ceylon/ceylon/
+/bindings/python/ceylon-workflow/honeybadger/honeybadger
 /bindings/ceylon/tests/data/*
 !/bindings/ceylon/tests/data/.no
 

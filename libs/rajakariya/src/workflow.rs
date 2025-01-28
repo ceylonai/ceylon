@@ -1,178 +1,241 @@
 use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, Mutex};
+use std::fmt::Debug;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use async_trait::async_trait;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum TaskState {
-    Ready,
+pub enum TaskStatus {
+    Pending,
     Running,
-    Complete,
+    Completed,
     Failed(String),
     Skipped,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum WorkflowState {
+pub enum GraphStatus {
     New,
     Running,
-    Complete,
+    Completed,
     Failed(String),
 }
 
-pub trait Task: Send + Sync {
+#[async_trait]
+pub trait AsyncTask: Send + Sync + Debug {
     fn id(&self) -> &str;
-    fn run(&mut self) -> Result<(), String>;
-    fn state(&self) -> &TaskState;
-    fn set_state(&mut self, state: TaskState);
-    fn dependencies(&self) -> &[String] {
-        &[]
+    fn dependencies(&self) -> &[String] { &[] }
+    async fn execute(&self) -> Result<(), String>;
+}
+
+#[derive(Debug)]
+pub struct TaskNode {
+    task: Box<dyn AsyncTask>,
+    status: TaskStatus,
+}
+
+impl TaskNode {
+    pub fn new(task: Box<dyn AsyncTask>) -> Self {
+        Self {
+            task,
+            status: TaskStatus::Pending,
+        }
     }
 }
 
-#[derive(Default)]
-struct DependencyGraph {
+pub struct AsyncGraph {
+    nodes: HashMap<String, Arc<Mutex<TaskNode>>>,
     dependencies: HashMap<String, Vec<String>>,
-    reverse_dependencies: HashMap<String, Vec<String>>,
+    reverse_deps: HashMap<String, Vec<String>>,
+    status: GraphStatus,
 }
 
-impl DependencyGraph {
-    fn new() -> Self {
-        Self::default()
+impl AsyncGraph {
+    pub fn new() -> Self {
+        Self {
+            nodes: HashMap::new(),
+            dependencies: HashMap::new(),
+            reverse_deps: HashMap::new(),
+            status: GraphStatus::New,
+        }
     }
 
-    fn add_task(&mut self, task_id: String, dependencies: &[String]) {
-        self.dependencies
-            .insert(task_id.clone(), dependencies.to_vec());
-        for dep in dependencies {
-            self.reverse_dependencies
-                .entry(dep.clone())
+    pub fn add_task(&mut self, task: Box<dyn AsyncTask>) -> Result<(), String> {
+        let task_id = task.id().to_string();
+        let deps = task.dependencies().to_vec();
+
+        // Check for cycles
+        if self.would_create_cycle(&task_id, &deps) {
+            return Err(format!("Adding task {} would create a cycle", task_id));
+        }
+
+        // Add dependencies
+        self.dependencies.insert(task_id.clone(), deps.clone());
+        for dep in deps {
+            self.reverse_deps
+                .entry(dep)
                 .or_default()
                 .push(task_id.clone());
         }
+
+        // Add task node
+        self.nodes.insert(task_id, Arc::new(Mutex::new(TaskNode::new(task))));
+        Ok(())
     }
 
-    fn get_tasks_with_no_dependencies(&self) -> Vec<String> {
-        self.dependencies
-            .iter()
-            .filter(|(_, deps)| deps.is_empty())
-            .map(|(task_id, _)| task_id.clone())
+    pub async fn execute(&mut self) -> Result<(), String> {
+        self.status = GraphStatus::Running;
+
+        let mut completed = HashSet::new();
+
+        while completed.len() < self.nodes.len() {
+            let ready_tasks = self.get_ready_tasks(&completed);
+            if ready_tasks.is_empty() && completed.len() < self.nodes.len() {
+                self.status = GraphStatus::Failed("Deadlock detected".to_string());
+                return Err("Deadlock detected".to_string());
+            }
+
+            let mut handles = Vec::new();
+
+            for task_id in ready_tasks {
+                let node = Arc::clone(self.nodes.get(&task_id).unwrap());
+                let task_id = task_id.clone();
+
+                handles.push(tokio::spawn(async move {
+                    let mut node = node.lock().await;
+                    node.status = TaskStatus::Running;
+
+                    match node.task.execute().await {
+                        Ok(()) => {
+                            node.status = TaskStatus::Completed;
+                            Ok(task_id)
+                        }
+                        Err(e) => {
+                            node.status = TaskStatus::Failed(e.clone());
+                            Err(e)
+                        }
+                    }
+                }));
+            }
+
+            for handle in handles {
+                match handle.await {
+                    Ok(Ok(task_id)) => {
+                        completed.insert(task_id);
+                    }
+                    Ok(Err(e)) => {
+                        self.status = GraphStatus::Failed(e.clone());
+                        return Err(e);
+                    }
+                    Err(e) => {
+                        self.status = GraphStatus::Failed(e.to_string());
+                        return Err(e.to_string());
+                    }
+                }
+            }
+        }
+
+        self.status = GraphStatus::Completed;
+        Ok(())
+    }
+
+    fn get_ready_tasks(&self, completed: &HashSet<String>) -> Vec<String> {
+        self.nodes
+            .keys()
+            .filter(|task_id| {
+                !completed.contains(*task_id) &&
+                    self.dependencies
+                        .get(*task_id)
+                        .map(|deps| deps.iter().all(|dep| completed.contains(dep)))
+                        .unwrap_or(true)
+            })
+            .cloned()
             .collect()
     }
 
-    fn remove_task(&mut self, task_id: &str) {
-        self.dependencies.remove(task_id);
-        for deps in self.dependencies.values_mut() {
-            deps.retain(|dep| dep != task_id);
-        }
-        self.reverse_dependencies.remove(task_id);
-    }
-}
-
-pub struct ParallelWorkflow {
-    id: String,
-    state: WorkflowState,
-    tasks: HashMap<String, Arc<Mutex<Box<dyn Task>>>>,
-    completed: HashSet<String>,
-    dependency_graph: DependencyGraph,
-}
-
-impl ParallelWorkflow {
-    pub fn new(id: String) -> Self {
-        ParallelWorkflow {
-            id,
-            state: WorkflowState::New,
-            tasks: HashMap::new(),
-            completed: HashSet::new(),
-            dependency_graph: DependencyGraph::new(),
-        }
-    }
-
-    pub fn add_task(&mut self, task: Box<dyn Task>) -> Result<(), String> {
-        let task_id = task.id().to_string();
-        let dependencies = task.dependencies().to_vec();
-
-        if self.would_create_cycle(&task_id, &dependencies) {
-            return Err(format!(
-                "Adding task {} would create a dependency cycle",
-                task_id
-            ));
-        }
-
-        self.dependency_graph
-            .add_task(task_id.clone(), &dependencies);
-        self.tasks.insert(task_id, Arc::new(Mutex::new(task)));
-        Ok(())
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.tasks.is_empty()
-    }
-
-    pub fn get_task(&self, task_id: &str) -> Option<&Arc<Mutex<Box<dyn Task>>>> {
-        self.tasks.get(task_id)
-    }
-
-    pub fn get_tasks_with_no_dependencies(&self) -> Vec<String> {
-        self.dependency_graph.get_tasks_with_no_dependencies()
-    }
-
-    pub fn mark_completed(&mut self, task_id: String) {
-        self.completed.insert(task_id);
-    }
-
-    pub fn set_state(&mut self, state: WorkflowState) {
-        self.state = state;
-    }
-
-    pub fn state(&self) -> &WorkflowState {
-        &self.state
-    }
-
-    pub fn cleanup_completed_tasks(&mut self) {
-        for completed_task in &self.completed {
-            self.dependency_graph.remove_task(completed_task);
-            self.tasks.remove(completed_task);
-        }
-        self.completed.clear();
-    }
-
-    pub fn validate(&self) -> Result<(), String> {
-        for (id, task) in &self.tasks {
-            for dep in task.lock().unwrap().dependencies() {
-                if !self.tasks.contains_key(dep) {
-                    return Err(format!("Task {} depends on missing task {}", id, dep));
-                }
-            }
-        }
-        Ok(())
-    }
-
     fn would_create_cycle(&self, new_task: &str, new_deps: &[String]) -> bool {
-        let mut dep_map: HashMap<String, Vec<String>> = self
-            .tasks
-            .iter()
-            .map(|(id, task)| (id.clone(), task.lock().unwrap().dependencies().to_vec()))
-            .collect();
-
+        let mut dep_map = self.dependencies.clone();
         dep_map.insert(new_task.to_string(), new_deps.to_vec());
 
-        for start_task in dep_map.keys() {
-            let mut visited = HashSet::new();
-            let mut stack = vec![start_task.clone()];
+        let mut visited = HashSet::new();
+        let mut stack = vec![new_task.to_string()];
 
-            while let Some(current) = stack.pop() {
-                if !visited.insert(current.clone()) {
-                    if current == *start_task {
-                        return true;
-                    }
-                    continue;
-                }
+        while let Some(current) = stack.pop() {
+            if !visited.insert(current.clone()) {
+                return true;
+            }
 
-                if let Some(deps) = dep_map.get(&current) {
-                    stack.extend(deps.iter().cloned());
-                }
+            if let Some(deps) = dep_map.get(&current) {
+                stack.extend(deps.iter().cloned());
             }
         }
+
         false
+    }
+
+    pub fn status(&self) -> &GraphStatus {
+        &self.status
+    }
+
+    pub async fn get_task_status(&self, task_id: &str) -> Option<TaskStatus> {
+        self.nodes.get(task_id).map(|node| {
+            node.try_lock()
+                .map(|node| node.status.clone())
+                .unwrap_or(TaskStatus::Running)
+        })
     }
 }
 
+// Example implementation
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[derive(Debug)]
+    struct TestTask {
+        id: String,
+        deps: Vec<String>,
+        delay: Duration,
+    }
+
+    #[async_trait]
+    impl AsyncTask for TestTask {
+        fn id(&self) -> &str {
+            &self.id
+        }
+
+        fn dependencies(&self) -> &[String] {
+            &self.deps
+        }
+
+        async fn execute(&self) -> Result<(), String> {
+            tokio::time::sleep(self.delay).await;
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn test_graph_execution() {
+        let mut graph = AsyncGraph::new();
+
+        // Add tasks with dependencies
+        graph.add_task(Box::new(TestTask {
+            id: "task1".to_string(),
+            deps: vec![],
+            delay: Duration::from_millis(100),
+        })).unwrap();
+
+        graph.add_task(Box::new(TestTask {
+            id: "task2".to_string(),
+            deps: vec!["task1".to_string()],
+            delay: Duration::from_millis(50),
+        })).unwrap();
+
+        // Execute graph
+        graph.execute().await.unwrap();
+        assert_eq!(*graph.status(), GraphStatus::Completed);
+    }
+}
