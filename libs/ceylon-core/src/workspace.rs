@@ -7,6 +7,7 @@
 mod agent;
 mod message;
 mod uniffied_agent;
+mod workflow;
 
 pub use agent::{AgentDetail, EventHandler, MessageHandler, Processor};
 
