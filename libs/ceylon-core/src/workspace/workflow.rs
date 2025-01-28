@@ -46,6 +46,12 @@ pub struct TaskManager {
     agent_details: Arc<RwLock<HashMap<String, AgentDetail>>>,
 }
 
+impl Default for TaskManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TaskManager {
     pub fn new() -> Self {
         TaskManager {
@@ -61,9 +67,9 @@ impl TaskManager {
         task_id
     }
 
-    pub async fn assign_task(&self, task_id: &str, agent_id: &str) -> bool {
+    pub async fn assign_task(&self, task_id: String, agent_id: String) -> bool {
         let mut tasks = self.tasks.write().await;
-        if let Some(task) = tasks.get_mut(task_id) {
+        if let Some(task) = tasks.get_mut(task_id.as_str()) {
             if task.status == TaskStatus::Pending {
                 task.status = TaskStatus::InProgress;
                 task.assigned_to = Some(agent_id.to_string());
@@ -73,9 +79,9 @@ impl TaskManager {
         false
     }
 
-    pub async fn complete_task(&self, task_id: &str, result: Vec<u8>) -> bool {
+    pub async fn complete_task(&self, task_id: String, result: Vec<u8>) -> bool {
         let mut tasks = self.tasks.write().await;
-        if let Some(task) = tasks.get_mut(task_id) {
+        if let Some(task) = tasks.get_mut(task_id.as_str()) {
             task.status = TaskStatus::Completed;
             task.result = Some(result);
             return true;
@@ -114,7 +120,7 @@ impl MessageHandler for TaskMessageHandler {
                 }
             }
             TaskMessage::Complete { task_id, result } => {
-                self.task_manager.complete_task(&task_id, result).await;
+                self.task_manager.complete_task(task_id, result).await;
             }
         }
     }
@@ -133,7 +139,7 @@ impl Processor for TaskProcessor {
         for task in pending_tasks {
             // Process task logic here
             let result = vec![]; // Replace with actual processing
-            self.task_manager.complete_task(&task.id, result).await;
+            self.task_manager.complete_task(task.id, result).await;
         }
     }
 }
@@ -196,7 +202,7 @@ mod tests {
 
             // Test task completion
             let result = "completed result".as_bytes().to_vec();
-            let completed = task_manager.complete_task(&task_id, result.clone()).await;
+            let completed = task_manager.complete_task(task_id.clone(), result.clone()).await;
             assert!(completed);
 
             let tasks = task_manager.tasks.read().await;
@@ -297,7 +303,7 @@ mod tests {
             assert_eq!(task.status, TaskStatus::InProgress);
 
             // Test completion
-            let completed = task_manager.complete_task(&task_id, vec![1, 2, 3]).await;
+            let completed = task_manager.complete_task(task_id.clone(), vec![1, 2, 3]).await;
             assert!(completed);
 
             let tasks = task_manager.tasks.read().await;
@@ -327,7 +333,7 @@ mod tests {
 
             // Change status of some tasks
             task_manager.assign_task("in_progress", "agent1").await;
-            task_manager.complete_task("completed", vec![]).await;
+            task_manager.complete_task("completed".to_string(), vec![]).await;
 
             // Get pending tasks
             let pending_tasks = task_manager.get_pending_tasks().await;

@@ -11,4 +11,9 @@ mod workflow;
 
 pub use agent::{AgentDetail, EventHandler, MessageHandler, Processor};
 
+pub use workflow::{
+    create_task, Task, TaskEventHandler, TaskManager, TaskMessage, TaskMessageHandler,
+    TaskProcessor, TaskStatus,
+};
+
 pub use uniffied_agent::{UnifiedAgent, UnifiedAgentConfig};

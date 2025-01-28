@@ -4,7 +4,7 @@
 
 from .ceylon import version
 from .ceylon import AgentDetail, MessageHandler, \
-    EventHandler, Processor, UnifiedAgent, UnifiedAgentConfig, PeerMode
+    EventHandler, Processor, UnifiedAgent, UnifiedAgentConfig, PeerMode, TaskManager, Task, TaskStatus
 from .ceylon import enable_log
 from .base.agents import Admin, Worker
 from .base.uni_agent import BaseAgent

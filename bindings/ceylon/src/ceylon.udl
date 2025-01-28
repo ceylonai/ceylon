@@ -67,3 +67,35 @@ interface UnifiedAgent{
     sequence<AgentDetail> get_connected_agents();
 
 };
+
+enum TaskStatus {
+    "Pending",
+    "InProgress",
+    "Completed",
+    "Failed"
+};
+
+// Dictionary definitions
+dictionary Task {
+    string id;
+    bytes data;
+    TaskStatus status;
+    string? assigned_to;
+    bytes? result;
+};
+
+interface TaskManager {
+    constructor();
+
+    [Async]
+    string submit_task(Task task);
+
+    [Async]
+    boolean assign_task(string task_id, string agent_id);
+
+    [Async]
+    boolean complete_task(string task_id, bytes result);
+
+    [Async]
+    sequence<Task> get_pending_tasks();
+};

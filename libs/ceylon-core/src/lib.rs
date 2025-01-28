@@ -8,12 +8,8 @@ mod utils;
 mod workspace;
 
 pub use workspace::{
-    Processor,
-    MessageHandler,
-    EventHandler,
-    AgentDetail,
-    UnifiedAgentConfig,
-    UnifiedAgent
+    AgentDetail, EventHandler, MessageHandler, Processor, Task, TaskEventHandler, TaskManager,
+    TaskMessage, TaskMessageHandler, TaskProcessor, UnifiedAgent, UnifiedAgentConfig,TaskStatus
 };
 
 pub use sangedama::peer::PeerMode;
