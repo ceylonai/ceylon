@@ -148,6 +148,7 @@ async fn test_unified_agent_communication() {
         admin_message_handler.clone(),
         admin_processor.clone(),
         admin_event_handler.clone(),
+        None
     );
 
     let admin_id = admin_agent.details().id.clone();
@@ -182,6 +183,7 @@ async fn test_unified_agent_communication() {
         worker_message_handler.clone(),
         worker_processor.clone(),
         worker_event_handler.clone(),
+        None
     );
 
     let worker_handle = tokio::spawn(async move {

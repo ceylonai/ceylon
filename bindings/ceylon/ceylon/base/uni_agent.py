@@ -13,6 +13,15 @@ from ceylon.ceylon import UnifiedAgent, PeerMode, UnifiedAgentConfig
 from ceylon.ceylon.ceylon import uniffi_set_event_loop
 
 
+class BaseAgentData(AgentDetail):
+
+    @property
+    def get_extra_data(self):
+        if self.extra_data is None:
+            return None
+        return pickle.dumps(self.extra_data)
+
+
 class BaseAgent(UnifiedAgent, MessageHandler, EventHandler, Processor, AgentCommon):
     """
     Extended UnifiedAgent with additional functionality and built-in message/event handling.
@@ -29,7 +38,8 @@ class BaseAgent(UnifiedAgent, MessageHandler, EventHandler, Processor, AgentComm
             admin_ip: Optional[str] = None,
             workspace_id: str = "default",
             buffer_size: int = 1024,
-            config_path: Optional[str] = None
+            config_path: Optional[str] = None,
+            extra_data: Optional[bytes] = None
     ):
         # Create configuration
         config = UnifiedAgentConfig(
@@ -49,7 +59,8 @@ class BaseAgent(UnifiedAgent, MessageHandler, EventHandler, Processor, AgentComm
             config_path=config_path,
             processor=self,
             on_message=self,
-            on_event=self
+            on_event=self,
+            extra_data=extra_data
         )
         AgentCommon.__init__(self)
         # super(AgentCommon, self).__init__()
@@ -107,10 +118,10 @@ class BaseAgent(UnifiedAgent, MessageHandler, EventHandler, Processor, AgentComm
         """Get agent details by ID"""
         return self.connected_agents.get(agent_id)
 
-    async def on_message(self, agent: "AgentDetail", data: "bytes", time: "int"):
+    async def on_message(self, agent: BaseAgentData, data: "bytes", time: "int"):
         await self.common_on_message(agent, data, time)
 
-    async def on_agent_connected(self, topic: "str", agent: "AgentDetail"):
+    async def on_agent_connected(self, topic: "str", agent: BaseAgentData):
         await self.common_on_agent_connected(topic, agent)
 
     async def run(self, inputs: "bytes"):

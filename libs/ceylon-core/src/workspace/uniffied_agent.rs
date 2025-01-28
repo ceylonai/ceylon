@@ -132,6 +132,8 @@ pub struct UnifiedAgent {
     _connected_agents: Arc<RwLock<HashMap<String, AgentDetail>>>,
 
     _cancel_token: CancellationToken,
+
+    _extra_data: Option<Vec<u8>>,
 }
 
 impl UnifiedAgent {
@@ -141,6 +143,7 @@ impl UnifiedAgent {
         on_message: Arc<dyn MessageHandler>,
         processor: Arc<dyn Processor>,
         on_event: Arc<dyn EventHandler>,
+        extra_data: Option<Vec<u8>>,
     ) -> Self {
         let (broadcast_emitter, broadcast_receiver) = mpsc::channel(
             config
@@ -191,6 +194,8 @@ impl UnifiedAgent {
             _connected_agents: Arc::new(RwLock::new(HashMap::new())),
 
             _cancel_token: CancellationToken::new(),
+
+            _extra_data: extra_data,
         }
     }
 
@@ -229,6 +234,7 @@ impl UnifiedAgent {
             name: self._config.name.clone(),
             id: self._peer_id.clone(),
             role: self._config.role.clone().unwrap_or("".to_string()),
+            extra_data: self._extra_data.clone(),
         }
     }
 
@@ -446,7 +452,8 @@ impl UnifiedAgent {
                                             let _ag = AgentDetail{
                                                 name,
                                                 id,
-                                                role
+                                                role,
+                                                extra_data: None,
                                             };
                                             worker_details.write().await.insert(id_key, _ag.clone());
                                             let agent_intro_message = AgentMessage::create_registration_ack_message(

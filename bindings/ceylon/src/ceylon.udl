@@ -9,6 +9,7 @@ dictionary AgentDetail{
     string name;
     string id;
     string role;
+    bytes? extra_data;
 };
 
 // Handle Agents behaviours
@@ -47,7 +48,8 @@ dictionary UnifiedAgentConfig {
 };
 
 interface UnifiedAgent{
-    constructor(UnifiedAgentConfig? config,string? config_path,MessageHandler on_message, Processor processor, EventHandler on_event);
+    constructor(UnifiedAgentConfig? config,string? config_path,MessageHandler on_message, Processor processor, EventHandler on_event,
+    bytes? extra_data);
     
     [Async]
     void start(bytes inputs, sequence<UnifiedAgent>? workers);

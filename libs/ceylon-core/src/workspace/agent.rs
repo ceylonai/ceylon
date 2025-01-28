@@ -13,6 +13,7 @@ pub struct AgentDetail {
     pub name: String,
     pub id: String,
     pub role: String,
+    pub extra_data: Option<Vec<u8>>,
 }
 
 #[async_trait::async_trait]
