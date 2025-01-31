@@ -31,9 +31,7 @@ async def main():
     workers = [agent1, agent2]
     async with playground.play(workers=workers) as active_playground:
         pl: PlayGround = active_playground
-        while True:
-            await pl.broadcast_message({"type": "worker_status", "name": agent1.details().name, "messages_received": 1})
-            await asyncio.sleep(1)
+        await pl.broadcast_message({"type": "worker_status", "name": agent1.details().name, "messages_received": 1})
 
 
 if __name__ == "__main__":

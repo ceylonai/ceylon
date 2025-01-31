@@ -19,6 +19,11 @@ class PlayGround(Admin):
         super().__init__(name=name, port=port, role="playground")
         self.llm_agents: Dict[str, AgentConnectedStatus] = {}
         self._connected_event = None
+        self._stop_event = None
+
+    async def finish(self) -> None:
+        if self._stop_event:
+            self._stop_event.set()
 
     @on_connect("*")
     async def on_llm_agent_connected(self, topic: str, agent: AgentDetail):
@@ -41,6 +46,7 @@ class PlayGround(Admin):
 
         # Initialize connection event
         self._connected_event = Event()
+        self._stop_event = Event()
 
         # Initialize agent statuses
         if workers:
@@ -59,5 +65,7 @@ class PlayGround(Admin):
 
         finally:
             # Cleanup
+            await self._stop_event.wait()
             self._connected_event = None
+            self._stop_event = None
             await self.stop()
