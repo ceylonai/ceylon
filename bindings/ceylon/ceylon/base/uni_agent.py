@@ -19,7 +19,7 @@ class BaseAgentData(AgentDetail):
     def get_extra_data(self):
         if self.extra_data is None:
             return None
-        return pickle.dumps(self.extra_data)
+        return pickle.loads(self.extra_data)
 
 
 class BaseAgent(UnifiedAgent, MessageHandler, EventHandler, Processor, AgentCommon):
@@ -39,7 +39,7 @@ class BaseAgent(UnifiedAgent, MessageHandler, EventHandler, Processor, AgentComm
             workspace_id: str = "default",
             buffer_size: int = 1024,
             config_path: Optional[str] = None,
-            extra_data: Optional[bytes] = None
+            extra_data: Optional[Any] = None
     ):
         # Create configuration
         config = UnifiedAgentConfig(
@@ -53,6 +53,10 @@ class BaseAgent(UnifiedAgent, MessageHandler, EventHandler, Processor, AgentComm
             admin_ip=admin_ip
         )
 
+        _extra_data = None
+        if extra_data is not None:
+            _extra_data = pickle.dumps(extra_data)
+
         # Initialize UnifiedAgent with self as handlers
         super().__init__(
             config=config,
@@ -60,7 +64,7 @@ class BaseAgent(UnifiedAgent, MessageHandler, EventHandler, Processor, AgentComm
             processor=self,
             on_message=self,
             on_event=self,
-            extra_data=extra_data
+            extra_data=_extra_data
         )
         AgentCommon.__init__(self)
         # super(AgentCommon, self).__init__()
