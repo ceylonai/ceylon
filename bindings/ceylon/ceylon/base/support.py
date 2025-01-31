@@ -3,6 +3,7 @@
 import asyncio
 import inspect
 import pickle
+import traceback
 from typing import Dict, Callable, Optional, Any
 from loguru import logger
 
@@ -124,6 +125,7 @@ class AgentCommon:
 
             await asyncio.gather(*tasks)
         except Exception as e:
+            traceback.print_exc()
             logger.error(f"Error processing message: {e}")
 
     async def common_on_agent_connected(self, topic: str, agent: AgentDetail):

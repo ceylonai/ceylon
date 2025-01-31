@@ -382,7 +382,8 @@ class PlayGround(BasePlayGround):
                 group = self.task_groups[task.group_id]
                 if self.check_group_completion(group):
                     group.status = TaskStatus.COMPLETED
-                    self.active_groups.remove(group.id)
+                    if group.id in self.active_groups:
+                        self.active_groups.remove(group.id)
                     self.completed_groups.add(group.id)
                     print(f"\nTask Group '{group.name}' completed!")
                     await self.print_group_statistics(group)
@@ -443,6 +444,7 @@ class PlayGround(BasePlayGround):
             if not group.depends_on:
                 self.active_groups.add(group.task_id)
                 await self.assign_group_tasks(group)
+
 
 def all_groups_completed(task_groups: Dict[str, TaskGroup],
                          completed_tasks: Dict[str, TaskMessage]) -> bool:

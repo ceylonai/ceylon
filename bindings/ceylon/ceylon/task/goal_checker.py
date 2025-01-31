@@ -1,29 +1,9 @@
 #  Copyright 2024-Present, Syigen Ltd. and Syigen Private Limited. All rights reserved.
 #  Licensed under the Apache License, Version 2.0 (See LICENSE.md or http://www.apache.org/licenses/LICENSE-2.0).
 #
-from dataclasses import dataclass
 from typing import Callable, List, Dict, Optional
-from enum import Enum
 
-from ceylon.task.data import TaskGroup, TaskMessage, TaskStatus
-
-
-class GoalStatus(Enum):
-    NOT_STARTED = "not_started"
-    IN_PROGRESS = "in_progress"
-    ACHIEVED = "achieved"
-    FAILED = "failed"
-
-
-@dataclass
-class TaskGroupGoal:
-    name: str
-    description: str
-    check_condition: Callable[[Dict[str, TaskGroup], Dict[str, TaskMessage]], bool]
-    success_message: str
-    failure_message: str
-    status: GoalStatus = GoalStatus.NOT_STARTED
-    dependent_groups: List[str] = None  # List of group IDs this goal depends on
+from ceylon.task.data import TaskGroup, TaskMessage, TaskStatus, TaskGroupGoal, GoalStatus
 
 
 class GoalChecker:
