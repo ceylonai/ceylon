@@ -4,68 +4,14 @@
 import asyncio
 import uuid
 from collections import defaultdict
-from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import List, Optional, Dict, Set
+from typing import List, Optional, Dict, Set, Callable
 
 from ceylon import on, on_connect
 from ceylon.base.playground import BasePlayGround
 from ceylon.llm.agent import LLMAgent
-
-
-class TaskStatus(Enum):
-    PENDING = "pending"
-    IN_PROGRESS = "in_progress"
-    COMPLETED = "completed"
-    FAILED = "failed"
-
-
-@dataclass
-class TaskMessage:
-    task_id: str
-    name: str
-    description: str
-    duration: float
-    required_role: str
-    parent_id: Optional[str] = None
-    group_id: Optional[str] = None  # Reference to TaskGroup
-    subtask_ids: Set[str] = field(default_factory=set)
-    assigned_to: Optional[str] = None
-    completed: bool = False
-    start_time: Optional[float] = None
-    end_time: Optional[float] = None
-    max_concurrent: int = 3
-    status: TaskStatus = TaskStatus.PENDING
-
-
-@dataclass
-class TaskGroup:
-    task_id: str
-    name: str
-    description: str
-    subtasks: List[TaskMessage]
-    dependencies: Dict[str, List[str]] = field(default_factory=dict)
-    depends_on: List[str] = field(default_factory=list)  # IDs of groups this group depends on
-    required_by: List[str] = field(default_factory=list)  # IDs of groups that depend on this group
-    status: TaskStatus = TaskStatus.PENDING
-    priority: int = 1
-
-
-@dataclass
-class TaskRequest:
-    requester: str
-    role: str
-    task_type: str
-    priority: int = 1
-
-
-@dataclass
-class TaskStatusUpdate:
-    task_id: str
-    status: TaskStatus
-    message: Optional[str] = None
-    group_id: Optional[str] = None
+from ceylon.task.data import TaskMessage, TaskRequest, TaskStatusUpdate, TaskGroup, TaskStatus
+from ceylon.task.goal_checker import PlayGroundExtension, TaskGroupGoal
 
 
 class TaskWorkerAgent(LLMAgent):
@@ -156,6 +102,7 @@ class TaskWorkerAgent(LLMAgent):
 class PlayGround(BasePlayGround):
     def __init__(self, name="task_manager", port=8888):
         super().__init__(name=name, port=port)
+        # Existing initialization code...
         self.tasks: Dict[str, TaskMessage] = {}
         self.completed_tasks: Dict[str, TaskMessage] = {}
         self.task_groups: Dict[str, TaskGroup] = {}
@@ -164,6 +111,48 @@ class PlayGround(BasePlayGround):
         self.workers_by_role: Dict[str, List[str]] = defaultdict(list)
         self.worker_task_counts: Dict[str, int] = defaultdict(int)
         self.task_templates = self._create_task_templates()
+
+        # Add goal checking extension
+        self.goal_extension = PlayGroundExtension(self)
+
+    async def add_goal(self, goal_id: str, goal: TaskGroupGoal):
+        """Add a new goal to the system"""
+        self.goal_extension.add_task_goal(goal_id, goal)
+
+    async def check_goals(self):
+        """Check if any final goals have been achieved"""
+        return await self.goal_extension.check_task_goals()
+
+    @on(TaskMessage)
+    async def handle_task_completion(self, task: TaskMessage, time: int):
+        if task.completed and task.task_id in self.tasks:
+            self.completed_tasks[task.task_id] = task
+            self.worker_task_counts[task.assigned_to] -= 1
+
+            # Update task group status
+            if task.group_id in self.task_groups:
+                group = self.task_groups[task.group_id]
+                if self.check_group_completion(group):
+                    group.status = TaskStatus.COMPLETED
+                    self.active_groups.remove(group.task_id)
+                    self.completed_groups.add(group.task_id)
+                    print(f"\nTask Group '{group.name}' completed!")
+                    await self.print_group_statistics(group)
+
+                    # Activate dependent groups
+                    await self.activate_ready_groups()
+
+                    # Check goals after group completion
+                    if await self.check_goals():
+                        print("\nFinal goal achieved! Stopping task system...")
+                        await self.finish()
+                        return
+
+            await self.broadcast_message(TaskStatusUpdate(
+                task_id=task.task_id,
+                status=TaskStatus.COMPLETED,
+                group_id=task.group_id
+            ))
 
     def _create_task_templates(self):
         return {
@@ -455,6 +444,26 @@ class PlayGround(BasePlayGround):
                 self.active_groups.add(group.task_id)
                 await self.assign_group_tasks(group)
 
+def all_groups_completed(task_groups: Dict[str, TaskGroup],
+                         completed_tasks: Dict[str, TaskMessage]) -> bool:
+    """Check if all task groups are completed"""
+    return all(group.status == TaskStatus.COMPLETED
+               for group in task_groups.values())
+
+
+def specific_groups_completed(group_ids: List[str]) -> Callable:
+    """Create a condition checker for specific groups"""
+
+    def checker(task_groups: Dict[str, TaskGroup],
+                completed_tasks: Dict[str, TaskMessage]) -> bool:
+        return all(
+            group_id in task_groups
+            and task_groups[group_id].status == TaskStatus.COMPLETED
+            for group_id in group_ids
+        )
+
+    return checker
+
 
 async def main():
     playground = PlayGround()
@@ -465,8 +474,7 @@ async def main():
         TaskWorkerAgent("worker4", "system_admin", max_concurrent_tasks=2)
     ]
 
-    # Create multiple task groups with dependencies
-    # Group 1: Data Processing
+    # Create task groups (as before)
     data_group = playground.create_task_group(
         name="Data Processing",
         description="Initial data processing tasks",
@@ -479,7 +487,6 @@ async def main():
         priority=1
     )
 
-    # Group 2: Reporting (depends on Data Processing)
     reporting_group = playground.create_task_group(
         name="Report Generation",
         description="Generate reports from processed data",
@@ -493,7 +500,6 @@ async def main():
         priority=2
     )
 
-    # Group 3: System Maintenance (independent)
     maintenance_group = playground.create_task_group(
         name="System Maintenance",
         description="Regular system maintenance tasks",
@@ -506,16 +512,29 @@ async def main():
         priority=3
     )
 
-    # Start the playground with all task groups
+    # Define goals
+    final_goal = TaskGroupGoal(
+        name="Complete Processing and Reporting",
+        description="Complete data processing and report generation",
+        check_condition=specific_groups_completed([data_group.task_id, reporting_group.task_id]),
+        success_message="Successfully completed data processing and report generation!",
+        failure_message="Failed to complete processing and reporting tasks.",
+        dependent_groups=[data_group.task_id, reporting_group.task_id]
+    )
+
     async with playground.play(workers=workers) as active_playground:
+        # Add goals
+        await active_playground.add_goal("final_goal", final_goal)
+
+        # Start task groups
         await active_playground.assign_task_groups([
             data_group,
             reporting_group,
             maintenance_group
         ])
 
-        # Wait for all groups to complete
-        while len(active_playground.completed_groups) < 3:
+        # Wait for completion or goal achievement
+        while not await active_playground.check_goals():
             await asyncio.sleep(1)
 
 
