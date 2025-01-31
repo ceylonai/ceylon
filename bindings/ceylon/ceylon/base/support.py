@@ -53,7 +53,7 @@ class AgentCommon:
         self._handlers = {}
         self._run_handlers = {}
         self._connection_handlers = {}
-        print(f"AgentCommon initialized for {self.__class__.__name__}")
+        logger.info(f"AgentCommon initialized for {self.__class__.__name__}")
 
     def on(self, data_type):
         def decorator(func):
@@ -88,7 +88,6 @@ class AgentCommon:
     async def onmessage_handler(self, agent: AgentDetail, data: bytes, time: int):
         message = pickle.loads(data)
         message_type = type(message)
-
         for cls in inspect.getmro(self.__class__):
             method_key = f"{cls.__name__}.{message_type}"
             if method_key in message_handlers:
