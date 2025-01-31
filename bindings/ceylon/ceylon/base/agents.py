@@ -12,9 +12,10 @@ class Admin(BaseAgent):
 
     def __init__(self, name: str, port: Optional[int] = None,
                  admin_peer: Optional[str] = None, admin_ip: Optional[str] = None, workspace_id: str = "default",
-                 buffer_size: int = 1024, config_path: Optional[str] = None, role: str = "admin"):
+                 buffer_size: int = 1024, config_path: Optional[str] = None, role: str = "admin",
+                 extra_data: Optional[bytes] = None):
         super().__init__(name, PeerMode.ADMIN, role, port, admin_peer, admin_ip, workspace_id, buffer_size,
-                         config_path)
+                         config_path, extra_data=extra_data)
 
 
 class Worker(BaseAgent):
