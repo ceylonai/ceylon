@@ -94,16 +94,16 @@ async def main():
     await frontend.add_subtask(implement_html)
 
     # Print initial status
-    logger.info("Initial Status:")
-    logger.info(await manager.get_all_tasks_status())
-    logger.info("\n")
+    logger.debug("Initial Status:")
+    logger.debug(await manager.get_all_tasks_status())
+    logger.debug("\n")
 
     # Execute all tasks
-    logger.info("Executing tasks...")
+    logger.debug("Executing tasks...")
     await manager.execute_all()
 
-    logger.info("\nFinal Status:")
-    logger.info(await manager.get_all_tasks_status())
+    logger.debug("\nFinal Status:")
+    logger.debug(await manager.get_all_tasks_status())
 
 
 if __name__ == "__main__":

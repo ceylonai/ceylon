@@ -35,8 +35,8 @@ class GoalChecker:
                 # Check goal condition
                 if goal.check_condition(task_groups, completed_tasks):
                     goal.status = GoalStatus.ACHIEVED
-                    logger.info(f"\nGoal Achieved: {goal.name}")
-                    logger.info(goal.success_message)
+                    logger.debug(f"\nGoal Achieved: {goal.name}")
+                    logger.debug(goal.success_message)
                     achieved_final_goal = goal_id
 
         return achieved_final_goal

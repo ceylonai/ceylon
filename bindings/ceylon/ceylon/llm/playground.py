@@ -37,12 +37,12 @@ class TaskWorkerAgent(LLMAgent):
             priority=priority
         )
         await self.broadcast_message(request)
-        logger.info(f"{self.name}: Requested new {task_type} task")
+        logger.debug(f"{self.name}: Requested new {task_type} task")
 
     @on(TaskStatusUpdate)
     async def handle_status_update(self, update: TaskStatusUpdate, time: int):
         if update.task_id in self.active_tasks:
-            logger.info(f"{self.name}: Received status update for task {update.task_id}: {update.status}")
+            logger.debug(f"{self.name}: Received status update for task {update.task_id}: {update.status}")
             if update.status == 'completed':
                 self.active_tasks.pop(update.task_id, None)
 
@@ -73,13 +73,13 @@ class TaskWorkerAgent(LLMAgent):
                     await asyncio.sleep(0.1)
                     continue
 
-                logger.info(f"{self.name} ({self.worker_role}): Starting task {task.task_id} - {task.name}")
+                logger.debug(f"{self.name} ({self.worker_role}): Starting task {task.task_id} - {task.name}")
                 task.start_time = datetime.now().timestamp()
                 self.active_tasks[task.task_id] = task
                 asyncio.create_task(self.execute_task(task))
 
             except Exception as e:
-                logger.info(f"Error processing task queue for {self.name}: {e}")
+                logger.debug(f"Error processing task queue for {self.name}: {e}")
                 await asyncio.sleep(1)
 
     async def execute_task(self, task: TaskMessage):
@@ -89,11 +89,11 @@ class TaskWorkerAgent(LLMAgent):
             task.end_time = datetime.now().timestamp()
             del self.active_tasks[task.task_id]
             await self.broadcast_message(task)
-            logger.info(f"{self.name} ({self.worker_role}): Completed task {task.task_id} - {task.name}")
+            logger.debug(f"{self.name} ({self.worker_role}): Completed task {task.task_id} - {task.name}")
             await self.request_task("standard")
 
         except Exception as e:
-            logger.info(f"Error executing task {task.task_id}: {e}")
+            logger.debug(f"Error executing task {task.task_id}: {e}")
             await self.broadcast_message(TaskStatusUpdate(
                 task_id=task.task_id,
                 status="failed",
@@ -138,7 +138,7 @@ class PlayGround(BasePlayGround):
                     group.status = TaskStatus.COMPLETED
                     self.active_groups.remove(group.task_id)
                     self.completed_groups.add(group.task_id)
-                    logger.info(f"\nTask Group '{group.name}' completed!")
+                    logger.debug(f"\nTask Group '{group.name}' completed!")
                     await self.print_group_statistics(group)
 
                     # Activate dependent groups
@@ -146,7 +146,7 @@ class PlayGround(BasePlayGround):
 
                     # Check goals after group completion
                     if await self.check_goals():
-                        logger.info("\nFinal goal achieved! Stopping task system...")
+                        logger.debug("\nFinal goal achieved! Stopping task system...")
                         await self.finish()
                         return
 
@@ -213,12 +213,12 @@ class PlayGround(BasePlayGround):
     @on(TaskRequest)
     async def handle_task_request(self, request: TaskRequest, time: int):
         if request.role not in self.task_templates:
-            logger.info(f"Warning: No task templates for role {request.role}")
+            logger.debug(f"Warning: No task templates for role {request.role}")
             return
 
         template = self.task_templates[request.role].get(request.task_type)
         if not template:
-            logger.info(f"Warning: No template for task type {request.task_type}")
+            logger.debug(f"Warning: No template for task type {request.task_type}")
             return
 
         new_task = template()
@@ -227,12 +227,12 @@ class PlayGround(BasePlayGround):
         self.worker_task_counts[request.requester] += 1
 
         await self.broadcast_message(new_task)
-        logger.info(f"Task Manager: Created and assigned new task {new_task.task_id} to {request.requester}")
+        logger.debug(f"Task Manager: Created and assigned new task {new_task.task_id} to {request.requester}")
 
     @on_connect("*")
     async def handle_worker_connection(self, topic: str, agent: "AgentDetail"):
         self.workers_by_role[agent.role].append(agent.name)
-        logger.info(f"Task Manager: Worker {agent.name} connected with role {agent.role}")
+        logger.debug(f"Task Manager: Worker {agent.name} connected with role {agent.role}")
 
     @on(TaskMessage)
     async def handle_task_completion(self, task: TaskMessage, time: int):
@@ -245,7 +245,7 @@ class PlayGround(BasePlayGround):
                 top_task = self.top_tasks[task.parent_id]
                 if self.check_top_task_completion(top_task):
                     top_task.completed = True
-                    logger.info(f"\nTop Task '{top_task.name}' completed!")
+                    logger.debug(f"\nTop Task '{top_task.name}' completed!")
                     await self.print_statistics(top_task)
                     await self.finish()
 
@@ -256,9 +256,9 @@ class PlayGround(BasePlayGround):
 
     async def print_statistics(self, top_task: Optional[TaskGroup] = None):
         if top_task:
-            logger.info(f"\nStatistics for Top Task: {top_task.name}")
+            logger.debug(f"\nStatistics for Top Task: {top_task.name}")
         else:
-            logger.info("\nCurrent Statistics:")
+            logger.debug("\nCurrent Statistics:")
 
         role_stats: Dict[str, Dict] = defaultdict(lambda: {"count": 0, "total_duration": 0})
         tasks_to_analyze = top_task.subtasks if top_task else self.completed_tasks.values()
@@ -272,9 +272,9 @@ class PlayGround(BasePlayGround):
 
         for role, stats in role_stats.items():
             avg_duration = stats["total_duration"] / stats["count"]
-            logger.info(f"Role: {role}")
-            logger.info(f"  Tasks Completed: {stats['count']}")
-            logger.info(f"  Average Duration: {avg_duration:.2f} seconds")
+            logger.debug(f"Role: {role}")
+            logger.debug(f"  Tasks Completed: {stats['count']}")
+            logger.debug(f"  Average Duration: {avg_duration:.2f} seconds")
 
     async def assign_tasks(self, top_task: TaskGroup):
         """Assign tasks from a top task"""
@@ -292,7 +292,7 @@ class PlayGround(BasePlayGround):
         for role, role_tasks in tasks_by_role.items():
             available_workers = self.workers_by_role.get(role, [])
             if not available_workers:
-                logger.info(f"Warning: No workers available for role {role}")
+                logger.debug(f"Warning: No workers available for role {role}")
                 continue
 
             for task in role_tasks:
@@ -346,7 +346,7 @@ class PlayGround(BasePlayGround):
                     group_id not in self.completed_groups and
                     self.check_group_dependencies(group)):
                 self.active_groups.add(group_id)
-                logger.info(f"\nActivating Task Group: {group.name}")
+                logger.debug(f"\nActivating Task Group: {group.name}")
                 # Assign tasks for this group
                 await self.assign_group_tasks(group)
 
@@ -360,7 +360,7 @@ class PlayGround(BasePlayGround):
         for role, role_tasks in tasks_by_role.items():
             available_workers = self.workers_by_role.get(role, [])
             if not available_workers:
-                logger.info(f"Warning: No workers available for role {role}")
+                logger.debug(f"Warning: No workers available for role {role}")
                 continue
 
             for task in role_tasks:
@@ -387,7 +387,7 @@ class PlayGround(BasePlayGround):
                     if group.id in self.active_groups:
                         self.active_groups.remove(group.id)
                     self.completed_groups.add(group.id)
-                    logger.info(f"\nTask Group '{group.name}' completed!")
+                    logger.debug(f"\nTask Group '{group.name}' completed!")
                     await self.print_group_statistics(group)
 
                     # Activate dependent groups
@@ -395,7 +395,7 @@ class PlayGround(BasePlayGround):
 
             # Check if all groups are completed
             if len(self.completed_groups) == len(self.task_groups):
-                logger.info("\nAll Task Groups completed!")
+                logger.debug("\nAll Task Groups completed!")
                 await self.print_all_statistics()
                 await self.finish()
 
@@ -406,14 +406,14 @@ class PlayGround(BasePlayGround):
             ))
 
     async def print_group_statistics(self, group: TaskGroup):
-        logger.info(f"\nStatistics for Task Group: {group.name}")
+        logger.debug(f"\nStatistics for Task Group: {group.name}")
         await self._print_task_stats(group.subtasks)
 
     async def print_all_statistics(self):
-        logger.info("\nOverall Statistics:")
+        logger.debug("\nOverall Statistics:")
         for group in self.task_groups.values():
-            logger.info(f"\nGroup: {group.name}")
-            logger.info(f"Status: {group.status.value}")
+            logger.debug(f"\nGroup: {group.name}")
+            logger.debug(f"Status: {group.status.value}")
             await self._print_task_stats(group.subtasks)
 
     async def _print_task_stats(self, tasks: List[TaskMessage]):
@@ -428,9 +428,9 @@ class PlayGround(BasePlayGround):
 
         for role, stats in role_stats.items():
             avg_duration = stats["total_duration"] / stats["count"]
-            logger.info(f"Role: {role}")
-            logger.info(f"  Tasks Completed: {stats['count']}")
-            logger.info(f"  Average Duration: {avg_duration:.2f} seconds")
+            logger.debug(f"Role: {role}")
+            logger.debug(f"  Tasks Completed: {stats['count']}")
+            logger.debug(f"  Average Duration: {avg_duration:.2f} seconds")
 
     async def assign_task_groups(self, groups: List[TaskGroup]):
         """Initialize and start processing multiple task groups"""

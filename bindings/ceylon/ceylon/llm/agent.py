@@ -8,7 +8,6 @@ from typing import TypeVar, Sequence
 from pydantic import BaseModel
 
 from ceylon import Worker
-from ceylon.base.uni_agent import BaseAgentData
 
 ResponseType = TypeVar("ResponseType")
 
