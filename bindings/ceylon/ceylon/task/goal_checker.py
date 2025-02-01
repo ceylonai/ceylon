@@ -3,6 +3,8 @@
 #
 from typing import Callable, List, Dict, Optional
 
+from loguru import logger
+
 from ceylon.task.data import TaskGroup, TaskMessage, TaskStatus, TaskGroupGoal, GoalStatus
 
 
@@ -33,8 +35,8 @@ class GoalChecker:
                 # Check goal condition
                 if goal.check_condition(task_groups, completed_tasks):
                     goal.status = GoalStatus.ACHIEVED
-                    print(f"\nGoal Achieved: {goal.name}")
-                    print(goal.success_message)
+                    logger.info(f"\nGoal Achieved: {goal.name}")
+                    logger.info(goal.success_message)
                     achieved_final_goal = goal_id
 
         return achieved_final_goal

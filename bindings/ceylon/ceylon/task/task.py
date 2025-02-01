@@ -2,6 +2,9 @@ import asyncio
 from typing import List, Optional
 from datetime import datetime
 
+from loguru import logger
+
+
 class Task:
     def __init__(self, name: str, description: str = "", duration: float = 0):
         self.name = name
@@ -91,16 +94,16 @@ async def main():
     await frontend.add_subtask(implement_html)
 
     # Print initial status
-    print("Initial Status:")
-    print(await manager.get_all_tasks_status())
-    print("\n")
+    logger.info("Initial Status:")
+    logger.info(await manager.get_all_tasks_status())
+    logger.info("\n")
 
     # Execute all tasks
-    print("Executing tasks...")
+    logger.info("Executing tasks...")
     await manager.execute_all()
 
-    print("\nFinal Status:")
-    print(await manager.get_all_tasks_status())
+    logger.info("\nFinal Status:")
+    logger.info(await manager.get_all_tasks_status())
 
 
 if __name__ == "__main__":
