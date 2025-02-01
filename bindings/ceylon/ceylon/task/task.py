@@ -22,7 +22,6 @@ class Task:
             return
 
         self.start_time = datetime.now()
-        print(f"Starting task: {self.name}")
 
         # Execute all subtasks first
         if self.subtasks:
@@ -34,7 +33,6 @@ class Task:
 
         self.completed = True
         self.end_time = datetime.now()
-        print(f"Completed task: {self.name}")
 
     async def get_status(self):
         """Get the current status of the task and its subtasks"""
