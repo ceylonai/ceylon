@@ -4,7 +4,7 @@
 #
 from loguru import logger
 from ceylon import on, on_connect
-from ceylon.base.playground import BasePlayGround
+from ceylon.base.playground import BasePlayGround, TaskOutput
 from ceylon.task.data import TaskMessage, TaskRequest, TaskStatusUpdate, TaskStatus
 from .manager import TaskManager
 
@@ -16,38 +16,69 @@ class TaskPlayGround(BasePlayGround):
 
     @on(TaskMessage)
     async def handle_task_completion(self, task: TaskMessage, time: int):
-        all_completed = await self.task_manager.handle_task_completion(task)
-
         if task.completed and task.task_id in self.task_manager.tasks:
-            print(f"Task {task.task_id} completed by {task.assigned_to}")
+            # Record task completion
+            logger.info(f"Task {task.task_id} completed by {task.assigned_to}")
 
+            # Create task output record
+            task_output = TaskOutput(
+                task_id=task.task_id,
+                name=task.name,
+                completed=True,
+                start_time=task.start_time,
+                end_time=task.end_time,
+                metadata=task.metadata if task.metadata else {}
+            )
+            self.add_completed_task(task.task_id, task_output)
+
+            # Store task result if present
+            if hasattr(task, 'result'):
+                self.add_task_result(task.task_id, task.result)
+
+            # Broadcast status update
             await self.broadcast_message(TaskStatusUpdate(
                 task_id=task.task_id,
                 status=TaskStatus.COMPLETED,
                 group_id=task.group_id
             ))
 
-            # If all groups are completed, finish the playground
+            # Check if all groups are completed
+            all_completed = await self.task_manager.handle_task_completion(task)
             if all_completed:
-                logger.debug("\nAll groups completed and goals achieved!")
+                logger.info("\nAll groups completed and goals achieved!")
                 await self.finish()
                 return
 
-            # Check for and activate any dependent groups
+            # Activate dependent groups
             new_assignments = await self.task_manager.activate_ready_groups()
             for assignment in new_assignments:
                 await self.broadcast_message(assignment)
+
+    @on(TaskStatusUpdate)
+    async def handle_task_status_update(self, update: TaskStatusUpdate, time: int):
+        if update.status == TaskStatus.FAILED and update.task_id in self.task_manager.tasks:
+            task = self.task_manager.tasks[update.task_id]
+            # Record failed task
+            task_output = TaskOutput(
+                task_id=task.task_id,
+                name=task.name,
+                completed=False,
+                start_time=task.start_time,
+                end_time=task.end_time,
+                error=update.message
+            )
+            self.add_completed_task(task.task_id, task_output)
 
     @on(TaskRequest)
     async def handle_task_request(self, request: TaskRequest, time: int):
         templates = self.task_manager.task_templates
         if request.role not in templates:
-            logger.debug(f"Warning: No task templates for role {request.role}")
+            logger.warning(f"No task templates for role {request.role}")
             return
 
         template = templates[request.role].get(request.task_type)
         if not template:
-            logger.debug(f"Warning: No template for task type {request.task_type}")
+            logger.warning(f"No template for task type {request.task_type}")
             return
 
         new_task = template()
@@ -56,7 +87,7 @@ class TaskPlayGround(BasePlayGround):
         self.task_manager.worker_task_counts[request.requester] += 1
 
         await self.broadcast_message(new_task)
-        logger.debug(f"Task Manager: Created and assigned new task {new_task.task_id} to {request.requester}")
+        logger.info(f"Task Manager: Created and assigned new task {new_task.task_id} to {request.requester}")
 
     @on_connect("*")
     async def handle_worker_connection(self, topic: str, agent: "AgentDetail"):
@@ -71,3 +102,20 @@ class TaskPlayGround(BasePlayGround):
     async def print_all_statistics(self):
         """Print statistics for all task groups"""
         await self.task_manager.print_all_statistics()
+
+        # Print task completion statistics
+        completed_tasks = self.get_completed_tasks()
+        successful = sum(1 for t in completed_tasks.values() if t.completed)
+        failed = sum(1 for t in completed_tasks.values() if not t.completed)
+
+        logger.info("\nTask Completion Statistics:")
+        logger.info(f"Total Tasks: {len(completed_tasks)}")
+        logger.info(f"Successful: {successful}")
+        logger.info(f"Failed: {failed}")
+
+        # Print task results if available
+        task_results = self.get_task_results()
+        if task_results:
+            logger.info("\nTask Results Summary:")
+            for task_id, result in task_results.items():
+                logger.info(f"Task {task_id}: {result}")

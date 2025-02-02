@@ -1,14 +1,25 @@
-#  Copyright 2024-Present, Syigen Ltd. and Syigen Private Limited. All rights reserved.
-#  Licensed under the Apache License, Version 2.0 (See LICENSE.md or http://www.apache.org/licenses/LICENSE-2.0).
-#
 from __future__ import annotations
 
 import asyncio
-from typing import List, Mapping, Dict, Optional, TypeVar, Sequence
 from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
+from typing import List, Dict, Optional, Any
+
+from loguru import logger
 from pydantic import BaseModel
 
-from ceylon import Admin, UnifiedAgent, AgentDetail, on, on_connect, BaseAgent, Worker
+from ceylon import Admin, AgentDetail, on_connect, BaseAgent
+
+
+@dataclass
+class TaskOutput:
+    task_id: str
+    name: str
+    completed: bool
+    start_time: Optional[float]
+    end_time: Optional[float]
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    error: Optional[str] = None
 
 
 class AgentConnectedStatus(BaseModel):
@@ -25,10 +36,28 @@ class BasePlayGround(Admin):
         self.llm_agents: Dict[str, AgentConnectedStatus] = {}
         self._connected_event = None
         self._stop_event = None
+        self._completed_tasks: Dict[str, TaskOutput] = {}
+        self._task_results: Dict[str, Any] = {}
 
     async def finish(self) -> None:
         if self._stop_event:
             self._stop_event.set()
+
+    def add_completed_task(self, task_id: str, task_output: TaskOutput) -> None:
+        """Add a completed task to the output collection"""
+        self._completed_tasks[task_id] = task_output
+
+    def add_task_result(self, task_id: str, result: Any) -> None:
+        """Add a task result to the results collection"""
+        self._task_results[task_id] = result
+
+    def get_completed_tasks(self) -> Dict[str, TaskOutput]:
+        """Get all completed tasks"""
+        return self._completed_tasks.copy()
+
+    def get_task_results(self) -> Dict[str, Any]:
+        """Get all task results"""
+        return self._task_results.copy()
 
     @on_connect("*")
     async def on_llm_agent_connected(self, topic: str, agent: AgentDetail):
@@ -40,18 +69,21 @@ class BasePlayGround(Admin):
     async def play(self, workers: Optional[List[BaseAgent]] = None):
         """
         Async context manager for the playground that ensures all agents are connected before proceeding.
-        
+        Returns completed task information when finished.
+
         Args:
             workers: Optional list of BaseAgent instances to start
-            
+
         Yields:
-            PlayGround: The playground instance with all agents connected
+            tuple[BasePlayGround, Dict[str, TaskOutput]]: The playground instance and completed tasks
         """
         from asyncio import Event
 
-        # Initialize connection event
+        # Initialize events and collections
         self._connected_event = Event()
         self._stop_event = Event()
+        self._completed_tasks.clear()
+        self._task_results.clear()
 
         # Initialize agent statuses
         if workers:
@@ -69,8 +101,19 @@ class BasePlayGround(Admin):
             yield self
 
         finally:
-            # Cleanup
+            # Wait for stop event and cleanup
             await self._stop_event.wait()
+
+            # Log completion statistics
+            logger.info(f"Playground finished with {len(self._completed_tasks)} completed tasks")
+            for task_id, output in self._completed_tasks.items():
+                if output.completed:
+                    duration = output.end_time - output.start_time if output.end_time and output.start_time else None
+                    logger.info(f"Task {task_id} ({output.name}) completed in {duration:.2f}s" if duration else f"Task {task_id} ({output.name}) completed")
+                else:
+                    logger.warning(f"Task {task_id} ({output.name}) failed: {output.error}")
+
+            # Cleanup
             self._connected_event = None
             self._stop_event = None
             await self.stop()
