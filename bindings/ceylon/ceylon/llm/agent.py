@@ -1,12 +1,20 @@
+#  Copyright 2024-Present, Syigen Ltd. and Syigen Private Limited. All rights reserved.
+#  Licensed under the Apache License, Version 2.0 (See LICENSE.md or http://www.apache.org/licenses/LICENSE-2.0).
+#
+
 import asyncio
-from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, field
 from datetime import datetime
-from pydantic import BaseModel
+from typing import Optional, Dict, Any
 
 from loguru import logger
+from pydantic import BaseModel
+
+from ceylon.llm.models import Model, ModelSettings, ModelMessage
+from ceylon.llm.models.support.messages import MessageRole, TextPart
 from ceylon.task.agent import TaskExecutionAgent
 from ceylon.task.data import TaskMessage, TaskStatus
+
 
 @dataclass
 class LLMResponse:
@@ -18,7 +26,7 @@ class LLMConfig(BaseModel):
     system_prompt: str
     temperature: float = 0.7
     max_tokens: int = 1000
-    stop_sequences: List[str] = []
+    stop_sequences: list[str] = []
     retry_attempts: int = 3
     retry_delay: float = 1.0
     timeout: float = 30.0
@@ -28,12 +36,13 @@ class LLMConfig(BaseModel):
 
 class LLMAgent(TaskExecutionAgent):
     """
-    An agent that processes tasks using LLM capabilities.
-    Extends TaskExecutionAgent with LLM-specific processing.
+    An agent that processes tasks using configurable LLM capabilities.
+    Supports multiple LLM backends through the Model interface.
     """
     def __init__(
             self,
             name: str,
+            llm_model: Model,
             config: LLMConfig,
             worker_role: str = "llm_processor",
             max_concurrent_tasks: int = 3
@@ -43,18 +52,29 @@ class LLMAgent(TaskExecutionAgent):
             worker_role=worker_role,
             max_concurrent_tasks=max_concurrent_tasks
         )
+        self.llm_model = llm_model
         self.config = config
         self.response_cache: Dict[str, LLMResponse] = {}
         self.processing_lock = asyncio.Lock()
+
+        # Initialize model context with settings
+        self.model_context = self.llm_model.create_context(
+            settings=ModelSettings(
+                temperature=config.temperature,
+                max_tokens=config.max_tokens
+            )
+        )
 
     async def execute_task(self, task: TaskMessage) -> None:
         """
         Execute an LLM task with retry logic and error handling
         """
         try:
-            logger.info(f"{self.name}: Starting LLM task {task.task_id}")
+            print(f"\n{'='*80}")
+            print(f"Task: {task.name}")
+            print(f"Description: {task.description}")
+            print(f"{'='*80}\n")
 
-            # Prepare context and execute with retries
             async with self.processing_lock:
                 response = await self._execute_with_retry(task)
 
@@ -62,15 +82,22 @@ class LLMAgent(TaskExecutionAgent):
                 # Cache successful response
                 self.response_cache[task.task_id] = response
 
+                # Print the response
+                print("\nGenerated Content:")
+                print(f"{'-'*80}")
+                print(response.content)
+                print(f"{'-'*80}\n")
+
                 # Update task with completion info
                 task.completed = True
                 task.end_time = datetime.now().timestamp()
 
                 # Include response in task metadata
-                if not hasattr(task, 'metadata'):
+                if not task.metadata:
                     task.metadata = {}
                 task.metadata['llm_response'] = response.content
                 task.metadata['response_timestamp'] = response.timestamp
+                task.metadata.update(response.metadata)
 
                 logger.info(f"{self.name}: Completed task {task.task_id}")
 
@@ -98,12 +125,13 @@ class LLMAgent(TaskExecutionAgent):
 
         for attempt in range(self.config.retry_attempts):
             try:
-                # Simulate LLM call - replace with actual LLM integration
-                await asyncio.sleep(task.duration)
                 response = await self._call_llm(task)
 
                 if response and response.content:
-                    return response
+                    if await self.validate_response(response, task):
+                        return response
+                    else:
+                        raise ValueError("Response validation failed")
 
             except Exception as e:
                 last_error = e
@@ -117,23 +145,40 @@ class LLMAgent(TaskExecutionAgent):
 
     async def _call_llm(self, task: TaskMessage) -> LLMResponse:
         """
-        Make the actual LLM API call
-        Replace this with your LLM integration (e.g. OpenAI, Anthropic, etc.)
+        Make the actual LLM API call using the configured model
         """
         try:
             async with asyncio.timeout(self.config.timeout):
-                # Construct prompt with system prompt and task details
-                prompt = f"{self.config.system_prompt}\n\nTask: {task.description}"
+                # Construct messages for the model
+                messages = [
+                    ModelMessage(
+                        role=MessageRole.SYSTEM,
+                        parts=[TextPart(text=self.config.system_prompt)]
+                    ),
+                    ModelMessage(
+                        role=MessageRole.USER,
+                        parts=[TextPart(text=self._format_task_prompt(task))]
+                    )
+                ]
 
-                # Simulate LLM response - replace with actual API call
-                response_text = f"Simulated LLM response for task {task.task_id}"
+                # Make the model request
+                response, usage = await self.llm_model.request(
+                    messages=messages,
+                    context=self.model_context
+                )
+
+                # Extract text from response parts
+                response_text = ""
+                for part in response.parts:
+                    if hasattr(part, 'text'):
+                        response_text += part.text
 
                 return LLMResponse(
                     content=response_text,
                     metadata={
                         'task_id': task.task_id,
-                        'prompt_tokens': len(prompt),
-                        'completion_tokens': len(response_text)
+                        'usage': usage.__dict__,
+                        'model_name': self.llm_model.model_name
                     }
                 )
 
@@ -142,7 +187,24 @@ class LLMAgent(TaskExecutionAgent):
         except Exception as e:
             raise Exception(f"LLM call failed: {str(e)}")
 
-    async def validate_response(self, response: LLMResponse) -> bool:
+    def _format_task_prompt(self, task: TaskMessage) -> str:
+        """
+        Format the task into a prompt for the LLM
+        """
+        prompt_parts = [
+            f"Task: {task.name}",
+            f"Description: {task.description}"
+        ]
+
+        # Add any task-specific metadata to prompt
+        if task.metadata:
+            for key, value in task.metadata.items():
+                if key in ['type', 'topic', 'style', 'target_length']:
+                    prompt_parts.append(f"{key.title()}: {value}")
+
+        return "\n".join(prompt_parts)
+
+    async def validate_response(self, response: LLMResponse, task: TaskMessage) -> bool:
         """
         Validate LLM response format and content
         Override this method to implement custom validation logic
@@ -150,5 +212,21 @@ class LLMAgent(TaskExecutionAgent):
         if not response or not response.content:
             return False
 
+        # Basic length validation
+        if task.metadata and 'target_length' in task.metadata:
+            target_length = task.metadata['target_length']
+            actual_length = len(response.content.split())
+            if actual_length < target_length * 0.5 or actual_length > target_length * 1.5:
+                logger.warning(f"Response length {actual_length} words outside target range of {target_length}")
+                return False
+
         # Add custom validation logic here
         return True
+
+    async def close(self) -> None:
+        """
+        Clean up resources when agent is stopped
+        """
+        if self.llm_model:
+            await self.llm_model.close()
+        await super().close()
