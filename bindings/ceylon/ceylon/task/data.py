@@ -98,6 +98,7 @@ class TaskGroup:
 
     def check_goal(self, task_groups: Dict[str, 'TaskGroup'], completed_tasks: Dict[str, TaskMessage]) -> bool:
         """Check if the group's goal has been achieved"""
+        print(f"Checking goal for group {self.name} {self.goal} ")
         if not self.goal:
             return False
 

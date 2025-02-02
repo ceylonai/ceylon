@@ -1,104 +1,16 @@
 #  Copyright 2024-Present, Syigen Ltd. and Syigen Private Limited. All rights reserved.
 #  Licensed under the Apache License, Version 2.0 (See LICENSE.md or http://www.apache.org/licenses/LICENSE-2.0).
 #
-import asyncio
 import uuid
 from collections import defaultdict
-from datetime import datetime
 from typing import List, Optional, Dict, Set
 
 from loguru import logger
 
 from ceylon import on, on_connect
 from ceylon.base.playground import BasePlayGround
-from ceylon.llm.agent import LLMAgent
 from ceylon.task.data import TaskMessage, TaskRequest, TaskStatusUpdate, TaskGroup, TaskStatus
 from ceylon.task.goal_checker import PlayGroundExtension, TaskGroupGoal
-
-
-class TaskWorkerAgent(LLMAgent):
-    def __init__(self, name: str, worker_role: str, max_concurrent_tasks: int = 3):
-        super().__init__(
-            name=name,
-            role=worker_role,
-            system_prompt=f"You are a task execution agent specialized in {worker_role} tasks."
-        )
-        self.worker_role = worker_role
-        self.active_tasks: Dict[str, TaskMessage] = {}
-        self.max_concurrent_tasks = max_concurrent_tasks
-        self.task_queue: asyncio.Queue = asyncio.Queue()
-        self.processing = False
-
-    async def request_task(self, task_type: str, priority: int = 1):
-        request = TaskRequest(
-            requester=self.name,
-            role=self.worker_role,
-            task_type=task_type,
-            priority=priority
-        )
-        await self.broadcast_message(request)
-        logger.debug(f"{self.name}: Requested new {task_type} task")
-
-    @on(TaskStatusUpdate)
-    async def handle_status_update(self, update: TaskStatusUpdate, time: int):
-        if update.task_id in self.active_tasks:
-            logger.debug(f"{self.name}: Received status update for task {update.task_id}: {update.status}")
-            if update.status == 'completed':
-                self.active_tasks.pop(update.task_id, None)
-
-    @on(TaskMessage)
-    async def handle_task(self, task: TaskMessage, time: int):
-        if task.assigned_to != self.name or task.required_role != self.worker_role:
-            return
-
-        await self.task_queue.put(task)
-        if not self.processing:
-            self.processing = True
-            asyncio.create_task(self.process_task_queue())
-
-    async def process_task_queue(self):
-        while True:
-            if len(self.active_tasks) >= self.max_concurrent_tasks:
-                await asyncio.sleep(0.1)
-                continue
-
-            try:
-                try:
-                    task = self.task_queue.get_nowait()
-                except asyncio.QueueEmpty:
-                    if not self.active_tasks:
-                        self.processing = False
-                        await self.request_task("standard")
-                        break
-                    await asyncio.sleep(0.1)
-                    continue
-
-                logger.debug(f"{self.name} ({self.worker_role}): Starting task {task.task_id} - {task.name}")
-                task.start_time = datetime.now().timestamp()
-                self.active_tasks[task.task_id] = task
-                asyncio.create_task(self.execute_task(task))
-
-            except Exception as e:
-                logger.debug(f"Error processing task queue for {self.name}: {e}")
-                await asyncio.sleep(1)
-
-    async def execute_task(self, task: TaskMessage):
-        try:
-            await asyncio.sleep(task.duration)
-            task.completed = True
-            task.end_time = datetime.now().timestamp()
-            del self.active_tasks[task.task_id]
-            await self.broadcast_message(task)
-            logger.debug(f"{self.name} ({self.worker_role}): Completed task {task.task_id} - {task.name}")
-            await self.request_task("standard")
-
-        except Exception as e:
-            logger.debug(f"Error executing task {task.task_id}: {e}")
-            await self.broadcast_message(TaskStatusUpdate(
-                task_id=task.task_id,
-                status="failed",
-                message=str(e)
-            ))
 
 
 class PlayGround(BasePlayGround):
@@ -156,10 +68,12 @@ class PlayGround(BasePlayGround):
 
     @on(TaskMessage)
     async def handle_task_completion(self, task: TaskMessage, time: int):
+        # print(f"Task {task.task_id} completed by {task.assigned_to} {task.completed}")
         if task.completed and task.task_id in self.tasks:
             self.completed_tasks[task.task_id] = task
             self.worker_task_counts[task.assigned_to] -= 1
 
+            print(f"Task {task.task_id} completed by {task.assigned_to}")
             # Update task group status
             if task.group_id in self.task_groups:
                 group = self.task_groups[task.group_id]
@@ -276,26 +190,6 @@ class PlayGround(BasePlayGround):
         self.workers_by_role[agent.role].append(agent.name)
         logger.debug(f"Task Manager: Worker {agent.name} connected with role {agent.role}")
 
-    @on(TaskMessage)
-    async def handle_task_completion(self, task: TaskMessage, time: int):
-        if task.completed and task.task_id in self.tasks:
-            self.completed_tasks[task.task_id] = task
-            self.worker_task_counts[task.assigned_to] -= 1
-
-            # Check if this task belongs to a top task
-            if task.parent_id and task.parent_id in self.top_tasks:
-                top_task = self.top_tasks[task.parent_id]
-                if self.check_top_task_completion(top_task):
-                    top_task.completed = True
-                    logger.debug(f"\nTop Task '{top_task.name}' completed!")
-                    await self.print_statistics(top_task)
-                    await self.finish()
-
-            await self.broadcast_message(TaskStatusUpdate(
-                task_id=task.task_id,
-                status=TaskStatus.COMPLETED
-            ))
-
     async def print_statistics(self, top_task: Optional[TaskGroup] = None):
         if top_task:
             logger.debug(f"\nStatistics for Top Task: {top_task.name}")
@@ -393,38 +287,6 @@ class PlayGround(BasePlayGround):
                 task.status = TaskStatus.IN_PROGRESS
                 self.worker_task_counts[worker_name] += 1
                 await self.broadcast_message(task)
-
-    @on(TaskMessage)
-    async def handle_task_completion(self, task: TaskMessage, time: int):
-        if task.completed and task.task_id in self.tasks:
-            self.completed_tasks[task.task_id] = task
-            self.worker_task_counts[task.assigned_to] -= 1
-
-            # Update task group status
-            if task.group_id in self.task_groups:
-                group = self.task_groups[task.group_id]
-                if self.check_group_completion(group):
-                    group.status = TaskStatus.COMPLETED
-                    if group.id in self.active_groups:
-                        self.active_groups.remove(group.id)
-                    self.completed_groups.add(group.id)
-                    logger.debug(f"\nTask Group '{group.name}' completed!")
-                    await self.print_group_statistics(group)
-
-                    # Activate dependent groups
-                    await self.activate_ready_groups()
-
-            # Check if all groups are completed
-            if len(self.completed_groups) == len(self.task_groups):
-                logger.debug("\nAll Task Groups completed!")
-                await self.print_all_statistics()
-                await self.finish()
-
-            await self.broadcast_message(TaskStatusUpdate(
-                task_id=task.task_id,
-                status=TaskStatus.COMPLETED,
-                group_id=task.group_id
-            ))
 
     async def print_group_statistics(self, group: TaskGroup):
         logger.debug(f"\nStatistics for Task Group: {group.name}")

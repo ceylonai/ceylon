@@ -1,13 +1,14 @@
 #  Copyright 2024-Present, Syigen Ltd. and Syigen Private Limited. All rights reserved.
 #  Licensed under the Apache License, Version 2.0 (See LICENSE.md or http://www.apache.org/licenses/LICENSE-2.0).
 #
+from __future__ import annotations
 
 import asyncio
-from typing import List, Mapping, Dict, Optional
+from typing import List, Mapping, Dict, Optional, TypeVar, Sequence
 from contextlib import asynccontextmanager
 from pydantic import BaseModel
 
-from ceylon import Admin, UnifiedAgent, AgentDetail, on, on_connect, BaseAgent
+from ceylon import Admin, UnifiedAgent, AgentDetail, on, on_connect, BaseAgent, Worker
 
 
 class AgentConnectedStatus(BaseModel):

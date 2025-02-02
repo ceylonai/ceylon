@@ -3,11 +3,15 @@
 #
 from __future__ import annotations
 
-from typing import TypeVar, Sequence
+import asyncio
+from datetime import datetime
+from typing import TypeVar, Sequence, Dict
 
+from loguru import logger
 from pydantic import BaseModel
 
-from ceylon import Worker
+from ceylon import Worker, on
+from ceylon.task.data import TaskMessage, TaskRequest, TaskStatusUpdate, TaskStatus
 
 ResponseType = TypeVar("ResponseType")
 
@@ -22,7 +26,7 @@ class LLMAgentConfig(BaseModel):
     response_type: type[ResponseType] | None
 
 
-class LLMAgent(Worker):
+class LLMAgentBase(Worker):
     def __init__(
             self,
             name: str,
@@ -35,3 +39,88 @@ class LLMAgent(Worker):
             system_prompt=system_prompt,
             response_type=response_type
         )
+
+
+class LLMAgent(LLMAgentBase):
+    def __init__(self, name: str, worker_role: str, max_concurrent_tasks: int = 3):
+        super().__init__(
+            name=name,
+            role=worker_role,
+            system_prompt=f"You are a task execution agent specialized in {worker_role} tasks."
+        )
+        self.worker_role = worker_role
+        self.active_tasks: Dict[str, TaskMessage] = {}
+        self.max_concurrent_tasks = max_concurrent_tasks
+        self.task_queue: asyncio.Queue = asyncio.Queue()
+        self.processing = False
+
+    async def request_task(self, task_type: str, priority: int = 1):
+        request = TaskRequest(
+            requester=self.name,
+            role=self.worker_role,
+            task_type=task_type,
+            priority=priority
+        )
+        await self.broadcast_message(request)
+        logger.debug(f"{self.name}: Requested new {task_type} task")
+
+    @on(TaskStatusUpdate)
+    async def handle_status_update(self, update: TaskStatusUpdate, time: int):
+        if update.task_id in self.active_tasks:
+            logger.debug(f"{self.name}: Received status update for task {update.task_id}: {update.status}")
+            if update.status == 'completed':
+                self.active_tasks.pop(update.task_id, None)
+
+    @on(TaskMessage)
+    async def handle_task(self, task: TaskMessage, time: int):
+        if task.assigned_to != self.name or task.required_role != self.worker_role:
+            return
+
+        await self.task_queue.put(task)
+        if not self.processing:
+            self.processing = True
+            asyncio.create_task(self.process_task_queue())
+
+    async def process_task_queue(self):
+        while True:
+            if len(self.active_tasks) >= self.max_concurrent_tasks:
+                await asyncio.sleep(0.1)
+                continue
+
+            try:
+                try:
+                    task = self.task_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    if not self.active_tasks:
+                        self.processing = False
+                        await self.request_task("standard")
+                        break
+                    await asyncio.sleep(0.1)
+                    continue
+
+                logger.debug(f"{self.name} ({self.worker_role}): Starting task {task.task_id} - {task.name}")
+                task.start_time = datetime.now().timestamp()
+                self.active_tasks[task.task_id] = task
+                asyncio.create_task(self.execute_task(task))
+
+            except Exception as e:
+                logger.debug(f"Error processing task queue for {self.name}: {e}")
+                await asyncio.sleep(1)
+
+    async def execute_task(self, task: TaskMessage):
+        try:
+            await asyncio.sleep(task.duration)
+            task.completed = True
+            task.end_time = datetime.now().timestamp()
+            del self.active_tasks[task.task_id]
+            await self.broadcast_message(task)
+            logger.debug(f"{self.name} ({self.worker_role}): Completed task {task.task_id} - {task.name}")
+            await self.request_task("standard")
+
+        except Exception as e:
+            logger.debug(f"Error executing task {task.task_id}: {e}")
+            await self.broadcast_message(TaskStatusUpdate(
+                task_id=task.task_id,
+                status=TaskStatus.FAILED,
+                message=str(e)
+            ))

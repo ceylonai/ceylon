@@ -2,7 +2,7 @@ import asyncio
 import uuid
 from typing import Dict, Callable
 
-from ceylon.llm.playground import PlayGround, TaskWorkerAgent
+from ceylon.llm import PlayGround, LLMAgent
 from ceylon.task.data import TaskMessage, TaskGroup, TaskStatus, TaskGroupGoal, GoalStatus
 
 
@@ -23,10 +23,10 @@ def group_tasks_completed(group_id: str) -> Callable:
 async def main():
     playground = PlayGround()
     workers = [
-        TaskWorkerAgent("worker1", "data_processor", max_concurrent_tasks=2),
-        TaskWorkerAgent("worker2", "data_processor", max_concurrent_tasks=2),
-        TaskWorkerAgent("worker3", "reporter", max_concurrent_tasks=3),
-        TaskWorkerAgent("worker4", "system_admin", max_concurrent_tasks=2)
+        LLMAgent("worker1", "data_processor", max_concurrent_tasks=2),
+        LLMAgent("worker2", "data_processor", max_concurrent_tasks=2),
+        LLMAgent("worker3", "reporter", max_concurrent_tasks=3),
+        LLMAgent("worker4", "system_admin", max_concurrent_tasks=2)
     ]
 
     # Create task groups with integrated goals
