@@ -8,6 +8,7 @@ from typing import Dict, Callable
 
 from ceylon.task import TaskExecutionAgent, TaskPlayGround
 from ceylon.task.data import TaskMessage, TaskGroup, TaskGroupGoal, GoalStatus
+from ceylon.task.manager import TaskManager
 
 
 def create_goal_checker(required_tasks: int) -> Callable:
@@ -35,7 +36,7 @@ async def main():
     ]
 
     # Create a task group with a clear goal: complete 5 tasks
-    processing_group = TaskPlayGround.create_task_group(
+    processing_group = TaskManager.create_task_group(
         name="Data Processing",
         description="Process 10 data items, goal achieves at 5",
         subtasks=[
@@ -59,12 +60,13 @@ async def main():
     )
 
     async with playground.play(workers=workers) as active_playground:
+        active_playground:TaskPlayGround = active_playground
         await active_playground.assign_task_groups([processing_group])
 
         # Wait for goal achievement
         while True:
             await asyncio.sleep(1)
-            current_group = active_playground.task_groups[processing_group.task_id]
+            current_group = active_playground.task_manager.task_groups[processing_group.task_id]
 
             # Print clear status updates
             print(f"\nGroup Status: {current_group.status}")
