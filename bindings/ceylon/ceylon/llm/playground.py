@@ -117,13 +117,42 @@ class PlayGround(BasePlayGround):
         # Add goal checking extension
         self.goal_extension = PlayGroundExtension(self)
 
-    async def add_goal(self, goal_id: str, goal: TaskGroupGoal):
-        """Add a new goal to the system"""
-        self.goal_extension.add_task_goal(goal_id, goal)
+    async def check_group_goals(self) -> bool:
+        """Check if any group goals have been achieved"""
+        goals_achieved = False
+        for group in self.task_groups.values():
+            if group.check_goal(self.task_groups, self.completed_tasks):
+                goals_achieved = True
+                # If this group has dependents, activate them
+                await self.activate_ready_groups()
+        return goals_achieved
 
-    async def check_goals(self):
-        """Check if any final goals have been achieved"""
-        return await self.goal_extension.check_task_goals()
+    @staticmethod
+    def create_task_group(
+            name: str,
+            description: str,
+            subtasks: List[TaskMessage],
+            goal: Optional[TaskGroupGoal] = None,
+            dependencies: Dict[str, List[str]] = None,
+            depends_on: List[str] = None,
+            priority: int = 1
+    ) -> TaskGroup:
+        group_id = str(uuid.uuid4())
+
+        # Link subtasks to group
+        for subtask in subtasks:
+            subtask.group_id = group_id
+
+        return TaskGroup(
+            task_id=group_id,
+            name=name,
+            description=description,
+            subtasks=subtasks,
+            goal=goal,
+            dependencies=dependencies or {},
+            depends_on=depends_on or [],
+            priority=priority
+        )
 
     @on(TaskMessage)
     async def handle_task_completion(self, task: TaskMessage, time: int):
@@ -136,19 +165,22 @@ class PlayGround(BasePlayGround):
                 group = self.task_groups[task.group_id]
                 if self.check_group_completion(group):
                     group.status = TaskStatus.COMPLETED
-                    self.active_groups.remove(group.task_id)
-                    self.completed_groups.add(group.task_id)
+                    if group.id in self.active_groups:
+                        self.active_groups.remove(group.id)
+                    self.completed_groups.add(group.id)
                     logger.debug(f"\nTask Group '{group.name}' completed!")
                     await self.print_group_statistics(group)
 
+                    # Check group goal
+                    if group.check_goal(self.task_groups, self.completed_tasks):
+                        logger.debug(f"\nGoal achieved for group: {group.name}")
+                        if len(self.completed_groups) == len(self.task_groups):
+                            logger.debug("\nAll groups completed and goals achieved!")
+                            await self.finish()
+                            return
+
                     # Activate dependent groups
                     await self.activate_ready_groups()
-
-                    # Check goals after group completion
-                    if await self.check_goals():
-                        logger.debug("\nFinal goal achieved! Stopping task system...")
-                        await self.finish()
-                        return
 
             await self.broadcast_message(TaskStatusUpdate(
                 task_id=task.task_id,
@@ -156,7 +188,16 @@ class PlayGround(BasePlayGround):
                 group_id=task.group_id
             ))
 
-    def _create_task_templates(self):
+    async def add_goal(self, goal_id: str, goal: TaskGroupGoal):
+        """Add a new goal to the system"""
+        self.goal_extension.add_task_goal(goal_id, goal)
+
+    async def check_goals(self):
+        """Check if any final goals have been achieved"""
+        return await self.goal_extension.check_task_goals()
+
+    @staticmethod
+    def _create_task_templates():
         return {
             "data_processor": {
                 "standard": lambda: TaskMessage(
@@ -187,7 +228,8 @@ class PlayGround(BasePlayGround):
             }
         }
 
-    def create_top_task(self, name: str, description: str, subtasks: List[TaskMessage],
+    @staticmethod
+    def create_top_task(name: str, description: str, subtasks: List[TaskMessage],
                         dependencies: Dict[str, List[str]] = None) -> TaskGroup:
         top_task_id = str(uuid.uuid4())
 
@@ -251,7 +293,7 @@ class PlayGround(BasePlayGround):
 
             await self.broadcast_message(TaskStatusUpdate(
                 task_id=task.task_id,
-                status="completed"
+                status=TaskStatus.COMPLETED
             ))
 
     async def print_statistics(self, top_task: Optional[TaskGroup] = None):
@@ -303,27 +345,6 @@ class PlayGround(BasePlayGround):
                 task.assigned_to = worker_name
                 self.worker_task_counts[worker_name] += 1
                 await self.broadcast_message(task)
-
-    @staticmethod
-    def create_task_group(name: str, description: str, subtasks: List[TaskMessage],
-                          dependencies: Dict[str, List[str]] = None,
-                          depends_on: List[str] = None,
-                          priority: int = 1) -> TaskGroup:
-        group_id = str(uuid.uuid4())
-
-        # Link subtasks to group
-        for subtask in subtasks:
-            subtask.group_id = group_id
-
-        return TaskGroup(
-            task_id=group_id,
-            name=name,
-            description=description,
-            subtasks=subtasks,
-            dependencies=dependencies or {},
-            depends_on=depends_on or [],
-            priority=priority
-        )
 
     def check_group_dependencies(self, group: TaskGroup) -> bool:
         """Check if all dependencies for a task group are met"""

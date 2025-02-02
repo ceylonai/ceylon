@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional, Set, List, Dict, Callable
 
+from loguru import logger
+
 
 class TaskStatus(Enum):
     PENDING = "pending"
@@ -39,7 +41,7 @@ class TaskGroup:
     name: str
     description: str
     subtasks: List[TaskMessage]
-    id : str = field(default_factory=lambda: str(uuid.uuid4()))
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     dependencies: Dict[str, List[str]] = field(default_factory=dict)
     depends_on: List[str] = field(default_factory=list)  # IDs of groups this group depends on
     required_by: List[str] = field(default_factory=list)  # IDs of groups that depend on this group
@@ -74,8 +76,38 @@ class GoalStatus(Enum):
 class TaskGroupGoal:
     name: str
     description: str
-    check_condition: Callable[[Dict[str, TaskGroup], Dict[str, TaskMessage]], bool]
+    check_condition: Callable[[Dict[str, 'TaskGroup'], Dict[str, TaskMessage]], bool]
     success_message: str
     failure_message: str
     status: GoalStatus = GoalStatus.NOT_STARTED
-    dependent_groups: List[str] = None  # List of group IDs this goal depends on
+
+
+@dataclass
+class TaskGroup:
+    task_id: str
+    name: str
+    description: str
+    subtasks: List[TaskMessage]
+    goal: Optional[TaskGroupGoal] = None
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    dependencies: Dict[str, List[str]] = field(default_factory=dict)
+    depends_on: List[str] = field(default_factory=list)
+    required_by: List[str] = field(default_factory=list)
+    status: TaskStatus = TaskStatus.PENDING
+    priority: int = 1
+
+    def check_goal(self, task_groups: Dict[str, 'TaskGroup'], completed_tasks: Dict[str, TaskMessage]) -> bool:
+        """Check if the group's goal has been achieved"""
+        if not self.goal:
+            return False
+
+        if self.goal.status == GoalStatus.ACHIEVED:
+            return True
+
+        if self.goal.check_condition(task_groups, completed_tasks):
+            self.goal.status = GoalStatus.ACHIEVED
+            logger.debug(f"\nGoal Achieved for group {self.name}: {self.goal.name}")
+            logger.debug(self.goal.success_message)
+            return True
+
+        return False
