@@ -3,5 +3,6 @@
 #
 from .playground import TaskPlayGround
 from .agent import TaskExecutionAgent
+from .manager import TaskManager
 
-__all__ = ["TaskPlayGround", "TaskExecutionAgent"]
+__all__ = ["TaskPlayGround", "TaskExecutionAgent", "TaskManager"]

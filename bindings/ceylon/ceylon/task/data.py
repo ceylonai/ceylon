@@ -5,7 +5,7 @@
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, Set, List, Dict, Callable
+from typing import Optional, Set, List, Dict, Callable, Any
 
 from loguru import logger
 
@@ -33,6 +33,7 @@ class TaskMessage:
     end_time: Optional[float] = None
     max_concurrent: int = 3
     status: TaskStatus = TaskStatus.PENDING
+    metadata: Optional[Dict[str, Any]] = None
 
 
 @dataclass
