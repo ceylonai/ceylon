@@ -1,17 +1,62 @@
 import asyncio
 import uuid
-from typing import List
+from typing import List, Dict
+from datetime import datetime
 from ceylon.task import TaskPlayGround
 from ceylon.task.data import TaskMessage, TaskGroup, TaskGroupGoal, GoalStatus
 from ceylon.task.manager import TaskManager
 from ceylon.llm.models.ollama import OllamaModel
 from ceylon.llm.agent import LLMAgent, LLMConfig
-from datetime import datetime
 
 def print_header(text: str):
     print(f"\n{'='*80}")
     print(f"{text.center(80)}")
     print(f"{'='*80}")
+
+def print_task_results(completed_tasks: Dict, task_results: Dict):
+    print_header("Task Results")
+
+    # Group tasks by type
+    writing_tasks = {}
+    analysis_tasks = {}
+
+    for task_id, output in completed_tasks.items():
+        if output.metadata.get('type') == 'article_writing':
+            writing_tasks[task_id] = output
+        elif output.metadata.get('type') == 'text_analysis':
+            analysis_tasks[task_id] = output
+
+    # Print writing task results
+    print_header("Generated Articles")
+    for task_id, output in writing_tasks.items():
+        print(f"\nArticle: {output.metadata.get('topic', 'Untitled')}")
+        print(f"Status: {'✓ Complete' if output.completed else '✗ Failed'}")
+        if output.completed:
+            print(f"Duration: {output.end_time - output.start_time:.2f}s")
+            result = task_results.get(task_id)
+            if result:
+                print("\nContent:")
+                print("-" * 40)
+                print(result)
+                print("-" * 40)
+        else:
+            print(f"Error: {output.error}")
+
+    # Print analysis task results
+    print_header("Text Analysis Results")
+    for task_id, output in analysis_tasks.items():
+        print(f"\nAnalysis Task: {output.name}")
+        print(f"Status: {'✓ Complete' if output.completed else '✗ Failed'}")
+        if output.completed:
+            print(f"Duration: {output.end_time - output.start_time:.2f}s")
+            result = task_results.get(task_id)
+            if result:
+                print("\nAnalysis:")
+                print("-" * 40)
+                print(result)
+                print("-" * 40)
+        else:
+            print(f"Error: {output.error}")
 
 def create_writing_tasks(topics: List[str]) -> List[TaskMessage]:
     """Create content generation tasks for given topics"""
@@ -84,7 +129,7 @@ async def main():
 
     # Initialize Ollama model
     llm_model = OllamaModel(
-        model_name="llama3.2",  # Or your preferred model
+        model_name="llama3.2",
         base_url="http://localhost:11434"
     )
 
@@ -117,7 +162,7 @@ async def main():
     # Initialize playground
     playground = TaskPlayGround(name="content_generation")
 
-    # Define writing topics
+    # Define topics and create task groups
     topics = [
         "Quantum Computing Applications",
         "Sustainable Energy Solutions",
@@ -125,11 +170,12 @@ async def main():
         "Space Exploration Progress"
     ]
 
-    print("\nTopics for Article Generation:")
-    for i, topic in enumerate(topics, 1):
-        print(f"{i}. {topic}")
+    analysis_texts = [
+        "Recent advancements in AI have transformed healthcare diagnosis...",
+        "Renewable energy adoption has increased significantly globally...",
+        "The shift to remote work has fundamentally changed workplace dynamics..."
+    ]
 
-    # Create writing task group
     writing_group = TaskManager.create_task_group(
         name="Article Writing",
         description="Generate informative articles on various topics",
@@ -144,18 +190,6 @@ async def main():
         priority=1
     )
 
-    # Sample texts for analysis
-    analysis_texts = [
-        "Recent advancements in AI have transformed healthcare diagnosis through improved pattern recognition and early disease detection.",
-        "Renewable energy adoption has increased significantly globally, with solar and wind power becoming increasingly cost-competitive with traditional energy sources.",
-        "The shift to remote work has fundamentally changed workplace dynamics, leading to new challenges in team collaboration and work-life balance."
-    ]
-
-    print("\nTexts for Analysis:")
-    for i, text in enumerate(analysis_texts, 1):
-        print(f"\n{i}. {text[:100]}...")
-
-    # Create analysis task group
     analysis_group = TaskManager.create_task_group(
         name="Content Analysis",
         description="Analyze various texts for insights",
@@ -172,7 +206,8 @@ async def main():
 
     try:
         print_header("Starting Task Processing")
-        print(f"Start Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        start_time = datetime.now()
+        print(f"Start Time: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
         # Run the playground
         async with playground.play(workers=llm_agents) as active_playground:
@@ -208,6 +243,19 @@ async def main():
                     print_header("All Tasks Completed!")
                     break
 
+            # Get completed tasks and results
+            completed_tasks = active_playground.get_completed_tasks()
+            task_results = active_playground.get_task_results()
+
+            # Print comprehensive results
+            print_task_results(completed_tasks, task_results)
+
+            # Print execution time
+            end_time = datetime.now()
+            duration = (end_time - start_time).total_seconds()
+            print(f"\nTotal Execution Time: {duration:.2f} seconds")
+
+            # Print final statistics
             print_header("Final Statistics")
             await active_playground.print_all_statistics()
 
