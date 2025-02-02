@@ -1,13 +1,18 @@
+#  Copyright 2024-Present, Syigen Ltd. and Syigen Private Limited. All rights reserved.
+#  Licensed under the Apache License, Version 2.0 (See LICENSE.md or http://www.apache.org/licenses/LICENSE-2.0).
+#
+
 import asyncio
 import uuid
 from typing import Dict, Callable
 
-from ceylon.llm import PlayGround, LLMAgent
-from ceylon.task.data import TaskMessage, TaskGroup, TaskStatus, TaskGroupGoal, GoalStatus
+from ceylon.task import TaskExecutionAgent, TaskPlayGround
+from ceylon.task.data import TaskMessage, TaskGroup, TaskGroupGoal, GoalStatus
 
 
 def create_goal_checker(required_tasks: int) -> Callable:
     """Creates a goal checker that completes when X tasks from a group are done"""
+
     def check_completion(task_groups: Dict[str, TaskGroup],
                          completed_tasks: Dict[str, TaskMessage]) -> bool:
         # Count completed tasks that belong to this group
@@ -18,18 +23,19 @@ def create_goal_checker(required_tasks: int) -> Callable:
         )
         print(f"Progress: {completed_group_tasks}/{required_tasks} tasks completed")
         return completed_group_tasks >= required_tasks
+
     return check_completion
 
 
 async def main():
-    playground = PlayGround()
+    playground = TaskPlayGround()
     workers = [
-        LLMAgent("worker1", "processor", max_concurrent_tasks=2),
-        LLMAgent("worker2", "processor", max_concurrent_tasks=2),
+        TaskExecutionAgent("worker1", "processor", max_concurrent_tasks=2),
+        TaskExecutionAgent("worker2", "processor", max_concurrent_tasks=2),
     ]
 
     # Create a task group with a clear goal: complete 5 tasks
-    processing_group = PlayGround.create_task_group(
+    processing_group = TaskPlayGround.create_task_group(
         name="Data Processing",
         description="Process 10 data items, goal achieves at 5",
         subtasks=[
@@ -70,5 +76,7 @@ async def main():
                 print("\nGoal achieved! System can stop while tasks continue.")
                 break
 
+
 if __name__ == "__main__":
     asyncio.run(main())
+

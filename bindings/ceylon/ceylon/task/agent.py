@@ -21,32 +21,31 @@ class AgentRequest(BaseModel):
     dependencies: Sequence[str]
 
 
-class LLMAgentConfig(BaseModel):
-    system_prompt: str | Sequence[str]
-    response_type: type[ResponseType] | None
+# class LLMAgentConfig(BaseModel):
+#     system_prompt: str | Sequence[str]
+#     response_type: type[ResponseType] | None
+#
+#
+# class LLMAgentBase(Worker):
+#     def __init__(
+#             self,
+#             name: str,
+#             role: str,
+#             system_prompt: str | Sequence[str] = (),
+#             response_type: type[ResponseType] = None
+#     ):
+#         super().__init__(name, role)
+#         self.config = LLMAgentConfig(
+#             system_prompt=system_prompt,
+#             response_type=response_type
+#         )
 
 
-class LLMAgentBase(Worker):
-    def __init__(
-            self,
-            name: str,
-            role: str,
-            system_prompt: str | Sequence[str] = (),
-            response_type: type[ResponseType] = None
-    ):
-        super().__init__(name, role)
-        self.config = LLMAgentConfig(
-            system_prompt=system_prompt,
-            response_type=response_type
-        )
-
-
-class LLMAgent(LLMAgentBase):
+class TaskExecutionAgent(Worker):
     def __init__(self, name: str, worker_role: str, max_concurrent_tasks: int = 3):
         super().__init__(
             name=name,
             role=worker_role,
-            system_prompt=f"You are a task execution agent specialized in {worker_role} tasks."
         )
         self.worker_role = worker_role
         self.active_tasks: Dict[str, TaskMessage] = {}

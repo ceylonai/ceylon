@@ -1,5 +1,6 @@
 #  Copyright 2024-Present, Syigen Ltd. and Syigen Private Limited. All rights reserved.
 #  Licensed under the Apache License, Version 2.0 (See LICENSE.md or http://www.apache.org/licenses/LICENSE-2.0).
+# 
 #
 import uuid
 from collections import defaultdict
@@ -12,7 +13,7 @@ from ceylon.base.playground import BasePlayGround
 from ceylon.task.data import TaskMessage, TaskRequest, TaskStatusUpdate, TaskGroup, TaskStatus, TaskGroupGoal
 
 
-class PlayGround(BasePlayGround):
+class TaskPlayGround(BasePlayGround):
     def __init__(self, name="task_manager", port=8888):
         super().__init__(name=name, port=port)
         # Existing initialization code...
