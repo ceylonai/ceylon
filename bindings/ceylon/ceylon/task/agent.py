@@ -72,6 +72,7 @@ class TaskExecutionAgent(Worker):
 
     @on(TaskMessage)
     async def handle_task(self, task: TaskMessage, time: int):
+        logger.debug(f"{self.name}: Received task {task.task_id} from {task.assigned_to}")
         if task.assigned_to != self.name or task.required_role != self.worker_role:
             return
 

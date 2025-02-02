@@ -24,7 +24,8 @@ async def main():
 
     # Create agent
     completion_agent = LLMAgent(
-        name="story_writer",
+        name="story writer",
+        role="story_writer",
         agent_instructions="You are a creative story writer."
     )
 

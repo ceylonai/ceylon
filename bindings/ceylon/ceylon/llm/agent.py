@@ -7,6 +7,7 @@ from datetime import datetime
 from loguru import logger
 
 from ceylon import Worker, on
+from ceylon.task import TaskExecutionAgent
 from ceylon.task.data import TaskMessage, TaskStatus
 
 
@@ -34,19 +35,21 @@ class LLMTask(TaskMessage):
     temperature: float = 0.7
 
 
-class LLMAgent(Worker):
+class LLMAgent(TaskExecutionAgent):
     def __init__(self,
                  name: str,
+                 role: str,
                  agent_instructions: str):
         super().__init__(
             name=name,
-            role="llm_agent"
+            worker_role=role,
         )
         self.agent_instructions = agent_instructions
         self.active_tasks: Dict[str, LLMTask] = {}
 
     @on(LLMTask)
     async def handle_task(self, task: LLMTask, time: int):
+        print( f"{self.name}: Received task {task.task_id} from {task.assigned_to}")
         if task.assigned_to != self.name:
             return
 
