@@ -1,3 +1,12 @@
+## v0.5.0
+- Enable Task Manager
+- Playground for Agent Communication
+- Simple connectivity for agents
+- LLM Model Support
+- Ollama Model
+- LLM Agent
+- Task Manager example
+- LLM Agent example
 ## v0.20.1
 - Update python dependencies
 ## v0.20.0
