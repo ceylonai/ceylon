@@ -96,6 +96,7 @@ class LLMAgent(TaskExecutionAgent):
                 if not task.metadata:
                     task.metadata = {}
                 task.metadata['llm_response'] = response.content
+                task.result = response.content
                 task.metadata['response_timestamp'] = response.timestamp
                 task.metadata.update(response.metadata)
 

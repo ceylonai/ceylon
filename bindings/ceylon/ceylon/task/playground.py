@@ -30,7 +30,6 @@ class TaskPlayGround(BasePlayGround):
                 metadata=task.metadata if task.metadata else {}
             )
             self.add_completed_task(task.task_id, task_output)
-
             # Store task result if present
             if hasattr(task, 'result'):
                 self.add_task_result(task.task_id, task.result)

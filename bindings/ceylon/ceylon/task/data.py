@@ -34,6 +34,7 @@ class TaskMessage:
     max_concurrent: int = 3
     status: TaskStatus = TaskStatus.PENDING
     metadata: Optional[Dict[str, Any]] = None
+    result: Optional[Any] = None
 
 
 @dataclass
