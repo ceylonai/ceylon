@@ -9,8 +9,7 @@ from loguru import logger
 
 from ceylon import on, on_connect
 from ceylon.base.playground import BasePlayGround
-from ceylon.task.data import TaskMessage, TaskRequest, TaskStatusUpdate, TaskGroup, TaskStatus
-from ceylon.task.goal_checker import PlayGroundExtension, TaskGroupGoal
+from ceylon.task.data import TaskMessage, TaskRequest, TaskStatusUpdate, TaskGroup, TaskStatus, TaskGroupGoal
 
 
 class PlayGround(BasePlayGround):
@@ -25,9 +24,6 @@ class PlayGround(BasePlayGround):
         self.workers_by_role: Dict[str, List[str]] = defaultdict(list)
         self.worker_task_counts: Dict[str, int] = defaultdict(int)
         self.task_templates = self._create_task_templates()
-
-        # Add goal checking extension
-        self.goal_extension = PlayGroundExtension(self)
 
     async def check_group_goals(self) -> bool:
         """Check if any group goals have been achieved"""
@@ -102,14 +98,6 @@ class PlayGround(BasePlayGround):
                 group_id=task.group_id
             ))
 
-    async def add_goal(self, goal_id: str, goal: TaskGroupGoal):
-        """Add a new goal to the system"""
-        self.goal_extension.add_task_goal(goal_id, goal)
-
-    async def check_goals(self):
-        """Check if any final goals have been achieved"""
-        return await self.goal_extension.check_task_goals()
-
     @staticmethod
     def _create_task_templates():
         return {
@@ -159,13 +147,6 @@ class PlayGround(BasePlayGround):
             dependencies=dependencies or {}
         )
 
-    def check_top_task_completion(self, top_task: TaskGroup) -> bool:
-        """Check if all subtasks in a top task are completed"""
-        return all(
-            task.task_id in self.completed_tasks
-            for task in top_task.subtasks
-        )
-
     @on(TaskRequest)
     async def handle_task_request(self, request: TaskRequest, time: int):
         if request.role not in self.task_templates:
@@ -189,56 +170,6 @@ class PlayGround(BasePlayGround):
     async def handle_worker_connection(self, topic: str, agent: "AgentDetail"):
         self.workers_by_role[agent.role].append(agent.name)
         logger.debug(f"Task Manager: Worker {agent.name} connected with role {agent.role}")
-
-    async def print_statistics(self, top_task: Optional[TaskGroup] = None):
-        if top_task:
-            logger.debug(f"\nStatistics for Top Task: {top_task.name}")
-        else:
-            logger.debug("\nCurrent Statistics:")
-
-        role_stats: Dict[str, Dict] = defaultdict(lambda: {"count": 0, "total_duration": 0})
-        tasks_to_analyze = top_task.subtasks if top_task else self.completed_tasks.values()
-
-        for task in tasks_to_analyze:
-            if task.task_id in self.completed_tasks:
-                task = self.completed_tasks[task.task_id]
-                duration = task.end_time - task.start_time
-                role_stats[task.required_role]["count"] += 1
-                role_stats[task.required_role]["total_duration"] += duration
-
-        for role, stats in role_stats.items():
-            avg_duration = stats["total_duration"] / stats["count"]
-            logger.debug(f"Role: {role}")
-            logger.debug(f"  Tasks Completed: {stats['count']}")
-            logger.debug(f"  Average Duration: {avg_duration:.2f} seconds")
-
-    async def assign_tasks(self, top_task: TaskGroup):
-        """Assign tasks from a top task"""
-        self.top_tasks[top_task.task_id] = top_task
-
-        for task in top_task.subtasks:
-            self.tasks[task.task_id] = task
-
-        # Group tasks by role
-        tasks_by_role = defaultdict(list)
-        for task in top_task.subtasks:
-            tasks_by_role[task.required_role].append(task)
-
-        # Assign tasks based on dependencies and roles
-        for role, role_tasks in tasks_by_role.items():
-            available_workers = self.workers_by_role.get(role, [])
-            if not available_workers:
-                logger.debug(f"Warning: No workers available for role {role}")
-                continue
-
-            for task in role_tasks:
-                worker_name = min(
-                    available_workers,
-                    key=lambda w: self.worker_task_counts[w]
-                )
-                task.assigned_to = worker_name
-                self.worker_task_counts[worker_name] += 1
-                await self.broadcast_message(task)
 
     def check_group_dependencies(self, group: TaskGroup) -> bool:
         """Check if all dependencies for a task group are met"""

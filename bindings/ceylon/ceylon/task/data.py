@@ -36,20 +36,6 @@ class TaskMessage:
 
 
 @dataclass
-class TaskGroup:
-    task_id: str
-    name: str
-    description: str
-    subtasks: List[TaskMessage]
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    dependencies: Dict[str, List[str]] = field(default_factory=dict)
-    depends_on: List[str] = field(default_factory=list)  # IDs of groups this group depends on
-    required_by: List[str] = field(default_factory=list)  # IDs of groups that depend on this group
-    status: TaskStatus = TaskStatus.PENDING
-    priority: int = 1
-
-
-@dataclass
 class TaskRequest:
     requester: str
     role: str
