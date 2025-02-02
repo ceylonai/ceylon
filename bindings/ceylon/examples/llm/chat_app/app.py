@@ -6,115 +6,69 @@ from ceylon.llm import PlayGround, LLMAgent
 from ceylon.task.data import TaskMessage, TaskGroup, TaskStatus, TaskGroupGoal, GoalStatus
 
 
-def group_tasks_completed(group_id: str) -> Callable:
-    """Create a condition checker for a specific group"""
-
-    def checker(task_groups: Dict[str, TaskGroup],
-                completed_tasks: Dict[str, TaskMessage]) -> bool:
-        print(f"Completed tasks: {completed_tasks}")
-        if len(completed_tasks) == 5:
-            return True
-        return (group_id in task_groups and
-                task_groups[group_id].status == TaskStatus.COMPLETED)
-
-    return checker
+def create_goal_checker(required_tasks: int) -> Callable:
+    """Creates a goal checker that completes when X tasks from a group are done"""
+    def check_completion(task_groups: Dict[str, TaskGroup],
+                         completed_tasks: Dict[str, TaskMessage]) -> bool:
+        # Count completed tasks that belong to this group
+        completed_group_tasks = sum(
+            1 for task in completed_tasks.values()
+            if hasattr(task, 'group_id') and
+            task.group_id in task_groups
+        )
+        print(f"Progress: {completed_group_tasks}/{required_tasks} tasks completed")
+        return completed_group_tasks >= required_tasks
+    return check_completion
 
 
 async def main():
     playground = PlayGround()
     workers = [
-        LLMAgent("worker1", "data_processor", max_concurrent_tasks=2),
-        LLMAgent("worker2", "data_processor", max_concurrent_tasks=2),
-        LLMAgent("worker3", "reporter", max_concurrent_tasks=3),
-        LLMAgent("worker4", "system_admin", max_concurrent_tasks=2)
+        LLMAgent("worker1", "processor", max_concurrent_tasks=2),
+        LLMAgent("worker2", "processor", max_concurrent_tasks=2),
     ]
 
-    # Create task groups with integrated goals
-    data_group = PlayGround.create_task_group(
+    # Create a task group with a clear goal: complete 5 tasks
+    processing_group = PlayGround.create_task_group(
         name="Data Processing",
-        description="Initial data processing tasks",
+        description="Process 10 data items, goal achieves at 5",
         subtasks=[
-            TaskMessage(task_id=str(uuid.uuid4()), name="Process Raw Data",
-                        description="Process raw data files",
-                        duration=2, required_role="data_processor")
-            for _ in range(2)
+            TaskMessage(
+                task_id=str(uuid.uuid4()),
+                name=f"Process Data Item {i}",
+                description=f"Processing task {i}",
+                duration=1,
+                required_role="processor"
+            )
+            for i in range(10)  # Create 10 tasks
         ],
         goal=TaskGroupGoal(
-            name="Complete Data Processing",
-            description="Complete all data processing tasks",
-            check_condition=group_tasks_completed(str(uuid.uuid4())),  # Will be updated with actual group ID
-            success_message="Successfully completed all data processing!",
-            failure_message="Failed to complete data processing tasks."
+            name="Partial Processing Complete",
+            description="Complete at least 5 processing tasks",
+            check_condition=create_goal_checker(required_tasks=5),  # Goal achieves at 5 tasks
+            success_message="Successfully completed minimum required tasks!",
+            failure_message="Failed to complete minimum required tasks."
         ),
         priority=1
     )
 
-    # Update the goal's check condition with the actual group ID
-    data_group.goal.check_condition = group_tasks_completed(data_group.task_id)
-
-    reporting_group = PlayGround.create_task_group(
-        name="Report Generation",
-        description="Generate reports from processed data",
-        subtasks=[
-            TaskMessage(task_id=str(uuid.uuid4()), name="Generate Report",
-                        description="Create analysis report",
-                        duration=3, required_role="reporter")
-            for _ in range(2)
-        ],
-        goal=TaskGroupGoal(
-            name="Complete Report Generation",
-            description="Complete all reporting tasks",
-            check_condition=group_tasks_completed(str(uuid.uuid4())),  # Will be updated with actual group ID
-            success_message="Successfully completed all reports!",
-            failure_message="Failed to complete report generation."
-        ),
-        depends_on=[data_group.task_id],
-        priority=2
-    )
-
-    # Update the goal's check condition with the actual group ID
-    reporting_group.goal.check_condition = group_tasks_completed(reporting_group.task_id)
-
-    maintenance_group = PlayGround.create_task_group(
-        name="System Maintenance",
-        description="Regular system maintenance tasks",
-        subtasks=[
-            TaskMessage(task_id=str(uuid.uuid4()), name="Backup Data",
-                        description="Backup processed data",
-                        duration=2, required_role="system_admin")
-            for _ in range(1)
-        ],
-        goal=TaskGroupGoal(
-            name="Complete System Maintenance",
-            description="Complete all maintenance tasks",
-            check_condition=group_tasks_completed(str(uuid.uuid4())),  # Will be updated with actual group ID
-            success_message="Successfully completed system maintenance!",
-            failure_message="Failed to complete maintenance tasks."
-        ),
-        priority=3
-    )
-
-    # Update the goal's check condition with the actual group ID
-    maintenance_group.goal.check_condition = group_tasks_completed(maintenance_group.task_id)
-
     async with playground.play(workers=workers) as active_playground:
-        # Start task groups
-        await active_playground.assign_task_groups([
-            data_group,
-            reporting_group,
-            maintenance_group
-        ])
+        await active_playground.assign_task_groups([processing_group])
 
-        # Wait for completion
+        # Wait for goal achievement
         while True:
             await asyncio.sleep(1)
-            all_completed = all(group.status == TaskStatus.COMPLETED
-                                for group in active_playground.task_groups.values())
-            all_goals_achieved = all(group.goal and group.goal.status == GoalStatus.ACHIEVED
-                                     for group in active_playground.task_groups.values())
-            if all_completed and all_goals_achieved:
-                break
+            current_group = active_playground.task_groups[processing_group.task_id]
 
+            # Print clear status updates
+            print(f"\nGroup Status: {current_group.status}")
+            if current_group.goal:
+                print(f"Goal Status: {current_group.goal.status}")
+
+            if (current_group.goal and
+                    current_group.goal.status == GoalStatus.ACHIEVED):
+                print("\nGoal achieved! System can stop while tasks continue.")
+                break
 
 if __name__ == "__main__":
     asyncio.run(main())
