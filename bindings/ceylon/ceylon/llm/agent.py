@@ -70,10 +70,10 @@ class LLMAgent(TaskExecutionAgent):
         Execute an LLM task with retry logic and error handling
         """
         try:
-            print(f"\n{'='*80}")
-            print(f"Task: {task.name}")
-            print(f"Description: {task.description}")
-            print(f"{'='*80}\n")
+            logger.info(f"\n{'='*80}")
+            logger.info(f"Task: {task.name}")
+            logger.info(f"Description: {task.description}")
+            logger.info(f"{'='*80}\n")
 
             async with self.processing_lock:
                 response = await self._execute_with_retry(task)
@@ -83,10 +83,10 @@ class LLMAgent(TaskExecutionAgent):
                 self.response_cache[task.task_id] = response
 
                 # Print the response
-                print("\nGenerated Content:")
-                print(f"{'-'*80}")
-                print(response.content)
-                print(f"{'-'*80}\n")
+                logger.info("\nGenerated Content:")
+                logger.info(f"{'-'*80}")
+                logger.info(response.content)
+                logger.info(f"{'-'*80}\n")
 
                 # Update task with completion info
                 task.completed = True

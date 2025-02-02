@@ -70,15 +70,9 @@ async def main():
         async with playground.play(workers=[llm_agent]) as active_playground:
             # Assign task group
             await active_playground.assign_task_groups([task_group])
-
             # Wait for completion
-            while True:
-                await asyncio.sleep(1)
-                if task.task_id in active_playground.get_completed_tasks():
-                    break
-
             # Get and display results
-            completed_task = active_playground.get_completed_tasks()[task.task_id]
+            completed_task = (await active_playground.wait_and_get_completed_tasks())[task.task_id]
             if completed_task.completed:
                 print("\nTask Completed Successfully!")
                 print(f"Duration: {completed_task.end_time - completed_task.start_time:.2f}s")

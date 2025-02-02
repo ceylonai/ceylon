@@ -36,6 +36,7 @@ class BasePlayGround(Admin):
         self.llm_agents: Dict[str, AgentConnectedStatus] = {}
         self._connected_event = None
         self._stop_event = None
+        self._all_tasks_completed_events: Dict[str, asyncio.Event] = {}
         self._completed_tasks: Dict[str, TaskOutput] = {}
         self._task_results: Dict[str, Any] = {}
 
@@ -54,6 +55,11 @@ class BasePlayGround(Admin):
     def get_completed_tasks(self) -> Dict[str, TaskOutput]:
         """Get all completed tasks"""
         return self._completed_tasks.copy()
+
+    async def wait_and_get_completed_tasks(self) -> Dict[str, TaskOutput]:
+        for event in self._all_tasks_completed_events.values():
+            await event.wait()
+        return self.get_completed_tasks()
 
     def get_task_results(self) -> Dict[str, Any]:
         """Get all task results"""
@@ -109,7 +115,8 @@ class BasePlayGround(Admin):
             for task_id, output in self._completed_tasks.items():
                 if output.completed:
                     duration = output.end_time - output.start_time if output.end_time and output.start_time else None
-                    logger.info(f"Task {task_id} ({output.name}) completed in {duration:.2f}s" if duration else f"Task {task_id} ({output.name}) completed")
+                    logger.info(
+                        f"Task {task_id} ({output.name}) completed in {duration:.2f}s" if duration else f"Task {task_id} ({output.name}) completed")
                 else:
                     logger.warning(f"Task {task_id} ({output.name}) failed: {output.error}")
 

@@ -2,6 +2,8 @@
 #  Licensed under the Apache License, Version 2.0 (See LICENSE.md or http://www.apache.org/licenses/LICENSE-2.0).
 # 
 #
+import asyncio
+
 from loguru import logger
 from ceylon import on, on_connect
 from ceylon.base.playground import BasePlayGround, TaskOutput
@@ -34,6 +36,7 @@ class TaskPlayGround(BasePlayGround):
             if hasattr(task, 'result'):
                 self.add_task_result(task.task_id, task.result)
 
+            self._all_tasks_completed_events[task.task_id].set()
             # Broadcast status update
             await self.broadcast_message(TaskStatusUpdate(
                 task_id=task.task_id,
@@ -97,6 +100,7 @@ class TaskPlayGround(BasePlayGround):
         assignments = await self.task_manager.assign_task_groups(groups)
         for assignment in assignments:
             await self.broadcast_message(assignment)
+            self._all_tasks_completed_events[assignment.task_id] = asyncio.Event()
 
     async def print_all_statistics(self):
         """Print statistics for all task groups"""

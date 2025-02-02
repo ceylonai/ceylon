@@ -1,12 +1,14 @@
 import asyncio
 import uuid
-from typing import List, Dict
 from datetime import datetime
-from ceylon.task import TaskPlayGround
-from ceylon.task.data import TaskMessage, TaskGroup, TaskGroupGoal, GoalStatus
-from ceylon.task.manager import TaskManager
-from ceylon.llm.models.ollama import OllamaModel
+from typing import List, Dict
+
 from ceylon.llm.agent import LLMAgent, LLMConfig
+from ceylon.llm.models.ollama import OllamaModel
+from ceylon.task import TaskPlayGround
+from ceylon.task.data import TaskMessage, TaskGroupGoal, GoalStatus
+from ceylon.task.manager import TaskManager
+
 
 def print_header(text: str):
     print(f"\n{'='*80}")
