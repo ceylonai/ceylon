@@ -42,7 +42,7 @@ async def main():
     task = TaskMessage(
         task_id=str(uuid.uuid4()),
         name="Write about AI",
-        description=(
+        instructions=(
             "Write a short, engaging paragraph about artificial intelligence "
             "and its impact on society."
         ),

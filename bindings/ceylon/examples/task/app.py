@@ -39,7 +39,7 @@ async def main():
             TaskMessage(
                 task_id=str(uuid.uuid4()),
                 name=f"Process Data Item {i}",
-                description=f"Processing task {i}",
+                instructions=f"Processing task {i}",
                 duration=1,
                 required_role="processor",
                 metadata={"item_number": i}

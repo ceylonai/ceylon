@@ -21,9 +21,8 @@ class TaskStatus(Enum):
 class TaskMessage:
     task_id: str
     name: str
-    description: str
-    duration: float
-    required_role: str
+    instructions: str
+    required_role: str=None
     parent_id: Optional[str] = None
     group_id: Optional[str] = None  # Reference to TaskGroup
     subtask_ids: Set[str] = field(default_factory=set)

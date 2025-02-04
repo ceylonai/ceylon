@@ -3,7 +3,7 @@ from typing import Any, AsyncIterator, Optional, Sequence
 
 import httpx
 
-from ceylon.llm.models import Model, ModelContext
+from ceylon.llm.models import Model, ModelContext, cached_async_http_client
 from ceylon.llm.models.support.messages import (
     MessageRole,
     ModelMessage,
@@ -35,14 +35,11 @@ class OllamaModel(Model):
         super().__init__(model_name, **kwargs)
         self.base_url = base_url.rstrip('/')
         self.timeout = timeout
-        self.client = httpx.AsyncClient(
-            base_url=self.base_url,
-            timeout=timeout
-        )
+        self.client = cached_async_http_client(timeout=self.timeout, base_url=self.base_url)
 
     async def close(self) -> None:
         """Close the HTTP client"""
-        await self.client.aclose()
+        await self.client().aclose()
 
     def _format_messages(self, messages: Sequence[ModelMessage]) -> str:
         """Format messages for Ollama API.
@@ -84,7 +81,8 @@ class OllamaModel(Model):
                 return part.tool_name
         return "unknown"
 
-    def _prepare_request_data(self, messages: Sequence[ModelMessage], context: ModelContext, stream: bool = False) -> dict[str, Any]:
+    def _prepare_request_data(self, messages: Sequence[ModelMessage], context: ModelContext, stream: bool = False) -> \
+    dict[str, Any]:
         """Prepare the request data for Ollama API"""
         data = {
             "model": self.model_name,
@@ -125,7 +123,7 @@ class OllamaModel(Model):
         data = self._prepare_request_data(messages, context, stream=False)
 
         # Make request
-        response = await self.client.post(
+        response = await self.client().post(
             "/api/generate",
             json=data
         )
@@ -165,7 +163,7 @@ class OllamaModel(Model):
         data = self._prepare_request_data(messages, context, stream=True)
 
         # Make streaming request
-        async with self.client.stream(
+        async with self.client().stream(
                 "POST",
                 "/api/generate",
                 json=data

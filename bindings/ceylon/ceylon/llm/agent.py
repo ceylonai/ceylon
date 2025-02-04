@@ -72,7 +72,7 @@ class LLMAgent(TaskExecutionAgent):
         try:
             logger.info(f"\n{'='*80}")
             logger.info(f"Task: {task.name}")
-            logger.info(f"Description: {task.description}")
+            logger.info(f"Description: {task.instructions}")
             logger.info(f"{'='*80}\n")
 
             async with self.processing_lock:
@@ -194,7 +194,7 @@ class LLMAgent(TaskExecutionAgent):
         """
         prompt_parts = [
             f"Task: {task.name}",
-            f"Description: {task.description}"
+            f"Description: {task.instructions}"
         ]
 
         # Add any task-specific metadata to prompt

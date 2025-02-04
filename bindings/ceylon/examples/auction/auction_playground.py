@@ -102,7 +102,7 @@ async def setup_auction(
         TaskMessage(
             task_id=f"bid_{bidder.name}_{item.name}",
             name=f"Place bid for {item.name}",
-            description=f"Submit bid for {item.name} (Starting price: ${item.starting_price:.2f})",
+            instructions=f"Submit bid for {item.name} (Starting price: ${item.starting_price:.2f})",
             duration=1,
             required_role="bidder",
             metadata={

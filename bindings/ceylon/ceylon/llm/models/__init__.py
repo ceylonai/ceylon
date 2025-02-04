@@ -4,8 +4,12 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from functools import cache
 from types import TracebackType
-from typing import AsyncIterator, Optional, Sequence, Type
+from typing import AsyncIterator, Optional, Sequence, Type, Callable
+
+import httpx
+from httpx import AsyncClient
 
 from ceylon.llm.models.support.http import AsyncHTTPClient, cached_async_http_client
 from ceylon.llm.models.support.messages import ModelMessage, ModelResponse, StreamedResponse
@@ -152,3 +156,32 @@ class Model(ABC):
 class UsageLimitExceeded(Exception):
     """Raised when usage limits are exceeded"""
     pass
+
+
+@cache
+def get_user_agent() -> str:
+    """Get the user agent string for the HTTP client."""
+    from ceylon import version
+
+    return f'ceylon-ai/{version()}'
+
+
+@cache
+def cached_async_http_client(timeout: int = 600, connect: int = 5,
+                             base_url: str = "http://localhost:11434") -> Callable[[], AsyncClient]:
+    """Cached HTTPX async client so multiple agents and calls can share the same client.
+
+    There are good reasons why in production you should use a `httpx.AsyncClient` as an async context manager as
+    described in [encode/httpx#2026](https://github.com/encode/httpx/pull/2026), but when experimenting or showing
+    examples, it's very useful not to, this allows multiple Agents to use a single client.
+
+    The default timeouts match those of OpenAI,
+    see <https://github.com/openai/openai-python/blob/v1.54.4/src/openai/_constants.py#L9>.
+    """
+    def factory() -> httpx.AsyncClient:
+        return httpx.AsyncClient(
+            headers={"User-Agent": get_user_agent()},
+            timeout=timeout,
+            base_url=base_url
+        )
+    return factory

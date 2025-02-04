@@ -160,7 +160,7 @@ class TaskManager:
                 "standard": lambda: TaskMessage(
                     task_id=str(uuid.uuid4()),
                     name="Process Data Batch",
-                    description="Process incoming data batch",
+                    instructions="Process incoming data batch",
                     duration=2,
                     required_role="data_processor"
                 ),
@@ -169,7 +169,7 @@ class TaskManager:
                 "standard": lambda: TaskMessage(
                     task_id=str(uuid.uuid4()),
                     name="Generate Report",
-                    description="Generate periodic report",
+                    instructions="Generate periodic report",
                     duration=3,
                     required_role="reporter"
                 ),
@@ -178,7 +178,7 @@ class TaskManager:
                 "standard": lambda: TaskMessage(
                     task_id=str(uuid.uuid4()),
                     name="System Maintenance",
-                    description="Perform system maintenance",
+                    instructions="Perform system maintenance",
                     duration=2,
                     required_role="system_admin"
                 ),

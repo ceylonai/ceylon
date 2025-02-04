@@ -294,10 +294,11 @@ sequenceDiagram
 ## Best Practices and Error Handling
 
 1. Task Validation
+
 ```python
 def validate_task(task: Task) -> bool:
     return (1 <= task.difficulty <= 10 and
-            task.description.strip() and
+            task.instructions.strip() and
             task.id > 0)
 ```
 

@@ -3,6 +3,8 @@ import uuid
 from datetime import datetime
 from typing import List, Dict
 
+import loguru
+
 from ceylon.llm.agent import LLMAgent, LLMConfig
 from ceylon.llm.models.ollama import OllamaModel
 from ceylon.task import TaskPlayGround
@@ -68,7 +70,7 @@ def create_writing_tasks(topics: List[str]) -> List[TaskMessage]:
         tasks.append(TaskMessage(
             task_id=task_id,
             name=f"Write Article: {topic}",
-            description=(
+            instructions=(
                 f"Write a comprehensive article about {topic}. "
                 f"Include key concepts, recent developments, and future implications."
             ),
@@ -91,7 +93,7 @@ def create_analysis_tasks(texts: List[str]) -> List[TaskMessage]:
         tasks.append(TaskMessage(
             task_id=task_id,
             name=f"Analyze Text {i + 1}",
-            description=(
+            instructions=(
                 "Perform a detailed analysis of the provided text. "
                 "Include key themes, sentiment, and main points."
             ),
@@ -269,4 +271,5 @@ async def main():
 if __name__ == "__main__":
     print("\nStarting Ceylon LLM Agent Demo...")
     print("Make sure Ollama is running at http://localhost:11434\n")
+    loguru.logger.remove()
     asyncio.run(main())
