@@ -142,6 +142,7 @@ Distribution logic:
 4. Broadcasts assignments
 
 ### Result Processing
+
 ```python
 @on(TaskResult)
 async def handle_result(self, data: TaskResult, time: int, agent: AgentDetail):
@@ -149,7 +150,7 @@ async def handle_result(self, data: TaskResult, time: int, agent: AgentDetail):
     if len(self.task_results) == len(self.tasks):
         print("All tasks completed")
         for result in self.task_results:
-            print(f"Task {result.task_id} assigned to {result.worker} - "
+            print(f"Task {result.id} assigned to {result.worker} - "
                   f"{'Success' if result.success else 'Failure'}")
         await self.end_task_management()
 ```

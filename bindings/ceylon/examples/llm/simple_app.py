@@ -72,13 +72,13 @@ async def main():
             await active_playground.assign_task_groups([task_group])
             # Wait for completion
             # Get and display results
-            completed_task = (await active_playground.wait_and_get_completed_tasks())[task.task_id]
+            completed_task = (await active_playground.wait_and_get_completed_tasks())[task.id]
             if completed_task.completed:
                 print("\nTask Completed Successfully!")
                 print(f"Duration: {completed_task.end_time - completed_task.start_time:.2f}s")
                 print("\nGenerated Content:")
                 print("=" * 80)
-                task_result = active_playground.get_task_results().get(task.task_id)
+                task_result = active_playground.get_task_results().get(task.id)
                 if task_result:
                     print(task_result)
                 print("=" * 80)

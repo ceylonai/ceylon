@@ -1,124 +1,163 @@
 #  Copyright 2024-Present, Syigen Ltd. and Syigen Private Limited. All rights reserved.
 #  Licensed under the Apache License, Version 2.0 (See LICENSE.md or http://www.apache.org/licenses/LICENSE-2.0).
-# 
 #
 import asyncio
+from typing import Dict, List, Any
 
 from loguru import logger
-from ceylon import on, on_connect
-from ceylon.base.playground import BasePlayGround, TaskOutput
-from ceylon.task.data import TaskMessage, TaskRequest, TaskStatusUpdate, TaskStatus
-from .manager import TaskManager
+
+from ceylon import on
+from ceylon.processor.agent import ProcessRequest, ProcessResponse, ProcessState
+from ceylon.processor.playground import ProcessPlayGround
+from ceylon.task.manager import TaskManager, TaskResult, TaskStatus, Task
 
 
-class TaskPlayGround(BasePlayGround):
-    def __init__(self, name="task_manager", port=8888):
+class TaskProcessingPlayground(ProcessPlayGround):
+    """
+    Extended playground that combines ProcessPlayGround capabilities with TaskManager
+    for structured task processing and dependency management.
+    """
+
+    def __init__(self, name="task_processor", port=8888):
         super().__init__(name=name, port=port)
         self.task_manager = TaskManager()
+        self.task_process_map: Dict[str, str] = {}  # Maps task IDs to process request IDs
+        self.pending_tasks: Dict[str, asyncio.Event] = {}
+        self.task_responses: Dict[str, TaskResult] = {}
 
-    @on(TaskMessage)
-    async def handle_task_completion(self, task: TaskMessage, time: int):
-        if task.completed and task.task_id in self.task_manager.tasks:
-            # Record task completion
-            logger.info(f"Task {task.task_id} completed by {task.assigned_to}")
+    async def add_and_execute_task(self,
+                                   task: Task,
+                                   wait_for_completion: bool = True) -> TaskResult:
+        """
+        Add a task and execute it through the processor system.
 
-            # Create task output record
-            task_output = TaskOutput(
-                task_id=task.task_id,
-                name=task.name,
-                completed=True,
-                start_time=task.start_time,
-                end_time=task.end_time,
-                metadata=task.metadata if task.metadata else {}
+        Args:
+            task (Task): The task to be added and executed.
+            wait_for_completion (bool): Whether to wait for the task to complete.
+
+        Returns:
+            TaskResult: Result of the task execution
+            :param task:
+        """
+        if type(task.processor) == str:
+            required_role = task.processor
+        else:
+            raise ValueError("Processor must be a string (role)")
+
+        async def process_executor(input_data: Dict) -> Any:
+
+            if task.dependencies:
+                dependency_data = {}
+                for dependency_id in task.dependencies:
+                    dependency_data[dependency_id] = self.task_responses[dependency_id]
+
+            else:
+                dependency_data = None
+
+            # Create and send process request
+            process_request = ProcessRequest(
+                task_type=required_role,
+                data=input_data.get('data'),
+                dependency_data=dependency_data
             )
-            self.add_completed_task(task.task_id, task_output)
-            # Store task result if present
-            if hasattr(task, 'result'):
-                self.add_task_result(task.task_id, task.result)
 
-            self._all_tasks_completed_events[task.task_id].set()
-            # Broadcast status update
-            await self.broadcast_message(TaskStatusUpdate(
-                task_id=task.task_id,
-                status=TaskStatus.COMPLETED,
-                group_id=task.group_id
-            ))
+            # Store mapping
+            self.task_process_map[task.id] = process_request.id
 
-            # Check if all groups are completed
-            all_completed = await self.task_manager.handle_task_completion(task)
-            if all_completed:
-                logger.info("\nAll groups completed and goals achieved!")
-                await self.finish()
-                return
+            # Send request and wait for response
+            response = await self.process_request(process_request)
 
-            # Activate dependent groups
-            new_assignments = await self.task_manager.activate_ready_groups()
-            for assignment in new_assignments:
-                await self.broadcast_message(assignment)
+            if response.status == ProcessState.SUCCESS:
+                return response.result
+            else:
+                raise Exception(response.error_message or "Task processing failed")
 
-    @on(TaskStatusUpdate)
-    async def handle_task_status_update(self, update: TaskStatusUpdate, time: int):
-        if update.status == TaskStatus.FAILED and update.task_id in self.task_manager.tasks:
-            task = self.task_manager.tasks[update.task_id]
-            # Record failed task
-            task_output = TaskOutput(
-                task_id=task.task_id,
-                name=task.name,
-                completed=False,
-                start_time=task.start_time,
-                end_time=task.end_time,
-                error=update.message
+        task.processor = process_executor
+
+        if wait_for_completion:
+            # Create completion event
+            self.pending_tasks[task.id] = asyncio.Event()
+
+            # Execute task
+            result = await self._execute_task(task)
+            self.task_responses[task.id] = result
+            self.task_manager.add_task(task)
+
+            # Clean up
+            self.pending_tasks.pop(task.id, None)
+            return result
+        else:
+            # Start execution without waiting
+            asyncio.create_task(self._execute_task(task))
+            return None
+
+    async def _execute_task(self, task: Task) -> TaskResult:
+        """Execute a single task and handle its result."""
+        try:
+            # Execute the task
+            result = await asyncio.create_task(
+                self.task_manager.execute_task(task)
             )
-            self.add_completed_task(task.task_id, task_output)
 
-    @on(TaskRequest)
-    async def handle_task_request(self, request: TaskRequest, time: int):
-        templates = self.task_manager.task_templates
-        if request.role not in templates:
-            logger.warning(f"No task templates for role {request.role}")
-            return
+            # Set completion event if it exists
+            if task.id in self.pending_tasks:
+                self.pending_tasks[task.id].set()
 
-        template = templates[request.role].get(request.task_type)
-        if not template:
-            logger.warning(f"No template for task type {request.task_type}")
-            return
+            return result
 
-        new_task = template()
-        new_task.assigned_to = request.requester
-        self.task_manager.tasks[new_task.task_id] = new_task
-        self.task_manager.worker_task_counts[request.requester] += 1
+        except Exception as e:
+            logger.error(f"Error executing task {task.name}: {e}")
+            return TaskResult(success=False, error=str(e))
 
-        await self.broadcast_message(new_task)
-        logger.info(f"Task Manager: Created and assigned new task {new_task.task_id} to {request.requester}")
+    async def execute_task_group(self, tasks: List[Task]) -> Dict[str, TaskResult]:
+        """Execute a group of tasks respecting dependencies."""
+        results = {}
+        pending_tasks = set()
 
-    @on_connect("*")
-    async def handle_worker_connection(self, topic: str, agent: "AgentDetail"):
-        self.task_manager.register_worker(agent.name, agent.role)
+        for task in tasks:
+            event = asyncio.Event()
+            self.pending_tasks[task.id] = event
+            pending_tasks.add(task.id)
 
-    async def assign_task_groups(self, groups):
-        """Initialize and start processing multiple task groups"""
-        assignments = await self.task_manager.assign_task_groups(groups)
-        for assignment in assignments:
-            await self.broadcast_message(assignment)
-            self._all_tasks_completed_events[assignment.task_id] = asyncio.Event()
+            # Start task execution
+            asyncio.create_task(self._execute_task(task))
 
-    async def print_all_statistics(self):
-        """Print statistics for all task groups"""
-        await self.task_manager.print_all_statistics()
+        # Wait for all tasks to complete
+        while pending_tasks:
+            completed = []
+            for task_id in pending_tasks:
+                if self.pending_tasks[task_id].is_set():
+                    completed.append(task_id)
+                    task = self.task_manager.get_task(task_id)
+                    results[task_id] = task.result
+                    self.pending_tasks.pop(task_id)
 
-        # Print task completion statistics
-        completed_tasks = self.get_completed_tasks()
-        successful = sum(1 for t in completed_tasks.values() if t.completed)
-        failed = sum(1 for t in completed_tasks.values() if not t.completed)
+            for task_id in completed:
+                pending_tasks.remove(task_id)
 
-        logger.info("\nTask Completion Statistics:")
-        logger.info(f"Total Tasks: {len(completed_tasks)}")
-        logger.info(f"Successful: {successful}")
-        logger.info(f"Failed: {failed}")
+            await asyncio.sleep(0.1)
 
-        # Print task results if available
-        task_results = self.get_task_results()
-        if task_results:
-            logger.info("\nTask Results Summary:")
-            for task_id, result in task_results.items():
-                logger.info(f"Task {task_id}: {result}")
+        return results
+
+    @on(ProcessResponse)
+    async def handle_process_response(self, response: ProcessResponse, time: int):
+        """Handle process responses and update task status."""
+        await super().handle_process_response(response, time)
+
+        # Find corresponding task
+        task_id = next(
+            (tid for tid, pid in self.task_process_map.items()
+             if pid == response.request_id),
+            None
+        )
+
+        if task_id:
+            task = self.task_manager.get_task(task_id)
+            if task:
+                if response.status == ProcessState.SUCCESS:
+                    task.status = TaskStatus.COMPLETED
+                elif response.status == ProcessState.ERROR:
+                    task.status = TaskStatus.FAILED
+
+                # Clean up mapping
+                self.task_process_map.pop(task_id, None)

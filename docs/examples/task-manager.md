@@ -120,98 +120,98 @@ class WorkerAgent(BaseAgent):
 
 ```python
 class TaskManager(BaseAgent):
-    def __init__(self, tasks: List[Task], expected_workers: int,
-                 name="task_manager", port=8000):
-        super().__init__(
-            name=name,
-            port=port,
-            mode=PeerMode.ADMIN,
-            role="task_manager"
-        )
-        self.tasks = tasks
-        self.expected_workers = expected_workers
-        self.task_results = []
-        self.tasks_assigned = False
-        self.worker_stats = {}
-        self.task_timeouts = {}
+   def __init__(self, tasks: List[Task], expected_workers: int,
+                name="task_manager", port=8000):
+      super().__init__(
+         name=name,
+         port=port,
+         mode=PeerMode.ADMIN,
+         role="task_manager"
+      )
+      self.tasks = tasks
+      self.expected_workers = expected_workers
+      self.task_results = []
+      self.tasks_assigned = False
+      self.worker_stats = {}
+      self.task_timeouts = {}
 
-    async def assign_tasks(self):
-        if self.tasks_assigned:
-            return
+   async def assign_tasks(self):
+      if self.tasks_assigned:
+         return
 
-        self.tasks_assigned = True
-        connected_workers = await self.get_connected_agents()
-        
-        # Intelligent task distribution
-        worker_tasks = self._match_tasks_to_workers(
-            self.tasks, connected_workers)
-        
-        for worker, task in worker_tasks:
-            assignment = TaskAssignment(
-                task=task,
-                assigned_at=int(time.time()),
-                timeout=task.difficulty * 2
-            )
-            await self.broadcast(pickle.dumps(assignment))
-            
-            # Set timeout handler
-            self.task_timeouts[task.id] = asyncio.create_task(
-                self._handle_timeout(task.id, assignment.timeout)
-            )
+      self.tasks_assigned = True
+      connected_workers = await self.get_connected_agents()
 
-    async def _handle_timeout(self, task_id: int, timeout: int):
-        await asyncio.sleep(timeout)
-        if task_id not in self.completed_tasks:
-            logger.warning(f"Task {task_id} timed out")
-            # Implement timeout handling
+      # Intelligent task distribution
+      worker_tasks = self._match_tasks_to_workers(
+         self.tasks, connected_workers)
 
-    def _match_tasks_to_workers(self, tasks, workers):
-        # Intelligent matching algorithm
-        matches = []
-        sorted_tasks = sorted(tasks, 
+      for worker, task in worker_tasks:
+         assignment = TaskAssignment(
+            task=task,
+            assigned_at=int(time.time()),
+            timeout=task.difficulty * 2
+         )
+         await self.broadcast(pickle.dumps(assignment))
+
+         # Set timeout handler
+         self.task_timeouts[task.id] = asyncio.create_task(
+            self._handle_timeout(task.id, assignment.timeout)
+         )
+
+   async def _handle_timeout(self, task_id: int, timeout: int):
+      await asyncio.sleep(timeout)
+      if task_id not in self.completed_tasks:
+         logger.warning(f"Task {task_id} timed out")
+         # Implement timeout handling
+
+   def _match_tasks_to_workers(self, tasks, workers):
+      # Intelligent matching algorithm
+      matches = []
+      sorted_tasks = sorted(tasks,
                             key=lambda t: t.difficulty,
                             reverse=True)
-        sorted_workers = sorted(workers,
+      sorted_workers = sorted(workers,
                               key=lambda w: self._get_worker_score(w))
-        
-        for task, worker in zip(sorted_tasks, sorted_workers):
-            matches.append((worker, task))
-        return matches
 
-    def _get_worker_score(self, worker):
-        stats = self.worker_stats.get(worker.name, {})
-        success_rate = stats.get('success_rate', 0.5)
-        completed_tasks = stats.get('completed_tasks', 0)
-        return success_rate * 0.7 + completed_tasks * 0.3
+      for task, worker in zip(sorted_tasks, sorted_workers):
+         matches.append((worker, task))
+      return matches
 
-    @on(TaskResult)
-    async def handle_result(self, data: TaskResult, 
-                          time: int, agent: AgentDetail):
-        # Cancel timeout handler
-        if data.task_id in self.task_timeouts:
-            self.task_timeouts[data.task_id].cancel()
-            
-        self.task_results.append(data)
-        self._update_worker_stats(data)
-        
-        if len(self.task_results) == len(self.tasks):
-            await self._generate_final_report()
-            await self.end_task_management()
+   def _get_worker_score(self, worker):
+      stats = self.worker_stats.get(worker.name, {})
+      success_rate = stats.get('success_rate', 0.5)
+      completed_tasks = stats.get('completed_tasks', 0)
+      return success_rate * 0.7 + completed_tasks * 0.3
 
-    def _update_worker_stats(self, result: TaskResult):
-        if result.worker not in self.worker_stats:
-            self.worker_stats[result.worker] = {
-                'completed_tasks': 0,
-                'successful_tasks': 0,
-                'total_time': 0
-            }
-            
-        stats = self.worker_stats[result.worker]
-        stats['completed_tasks'] += 1
-        if result.success:
-            stats['successful_tasks'] += 1
-        stats['total_time'] += result.execution_time
-        stats['success_rate'] = (stats['successful_tasks'] / 
+   @on(TaskResult)
+   async def handle_result(self, data: TaskResult,
+                           time: int, agent: AgentDetail):
+      # Cancel timeout handler
+      if data.id in self.task_timeouts:
+         self.task_timeouts[data.id].cancel()
+
+      self.task_results.append(data)
+      self._update_worker_stats(data)
+
+      if len(self.task_results) == len(self.tasks):
+         await self._generate_final_report()
+         await self.end_task_management()
+
+   def _update_worker_stats(self, result: TaskResult):
+      if result.worker not in self.worker_stats:
+         self.worker_stats[result.worker] = {
+            'completed_tasks': 0,
+            'successful_tasks': 0,
+            'total_time': 0
+         }
+
+      stats = self.worker_stats[result.worker]
+      stats['completed_tasks'] += 1
+      if result.success:
+         stats['successful_tasks'] += 1
+      stats['total_time'] += result.execution_time
+      stats['success_rate'] = (stats['successful_tasks'] /
                                stats['completed_tasks'])
 ```
 

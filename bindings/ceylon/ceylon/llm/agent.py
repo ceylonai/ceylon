@@ -80,7 +80,7 @@ class LLMAgent(TaskExecutionAgent):
 
             if response:
                 # Cache successful response
-                self.response_cache[task.task_id] = response
+                self.response_cache[task.id] = response
 
                 # Print the response
                 logger.info("\nGenerated Content:")
@@ -100,10 +100,10 @@ class LLMAgent(TaskExecutionAgent):
                 task.metadata['response_timestamp'] = response.timestamp
                 task.metadata.update(response.metadata)
 
-                logger.info(f"{self.name}: Completed task {task.task_id}")
+                logger.info(f"{self.name}: Completed task {task.id}")
 
                 # Remove from active tasks and broadcast completion
-                del self.active_tasks[task.task_id]
+                del self.active_tasks[task.id]
                 await self.broadcast_message(task)
 
                 # Request new task
@@ -112,7 +112,7 @@ class LLMAgent(TaskExecutionAgent):
                 raise Exception("Failed to get valid LLM response")
 
         except Exception as e:
-            logger.error(f"Error executing LLM task {task.task_id}: {e}")
+            logger.error(f"Error executing LLM task {task.id}: {e}")
             task.status = TaskStatus.FAILED
             task.metadata = task.metadata or {}
             task.metadata['error'] = str(e)
@@ -177,7 +177,7 @@ class LLMAgent(TaskExecutionAgent):
                 return LLMResponse(
                     content=response_text,
                     metadata={
-                        'task_id': task.task_id,
+                        'task_id': task.id,
                         'usage': usage.__dict__,
                         'model_name': self.llm_model.model_name
                     }

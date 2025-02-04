@@ -227,13 +227,13 @@ async def main():
 
                 # Check completion status
                 writing_done = (
-                        writing_group.task_id in active_playground.task_manager.completed_groups
+                        writing_group.id in active_playground.task_manager.completed_groups
                         or (writing_group.goal and
                             writing_group.goal.status == GoalStatus.ACHIEVED)
                 )
 
                 analysis_done = (
-                        analysis_group.task_id in active_playground.task_manager.completed_groups
+                        analysis_group.id in active_playground.task_manager.completed_groups
                         or (analysis_group.goal and
                             analysis_group.goal.status == GoalStatus.ACHIEVED)
                 )

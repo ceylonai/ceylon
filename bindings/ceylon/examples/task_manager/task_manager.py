@@ -94,7 +94,7 @@ class TaskManager(BaseAgent):
         if len(self.task_results) == len(self.tasks):
             print("All tasks completed")
             for result in self.task_results:
-                print(f"Task {result.task_id} assigned to {result.worker} - {'Success' if result.success else 'Failure'}")
+                print(f"Task {result.id} assigned to {result.worker} - {'Success' if result.success else 'Failure'}")
             await self.end_task_management()
 
     async def assign_tasks(self):

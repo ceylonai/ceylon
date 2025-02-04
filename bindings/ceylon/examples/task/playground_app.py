@@ -71,7 +71,7 @@ class TaskProcessor:
         """Monitor task group progress until goal is achieved"""
         while True:
             await asyncio.sleep(1)
-            current_group = active_playground.task_manager.task_groups[processing_group.task_id]
+            current_group = active_playground.task_manager.task_groups[processing_group.id]
 
             # Print status updates
             logger.info(f"Group Status: {current_group.status}")

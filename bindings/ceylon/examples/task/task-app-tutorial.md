@@ -202,7 +202,7 @@ async with playground.play(workers=workers) as active_playground:
     # Monitor progress
     while True:
         await asyncio.sleep(1)
-        current_group = active_playground.task_manager.task_groups[processing_group.task_id]
+        current_group = active_playground.task_manager.task_groups[processing_group.id]
 
         print(f"\nGroup Status: {current_group.status}")
         if current_group.goal:

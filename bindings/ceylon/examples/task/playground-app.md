@@ -156,19 +156,19 @@ processing_group = TaskManager.create_task_group(
 ### 3. Monitor Progress
 
 ```python
-async def monitor_progress(self, active_playground: TaskPlayGround, 
-                         processing_group: TaskGroup) -> None:
+async def monitor_progress(self, active_playground: TaskPlayGround,
+                           processing_group: TaskGroup) -> None:
     while True:
         await asyncio.sleep(1)
-        current_group = active_playground.task_manager.task_groups[processing_group.task_id]
+        current_group = active_playground.task_manager.task_groups[processing_group.id]
 
         # Print status updates
         logger.info(f"Group Status: {current_group.status}")
         if current_group.goal:
             logger.info(f"Goal Status: {current_group.goal.status}")
 
-        if (current_group.goal and 
-            current_group.goal.status == GoalStatus.ACHIEVED):
+        if (current_group.goal and
+                current_group.goal.status == GoalStatus.ACHIEVED):
             logger.info("Goal achieved! System can stop while tasks continue.")
             break
 ```

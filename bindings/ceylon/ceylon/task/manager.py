@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any, Callable, Dict, List, Set, Coroutine
 from dataclasses import dataclass, field
 from enum import Enum
@@ -23,7 +25,7 @@ class TaskResult:
 @dataclass
 class Task:
     name: str
-    process: Callable[..., Coroutine]  # Updated to expect a coroutine
+    processor: Callable[..., Coroutine] | str = None  # Updated to expect a coroutine
     input_data: Dict[str, Any] = field(default_factory=dict)
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     dependencies: Set[str] = field(default_factory=set)
@@ -42,33 +44,27 @@ class TaskManager:
 
     def add_task(
             self,
-            name: str,
-            process: Callable[..., Coroutine],
-            input_data: Dict[str, Any],
-            dependencies: Set[str] = None
+            task: Task,
     ) -> str:
         """
         Add a new task to the task manager.
 
         Args:
-            name: Name of the task
-            process: Async callable that will process the task
-            input_data: Dictionary of input data for the task
-            dependencies: Set of task IDs that this task depends on
+            task (Task): The task to be added.
 
         Returns:
             str: ID of the created task
         """
-        task_id = str(uuid.uuid4())
-        task = Task(
-            id=task_id,
-            name=name,
-            process=process,
-            input_data=input_data,
-            dependencies=dependencies or set()
-        )
-        self.tasks[task_id] = task
-        return task_id
+        # task_id = str(uuid.uuid4())
+        # task = Task(
+        #     id=task_id,
+        #     name=name,
+        #     processor=process,
+        #     input_data=input_data,
+        #     dependencies=dependencies or set()
+        # )
+        self.tasks[task.id] = task
+        return task.id
 
     def get_task(self, task_id: str) -> Task:
         """Get task by ID."""
@@ -99,6 +95,8 @@ class TaskManager:
             # Gather dependency outputs if needed
             dep_outputs = {}
             for dep_id in task.dependencies:
+                if dep_id not in self.tasks:
+                    raise ValueError(f"Dependency {dep_id} not found")
                 dep_task = self.tasks[dep_id]
                 if dep_task.result and dep_task.result.success:
                     dep_outputs[dep_id] = dep_task.result.output
@@ -110,12 +108,14 @@ class TaskManager:
             }
 
             # Execute the task process asynchronously
-            output = await task.process(execution_data)
+            output = await task.processor(execution_data)
 
             result = TaskResult(success=True, output=output)
             task.status = TaskStatus.COMPLETED
 
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             self.logger.error(f"Task failed: {task.name} ({task.id}). Error: {str(e)}")
             result = TaskResult(success=False, error=str(e))
             task.status = TaskStatus.FAILED
@@ -170,23 +170,28 @@ async def example_usage():
         return {'total': sum(d['processed'] for d in dep_outputs.values())}
 
     # Add tasks
-    task1_id = manager.add_task(
+    task1_id = manager.add_task(Task(
         name="Process Data 1",
-        process=process_data,
+        processor=process_data,
         input_data={'data': 5}
+    )
     )
 
     task2_id = manager.add_task(
-        name="Process Data 2",
-        process=process_data,
-        input_data={'data': 10}
+        Task(
+            name="Process Data 2",
+            processor=process_data,
+            input_data={'data': 10}
+        )
     )
 
     task3_id = manager.add_task(
-        name="Aggregate Results",
-        process=aggregate_results,
-        input_data={},
-        dependencies={task1_id, task2_id}
+        Task(
+            name="Aggregate Results",
+            processor=aggregate_results,
+            input_data={},
+            dependencies={task1_id, task2_id}
+        )
     )
 
     # Execute all tasks

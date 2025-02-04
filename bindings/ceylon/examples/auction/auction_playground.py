@@ -59,7 +59,7 @@ class AuctionAgent(TaskExecutionAgent):
                         amount=bid_amount,
                         item_id=task.metadata['item_id']
                     )
-                    self.bids[task.task_id] = bid
+                    self.bids[task.id] = bid
 
                     # Update task with bid information
                     task.completed = True

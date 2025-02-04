@@ -114,6 +114,8 @@ class BasePlayGround(Admin):
             logger.warning("Received Ctrl+C, initiating force close...")
             await self.force_close()
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             logger.error(f"Error in playground: {e}")
             await self.force_close()
         finally:
