@@ -2,7 +2,7 @@ import asyncio
 
 from ceylon.llm.agent import LLMConfig, LLMAgent
 from ceylon.llm.models.ollama import OllamaModel
-from ceylon.processor.agent import ProcessWorker, ProcessRequest, ProcessResponse
+from ceylon.processor.agent import ProcessRequest, ProcessResponse
 from ceylon.processor.playground import ProcessPlayGround
 
 
@@ -46,3 +46,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
