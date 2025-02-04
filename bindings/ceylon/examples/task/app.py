@@ -1,96 +1,91 @@
 import asyncio
-import uuid
-from typing import Dict, Callable
-from loguru import logger
-
-from ceylon.task import TaskExecutionAgent, TaskPlayGround
-from ceylon.task.data import TaskMessage, TaskGroup, TaskGroupGoal, GoalStatus
-from ceylon.task.manager import TaskManager
+from ceylon.processor.agent import ProcessWorker, ProcessRequest
+from ceylon.task.manager import TaskResult, Task
+from ceylon.task.playground import TaskProcessingPlayground
 
 
-def create_goal_checker(required_tasks: int) -> Callable:
-    """Creates a goal checker that completes when X tasks from a group are done"""
-    def check_completion(task_groups: Dict[str, TaskGroup],
-                         completed_tasks: Dict[str, TaskMessage]) -> bool:
-        completed_group_tasks = sum(
-            1 for task in completed_tasks.values()
-            if hasattr(task, 'group_id') and
-            task.group_id in task_groups
-        )
-        logger.info(f"Progress: {completed_group_tasks}/{required_tasks} tasks completed")
-        return completed_group_tasks >= required_tasks
+class TextProcessor(ProcessWorker):
+    """Example worker that processes text-based tasks."""
 
-    return check_completion
+    async def _processor(self, request: ProcessRequest, time: int):
+        print(f"Processing text: {request}")
+        data = request.data
+        return data * 5
+
+
+class AggregateProcessor(ProcessWorker):
+    """Example worker that processes text-based tasks."""
+
+    async def _processor(self, request: ProcessRequest, time: int):
+        print(f"Aggregating text: {request}")
+        data = request.data or 0
+        for d in request.dependency_data.values():
+            data += d.output
+        return data
 
 
 async def main():
-    # Initialize playground and workers
-    playground = TaskPlayGround()
-    workers = [
-        TaskExecutionAgent("worker1", "processor", max_concurrent_tasks=2),
-        TaskExecutionAgent("worker2", "processor", max_concurrent_tasks=2),
-    ]
+    # Create playground and worker
+    playground = TaskProcessingPlayground()
+    worker = TextProcessor("text_worker", role="multiply")
+    aggregate_worker = AggregateProcessor("aggregate_worker", role="aggregate")
 
-    # Create task group with a clear goal
-    processing_group = TaskManager.create_task_group(
-        name="Data Processing",
-        description="Process 10 data items, goal achieves at 5",
-        subtasks=[
-            TaskMessage(
-                task_id=str(uuid.uuid4()),
-                name=f"Process Data Item {i}",
-                instructions=f"Processing task {i}",
-                duration=1,
-                required_role="processor",
-                metadata={"item_number": i}
+    async with playground.play(workers=[worker, aggregate_worker]) as active_playground:
+        task1 = Task(
+            name="Process Data 1",
+            processor="multiply",
+            input_data={'data': 5}
+        )
+
+        task2 = Task(
+            name="Process Data 2",
+            processor="multiply",
+            input_data={'data': 10}
+        )
+
+        task3 = Task(
+            name="Process Data 3",
+            processor="aggregate",
+            dependencies={task1.id, task2.id},
+        )
+
+        for task in [task1, task2, task3]:
+            print(f"\nExecuting Task: {task.name}")
+            # Execute independent tasks
+            task_result: TaskResult = await active_playground.add_and_execute_task(
+                task=task,  # Pass task data
+                wait_for_completion=True
             )
-            for i in range(10)
-        ],
-        goal=TaskGroupGoal(
-            name="Partial Processing Complete",
-            description="Complete at least 5 processing tasks",
-            check_condition=create_goal_checker(required_tasks=5),
-            success_message="Successfully completed minimum required tasks!",
-            failure_message="Failed to complete minimum required tasks."
-        ),
-        priority=1
-    )
 
-    async with playground.play(workers=workers) as active_playground:
-        active_playground: TaskPlayGround = active_playground
-        await active_playground.assign_task_groups([processing_group])
+            print(f"\nTask Results:")
+            print(f"Task: {task.name}")
+            print(f"Result: {task_result.output}")
 
-        # Wait for goal achievement
-        while True:
-            await asyncio.sleep(1)
-            current_group = active_playground.task_manager.task_groups[processing_group.task_id]
-
-            # Print clear status updates
-            logger.info(f"Group Status: {current_group.status}")
-            if current_group.goal:
-                logger.info(f"Goal Status: {current_group.goal.status}")
-
-            if (current_group.goal and
-                    current_group.goal.status == GoalStatus.ACHIEVED):
-                logger.info("Goal achieved! System can stop while tasks continue.")
-                break
-
-        # Print completion statistics
-        completed_tasks = active_playground.get_completed_tasks()
-        logger.info(f"Completed Tasks: {len(completed_tasks)}")
-
-        for task_id, output in completed_tasks.items():
-            if output.completed:
-                duration = output.end_time - output.start_time if output.end_time and output.start_time else None
-                logger.info(f"Task {task_id} ({output.name}) - "
-                            f"Duration: {duration:.2f}s - "
-                            f"Metadata: {output.metadata}")
-            else:
-                logger.warning(f"Task {task_id} ({output.name}) failed: {output.error}")
-
-        task_results = active_playground.get_task_results()
-        logger.info(f"Task Results: {len(task_results)}")
-        logger.info(task_results)
+        # task2_id: TaskResult = await active_playground.add_and_execute_task(
+        #     name="Reverse Text",
+        #     process_type="reverse",
+        #     input_data={'data': "hello world"},
+        #     wait_for_completion=True
+        # )
+        #
+        # # Execute dependent task
+        # combine_task: TaskResult = await active_playground.add_and_execute_task(
+        #     name="Combine Results",
+        #     process_type="combine",
+        #     input_data={
+        #         'data': {
+        #             'text1': task1_id.output,
+        #             'text2': task2_id.output
+        #         }
+        #     },
+        #     dependencies={task1_id, task2_id},
+        #     wait_for_completion=True
+        # )
+        #
+        # print(f"\nTask Results:")
+        # print(f"Task 1 (Uppercase): {task1_id.output}")
+        # print(f"Task 2 (Reverse): {task2_id.output}")
+        # print(f"Combined Result: {combine_task.output}")
 
 
 if __name__ == "__main__":

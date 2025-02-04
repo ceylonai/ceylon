@@ -26,6 +26,7 @@ class ProcessRequest:
     data: Any
     id: str = dataclasses.field(default_factory=lambda: str(uuid.uuid4()))
     metadata: Optional[Dict[str, Any]] = None
+    dependency_data: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -46,6 +47,8 @@ class ProcessWorker(Worker):
     @on(ProcessRequest)
     async def handle_request(self, request: ProcessRequest, time: int):
         try:
+            if request.task_type != self.details().role:
+                return
             start_time = datetime.now()
             # Process the request (example implementation)
             try:
@@ -71,7 +74,7 @@ class ProcessWorker(Worker):
             error_response = ProcessResponse(
                 request_id=request.id,
                 result=None,
-                status="error",
+                status=ProcessState.ERROR,
                 error_message=str(e)
             )
             await self.broadcast_message(error_response)

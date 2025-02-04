@@ -24,7 +24,8 @@ class ProcessPlayGround(BasePlayGround):
         """Handle task completion responses from workers"""
         logger.info(f"Received task response for {response.request_id}")
         self.process_responses[response.request_id] = response
-        if response.request_id in self.process_events and response.status != ProcessState.PENDING or response.status != ProcessState.PROCESSING:
+        if response.request_id in self.process_events and (
+                response.status != ProcessState.PENDING or response.status != ProcessState.PROCESSING):
             self.process_events[response.request_id].set()
 
     async def process_request(self, request: ProcessRequest, wait_for_completion=True) -> ProcessResponse or None:
@@ -33,4 +34,6 @@ class ProcessPlayGround(BasePlayGround):
             event = asyncio.Event()
             self.process_events[request.id] = event
             await event.wait()
+            # Cleanup
+            self.process_events.pop(request.id)
             return self.process_responses[request.id]
