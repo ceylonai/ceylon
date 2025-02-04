@@ -37,6 +37,7 @@ class TaskProcessingPlayground(ProcessPlayGround):
 
         Returns:
             TaskResult: Result of the task execution
+            :param wait_for_completion:
             :param task:
         """
         if type(task.processor) == str:

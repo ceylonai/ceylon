@@ -1,40 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Set, Coroutine
-from dataclasses import dataclass, field
-from enum import Enum
-import uuid
-import logging
 import asyncio
+import logging
+from typing import Dict, List
 
-
-class TaskStatus(Enum):
-    PENDING = "PENDING"
-    RUNNING = "RUNNING"
-    COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
-
-
-@dataclass
-class TaskResult:
-    success: bool
-    output: Any = None
-    error: str = None
-
-
-@dataclass
-class Task:
-    name: str
-    processor: Callable[..., Coroutine] | str = None  # Updated to expect a coroutine
-    input_data: Dict[str, Any] = field(default_factory=dict)
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    dependencies: Set[str] = field(default_factory=set)
-    status: TaskStatus = TaskStatus.PENDING
-    result: TaskResult = None
-
-    def __post_init__(self):
-        if not self.id:
-            self.id = str(uuid.uuid4())
+from ceylon.task.data import Task, TaskResult, TaskStatus
 
 
 class TaskManager:
@@ -55,14 +25,6 @@ class TaskManager:
         Returns:
             str: ID of the created task
         """
-        # task_id = str(uuid.uuid4())
-        # task = Task(
-        #     id=task_id,
-        #     name=name,
-        #     processor=process,
-        #     input_data=input_data,
-        #     dependencies=dependencies or set()
-        # )
         self.tasks[task.id] = task
         return task.id
 

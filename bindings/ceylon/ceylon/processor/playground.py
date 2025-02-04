@@ -9,7 +9,7 @@ from loguru import logger
 
 from ceylon import on
 from ceylon.base.playground import BasePlayGround
-from ceylon.processor.agent import ProcessResponse, ProcessRequest, ProcessState
+from ceylon.processor.data import ProcessResponse, ProcessRequest, ProcessState
 
 
 class ProcessPlayGround(BasePlayGround):

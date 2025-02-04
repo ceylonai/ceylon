@@ -2,42 +2,11 @@
 #  Licensed under the Apache License, Version 2.0 (See LICENSE.md or http://www.apache.org/licenses/LICENSE-2.0).
 #
 
-import dataclasses
-import uuid
 from abc import abstractmethod
-from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
-from typing import Optional, Any, Dict
 
 from ceylon import Worker, on
-
-
-class ProcessState(Enum):
-    PENDING = "pending"
-    PROCESSING = "processing"
-    ERROR = "error"
-    SUCCESS = "success"
-
-
-@dataclass
-class ProcessRequest:
-    task_type: str
-    data: Any
-    id: str = dataclasses.field(default_factory=lambda: str(uuid.uuid4()))
-    metadata: Optional[Dict[str, Any]] = None
-    dependency_data: Optional[Dict[str, Any]] = None
-
-
-@dataclass
-class ProcessResponse:
-    request_id: str
-    result: Any
-    status: ProcessState = ProcessState.PENDING  # 'success' or 'error'
-    id: str = dataclasses.field(default_factory=lambda: str(uuid.uuid4()))
-    error_message: Optional[str] = None
-    execution_time: Optional[float] = None
-    metadata: Optional[Dict[str, Any]] = None
+from ceylon.processor.data import ProcessResponse, ProcessRequest, ProcessState
 
 
 class ProcessWorker(Worker):
