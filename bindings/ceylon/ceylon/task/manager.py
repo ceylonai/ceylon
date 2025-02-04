@@ -1,9 +1,9 @@
-from typing import Any, Callable, Dict, List, Set
+from typing import Any, Callable, Dict, List, Set, Coroutine
 from dataclasses import dataclass, field
 from enum import Enum
 import uuid
-from collections import deque
 import logging
+import asyncio
 
 
 class TaskStatus(Enum):
@@ -23,7 +23,7 @@ class TaskResult:
 @dataclass
 class Task:
     name: str
-    process: Callable
+    process: Callable[..., Coroutine]  # Updated to expect a coroutine
     input_data: Dict[str, Any] = field(default_factory=dict)
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     dependencies: Set[str] = field(default_factory=set)
@@ -40,17 +40,22 @@ class TaskManager:
         self.tasks: Dict[str, Task] = {}
         self.logger = logging.getLogger(__name__)
 
-    def add_task(self, name: str, process: Callable, input_data: Dict[str, Any],
-                 dependencies: Set[str] = None) -> str:
+    def add_task(
+            self,
+            name: str,
+            process: Callable[..., Coroutine],
+            input_data: Dict[str, Any],
+            dependencies: Set[str] = None
+    ) -> str:
         """
         Add a new task to the task manager.
-        
+
         Args:
             name: Name of the task
-            process: Callable that will process the task
+            process: Async callable that will process the task
             input_data: Dictionary of input data for the task
             dependencies: Set of task IDs that this task depends on
-            
+
         Returns:
             str: ID of the created task
         """
@@ -85,8 +90,8 @@ class TaskManager:
                 return False
         return True
 
-    def execute_task(self, task: Task) -> TaskResult:
-        """Execute a single task."""
+    async def execute_task(self, task: Task) -> TaskResult:
+        """Execute a single task asynchronously."""
         try:
             task.status = TaskStatus.RUNNING
             self.logger.info(f"Executing task: {task.name} ({task.id})")
@@ -104,8 +109,8 @@ class TaskManager:
                 'dependency_outputs': dep_outputs
             }
 
-            # Execute the task process
-            output = task.process(execution_data)
+            # Execute the task process asynchronously
+            output = await task.process(execution_data)
 
             result = TaskResult(success=True, output=output)
             task.status = TaskStatus.COMPLETED
@@ -118,9 +123,9 @@ class TaskManager:
         task.result = result
         return result
 
-    def execute_all_tasks(self) -> Dict[str, TaskResult]:
+    async def execute_all_tasks(self) -> Dict[str, TaskResult]:
         """
-        Execute all tasks in dependency order.
+        Execute all tasks in dependency order asynchronously.
         Returns a dictionary mapping task IDs to their results.
         """
         results = {}
@@ -130,29 +135,38 @@ class TaskManager:
             if not ready_tasks:
                 break
 
-            for task in ready_tasks:
-                result = self.execute_task(task)
-                results[task.id] = result
+            # Execute ready tasks concurrently
+            tasks = [self.execute_task(task) for task in ready_tasks]
+            task_results = await asyncio.gather(*tasks, return_exceptions=True)
 
-                if not result.success:
+            # Process results
+            for task, result in zip(ready_tasks, task_results):
+                if isinstance(result, Exception):
+                    results[task.id] = TaskResult(success=False, error=str(result))
+                    task.status = TaskStatus.FAILED
                     self.logger.error(f"Task {task.name} failed. Stopping execution.")
                     return results
+                results[task.id] = result
 
         return results
 
 
 # Example usage
-def example_usage():
+async def example_usage():
     # Create a task manager
     manager = TaskManager()
 
     # Define some example task processes
-    def process_data(input_data):
+    async def process_data(input_data):
         data = input_data['data']
+        # Simulate some async work
+        await asyncio.sleep(1)
         return {'processed': data * 2}
 
-    def aggregate_results(input_data):
+    async def aggregate_results(input_data):
         dep_outputs = input_data['dependency_outputs']
+        # Simulate some async work
+        await asyncio.sleep(0.5)
         return {'total': sum(d['processed'] for d in dep_outputs.values())}
 
     # Add tasks
@@ -176,7 +190,7 @@ def example_usage():
     )
 
     # Execute all tasks
-    results = manager.execute_all_tasks()
+    results = await manager.execute_all_tasks()
 
     # Print results
     for task_id, result in results.items():
@@ -189,4 +203,4 @@ def example_usage():
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    example_usage()
+    asyncio.run(example_usage())
