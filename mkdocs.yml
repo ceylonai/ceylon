@@ -99,8 +99,14 @@ nav:
       - Overview: tutorials.md
       - Best Practices: best-practices.md
       - Examples:
-          - Time Scheduling: examples/time-scheduling.md
-          - Single Item Auction: examples/auction.md
-          - Task Manager: examples/task-manager.md
-          - Distributed Agents: examples/connect-through-network.md
+          - Overview: examples/overview.md
+          - Playground:
+              - Meeting Scheduling: examples/playground/time-scheduling.md
+              - Single Item Auction: examples/playground/auction.md
+              - Task Manager: examples/playground/task-manager.md
+          - Direct Agent:
+              - Time Scheduling: examples/time-scheduling.md
+              - Single Item Auction: examples/auction.md
+              - Task Manager: examples/task-manager.md
+              - Distributed Agents: examples/connect-through-network.md
 
