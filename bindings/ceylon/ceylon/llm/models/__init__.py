@@ -16,6 +16,27 @@ from ceylon.llm.models.support.messages import ModelMessage, ModelResponse, Stre
 from ceylon.llm.models.support.settings import ModelSettings
 from ceylon.llm.models.support.tools import ToolDefinition
 from ceylon.llm.models.support.usage import Usage, UsageLimits
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from types import TracebackType
+from typing import AsyncIterator, Optional, Sequence, Type, Any
+import re
+import json
+
+from ceylon.llm.models.support.http import AsyncHTTPClient, cached_async_http_client
+from ceylon.llm.models.support.messages import (
+    ModelMessage,
+    ModelResponse,
+    StreamedResponse,
+    MessageRole,
+    TextPart,
+    ToolCallPart,
+    ToolReturnPart,
+    ModelMessagePart
+)
+from ceylon.llm.models.support.settings import ModelSettings
+from ceylon.llm.models.support.tools import ToolDefinition
+from ceylon.llm.models.support.usage import Usage, UsageLimits
 
 
 @dataclass
@@ -27,7 +48,13 @@ class ModelContext:
 
 
 class Model(ABC):
-    """Base class for all language model implementations"""
+    """Base class for all language model implementations with tool support"""
+
+    # Regex pattern for extracting tool calls - can be overridden by subclasses
+    TOOL_CALL_PATTERN = re.compile(
+        r'<tool_call>(?P<tool_json>.*?)</tool_call>',
+        re.DOTALL
+    )
 
     def __init__(
             self,
@@ -147,10 +174,107 @@ class Model(ABC):
             raise UsageLimitExceeded(
                 f"Request limit {limits.request_limit} exceeded"
             )
-        if limits.total_tokens and usage.total_tokens >= limits.total_tokens:
+        if limits.request_tokens_limit and usage.request_tokens >= limits.request_tokens_limit:
             raise UsageLimitExceeded(
-                f"Total token limit {limits.total_tokens} exceeded"
+                f"Request tokens limit {limits.request_tokens_limit} exceeded"
             )
+        if limits.response_tokens_limit and usage.response_tokens >= limits.response_tokens_limit:
+            raise UsageLimitExceeded(
+                f"Response tokens limit {limits.response_tokens_limit} exceeded"
+            )
+
+    def _format_tool_descriptions(self, tools: Sequence[ToolDefinition]) -> str:
+        """Format tool descriptions for system message.
+
+        Args:
+            tools: Sequence of tool definitions
+
+        Returns:
+            Formatted tool descriptions string
+        """
+        if not tools:
+            return ""
+
+        tool_descriptions = []
+        for tool in tools:
+            desc = f"- {tool.name}: {tool.description}\n"
+            desc += f"  Parameters: {json.dumps(tool.parameters_json_schema)}"
+            tool_descriptions.append(desc)
+
+        return (
+            "You have access to the following tools:\n\n"
+            f"{chr(10).join(tool_descriptions)}\n\n"
+            "To use a tool, respond with XML tags like this:\n"
+            "<tool_call>{\"tool_name\": \"tool_name\", \"args\": {\"arg1\": \"value1\"}}</tool_call>\n"
+            "Wait for the tool result before continuing."
+        )
+
+    def _parse_tool_call(self, match: re.Match) -> Optional[ToolCallPart]:
+        """Parse a tool call match into a ToolCallPart.
+
+        Args:
+            match: Regex match object containing tool call JSON
+
+        Returns:
+            ToolCallPart if valid, None if invalid
+        """
+        try:
+            tool_data = json.loads(match.group('tool_json'))
+            if isinstance(tool_data, dict) and 'tool_name' in tool_data and 'args' in tool_data:
+                return ToolCallPart(
+                    tool_name=tool_data['tool_name'],
+                    args=tool_data['args']
+                )
+        except (json.JSONDecodeError, KeyError):
+            pass
+        return None
+
+    def _parse_response(self, text: str) -> list[ModelMessagePart]:
+        """Parse response text into message parts.
+
+        Args:
+            text: Raw response text from model
+
+        Returns:
+            List of ModelMessagePart objects
+        """
+        parts = []
+        current_text = []
+        last_end = 0
+
+        # Find all tool calls in the response
+        for match in self.TOOL_CALL_PATTERN.finditer(text):
+            # Add any text before the tool call
+            if match.start() > last_end:
+                prefix_text = text[last_end:match.start()].strip()
+                if prefix_text:
+                    current_text.append(prefix_text)
+
+            # Parse and add the tool call
+            tool_call = self._parse_tool_call(match)
+            if tool_call:
+                # If we have accumulated text, add it first
+                if current_text:
+                    parts.append(TextPart(text=' '.join(current_text)))
+                    current_text = []
+                parts.append(tool_call)
+            else:
+                # If tool call parsing fails, treat it as regular text
+                current_text.append(match.group(0))
+
+            last_end = match.end()
+
+        # Add any remaining text after the last tool call
+        if last_end < len(text):
+            remaining = text[last_end:].strip()
+            if remaining:
+                current_text.append(remaining)
+
+        # Add any accumulated text as final part
+        if current_text:
+            parts.append(TextPart(text=' '.join(current_text)))
+
+        return parts
 
 
 class UsageLimitExceeded(Exception):
@@ -178,10 +302,12 @@ def cached_async_http_client(timeout: int = 600, connect: int = 5,
     The default timeouts match those of OpenAI,
     see <https://github.com/openai/openai-python/blob/v1.54.4/src/openai/_constants.py#L9>.
     """
+
     def factory() -> httpx.AsyncClient:
         return httpx.AsyncClient(
             headers={"User-Agent": get_user_agent()},
             timeout=timeout,
             base_url=base_url
         )
+
     return factory

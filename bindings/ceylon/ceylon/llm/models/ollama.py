@@ -10,7 +10,8 @@ from ceylon.llm.models.support.messages import (
     ModelResponse,
     StreamedResponse,
     TextPart,
-    ToolCallPart
+    ToolCallPart,
+    ToolReturnPart
 )
 from ceylon.llm.models.support.usage import Usage
 
@@ -26,7 +27,7 @@ class OllamaModel(Model):
             **kwargs: Any
     ):
         """Initialize the Ollama model.
-        
+
         Args:
             model_name: Name of the Ollama model to use
             base_url: Base URL for the Ollama API
@@ -41,52 +42,65 @@ class OllamaModel(Model):
         """Close the HTTP client"""
         await self.client().aclose()
 
-    def _format_messages(self, messages: Sequence[ModelMessage]) -> str:
+    def _format_messages(self, messages: Sequence[ModelMessage], context: ModelContext) -> str:
         """Format messages for Ollama API.
 
-        Ollama's generate endpoint expects a prompt string, so we format
-        the messages into a conversation format.
+        Args:
+            messages: Messages to format
+            context: Context containing tools and settings
+
+        Returns:
+            Formatted prompt string
         """
         formatted_parts = []
 
-        for message in messages:
-            if message.role == MessageRole.SYSTEM:
-                formatted_parts.append(f"System: {self._get_text_content(message)}")
-            elif message.role == MessageRole.USER:
-                formatted_parts.append(f"User: {self._get_text_content(message)}")
-            elif message.role == MessageRole.ASSISTANT:
-                formatted_parts.append(f"Assistant: {self._get_text_content(message)}")
-            elif message.role == MessageRole.TOOL:
-                # Include tool name in response if available
-                tool_name = self._get_tool_name(message)
-                formatted_parts.append(f"Tool ({tool_name}): {self._get_text_content(message)}")
+        # Add tool definitions if available
+        if context.tools:
+            formatted_parts.append(f"System: {self._format_tool_descriptions(context.tools)}")
 
-        # Add a final Assistant: prompt to indicate it's the model's turn
+        # Format conversation history
+        for message in messages:
+            prefix = {
+                MessageRole.SYSTEM: "System",
+                MessageRole.USER: "User",
+                MessageRole.ASSISTANT: "Assistant",
+                MessageRole.TOOL: "Tool"
+            }.get(message.role, "Unknown")
+
+            content = []
+            for part in message.parts:
+                if isinstance(part, TextPart):
+                    content.append(part.text)
+                elif isinstance(part, ToolCallPart):
+                    tool_call = {
+                        "tool_name": part.tool_name,
+                        "args": part.args
+                    }
+                    content.append(
+                        f"<tool_call>{json.dumps(tool_call)}</tool_call>"
+                    )
+                elif isinstance(part, ToolReturnPart):
+                    content.append(
+                        f"Result from {part.tool_name}: {json.dumps(part.content)}"
+                    )
+
+            formatted_parts.append(f"{prefix}: {' '.join(content)}")
+
+        # Add final prompt for assistant
         formatted_parts.append("Assistant:")
 
         return "\n\n".join(formatted_parts)
 
-    def _get_text_content(self, message: ModelMessage) -> str:
-        """Extract text content from message parts"""
-        parts = []
-        for part in message.parts:
-            if isinstance(part, TextPart):
-                parts.append(part.text)
-        return " ".join(parts)
-
-    def _get_tool_name(self, message: ModelMessage) -> str:
-        """Get tool name from message if present"""
-        for part in message.parts:
-            if isinstance(part, ToolCallPart):
-                return part.tool_name
-        return "unknown"
-
-    def _prepare_request_data(self, messages: Sequence[ModelMessage], context: ModelContext, stream: bool = False) -> \
-    dict[str, Any]:
+    def _prepare_request_data(
+            self,
+            messages: Sequence[ModelMessage],
+            context: ModelContext,
+            stream: bool = False
+    ) -> dict[str, Any]:
         """Prepare the request data for Ollama API"""
         data = {
             "model": self.model_name,
-            "prompt": self._format_messages(messages),
+            "prompt": self._format_messages(messages, context),
             "stream": stream
         }
 
@@ -113,7 +127,7 @@ class OllamaModel(Model):
 
         Args:
             messages: Sequence of messages to send
-            context: Context containing settings
+            context: Context containing settings and tools
 
         Returns:
             Tuple of (model response, usage statistics)
@@ -130,8 +144,10 @@ class OllamaModel(Model):
         response.raise_for_status()
         result = response.json()
 
-        # Extract response and usage
+        # Parse response and create usage stats
         response_text = result.get("response", "")
+        response_parts = self._parse_response(response_text)
+
         usage = Usage(
             request_tokens=result.get("prompt_eval_count", 0),
             response_tokens=result.get("eval_count", 0),
@@ -142,7 +158,7 @@ class OllamaModel(Model):
             requests=1
         )
 
-        return ModelResponse(parts=[TextPart(text=response_text)]), usage
+        return ModelResponse(parts=response_parts), usage
 
     async def request_stream(
             self,
@@ -153,7 +169,7 @@ class OllamaModel(Model):
 
         Args:
             messages: Sequence of messages to send
-            context: Context containing settings
+            context: Context containing settings and tools
 
         Yields:
             StreamedResponse objects containing response chunks
@@ -162,16 +178,16 @@ class OllamaModel(Model):
 
         data = self._prepare_request_data(messages, context, stream=True)
 
-        # Make streaming request
+        # Track state across chunks
+        current_text = []
+        total_usage = Usage(requests=1)
+
         async with self.client().stream(
                 "POST",
                 "/api/generate",
                 json=data
         ) as response:
             response.raise_for_status()
-
-            # Track usage across chunks
-            total_usage = Usage(requests=1)
 
             async for line in response.aiter_lines():
                 if not line.strip():
@@ -182,8 +198,41 @@ class OllamaModel(Model):
                 except json.JSONDecodeError:
                     continue
 
-                # Extract chunk text and update usage
                 if "response" in chunk:
+                    chunk_text = chunk["response"]
+                    current_text.append(chunk_text)
+
+                    # Try to parse complete tool calls
+                    accumulated_text = ''.join(current_text)
+                    for match in self.TOOL_CALL_PATTERN.finditer(accumulated_text):
+                        tool_call = self._parse_tool_call(match)
+                        if tool_call:
+                            # Yield any text before the tool call
+                            prefix = accumulated_text[:match.start()].strip()
+                            if prefix:
+                                yield StreamedResponse(
+                                    delta=TextPart(text=prefix),
+                                    usage=None
+                                )
+
+                            # Yield the tool call
+                            yield StreamedResponse(
+                                delta=tool_call,
+                                usage=None
+                            )
+
+                            # Keep any remaining text
+                            current_text = [accumulated_text[match.end():]]
+                            break
+                    else:
+                        # If no tool call found and we've accumulated enough text
+                        if len(accumulated_text) > 100:
+                            yield StreamedResponse(
+                                delta=TextPart(text=accumulated_text),
+                                usage=None
+                            )
+                            current_text = []
+
                     # Update usage stats
                     chunk_usage = Usage(
                         request_tokens=chunk.get("prompt_eval_count", 0),
@@ -195,14 +244,14 @@ class OllamaModel(Model):
                     )
                     total_usage.add(chunk_usage)
 
-                    # Yield response chunk
-                    yield StreamedResponse(
-                        delta=TextPart(text=chunk["response"]),
-                        usage=chunk_usage
-                    )
-
-                # Handle done message
                 if chunk.get("done", False):
+                    # Yield any remaining text
+                    remaining_text = ''.join(current_text).strip()
+                    if remaining_text:
+                        yield StreamedResponse(
+                            delta=TextPart(text=remaining_text),
+                            usage=total_usage
+                        )
                     break
 
     @classmethod
