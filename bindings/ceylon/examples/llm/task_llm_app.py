@@ -72,7 +72,7 @@ async def main():
         ]
 
         for question in test_questions:
-            response:TaskResult = await active_playground.add_and_execute_task(
+            response: TaskResult = await active_playground.add_and_execute_task(
                 Task(
                     name="Calculate",
                     processor="math_assistant",
@@ -81,6 +81,8 @@ async def main():
             )
             print(f"\nQuestion: {question}")
             print(f"Response: {response.output}")
+
+        await active_playground.finish()
 
 
 if __name__ == "__main__":
