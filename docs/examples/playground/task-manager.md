@@ -1,332 +1,281 @@
-# Building a Distributed Task Processing System with Ceylon
+# Building Distributed Task Processing Systems with Ceylon
 
-This tutorial will guide you through building a scalable distributed task processing system using Ceylon's TaskPlayGround functionality. The system includes multiple worker agents, task groups, goal-based completion tracking, and comprehensive monitoring.
+This tutorial demonstrates how to build a distributed task processing system using Ceylon's TaskProcessingPlayground. We'll create a system where multiple workers process tasks based on their skill levels.
 
-## Table of Contents
-1. [System Overview](#system-overview)
-2. [Prerequisites](#prerequisites)
-3. [Core Components](#core-components)
-4. [Implementation Steps](#implementation-steps)
-5. [Running the System](#running-the-system)
-6. [Advanced Features](#advanced-features)
-7. [Best Practices](#best-practices)
-8. [Troubleshooting](#troubleshooting)
+## Core Concepts
 
-## System Overview
+### TaskProcessingPlayground
+- Central coordinator for distributed task processing
+- Manages task distribution and execution
+- Handles worker coordination and result collection
 
-### Architecture Diagram
+### ProcessWorker
+- Individual processing units
+- Implements specific task logic
+- Can maintain internal state and configurations
 
-```mermaid
-graph TB
-    subgraph Playground[Task Playground]
-        TM[Task Manager]
-        WR[Worker Registry]
-        PM[Progress Monitor]
+### Task
+- Represents a unit of work
+- Contains input data and processing instructions
+- Can have dependencies on other tasks
+
+## Message Passing
+
+````mermaid
+sequenceDiagram
+    participant TM as TaskManager
+    participant W1 as Junior(skill=3)
+    participant W2 as Intermediate(skill=6)
+    participant W3 as Senior(skill=9)
+    
+    Note over TM,W3: Connection Phase
+    W1->>TM: Connect
+    W2->>TM: Connect
+    W3->>TM: Connect
+    
+    Note over TM,W3: Task Assignment Phase
+    TM->>W1: TaskAssignment(Task 1, difficulty=2)
+    TM->>W2: TaskAssignment(Task 2, difficulty=5)
+    TM->>W3: TaskAssignment(Task 3, difficulty=8)
+    
+    Note over TM,W3: Task Processing Phase
+    par Process Tasks
+        W1-->>TM: TaskResult(id=1, success=true)
+        W2-->>TM: TaskResult(id=2, success=true)
+        W3-->>TM: TaskResult(id=3, success=true)
     end
+    
+    Note over TM: Calculate Success Rate
+    Note over TM: End Task Management
+````
+The diagram illustrates a distributed task management system where a central TaskManager coordinates with multiple worker agents. Each worker has a different skill level (3, 6, and 9) and can handle tasks of varying difficulty (2, 5, and 8). The workflow begins with workers connecting to the TaskManager, followed by task assignments based on availability. Workers process their assigned tasks in parallel, with success determined by whether their skill level exceeds the task's difficulty. Once all tasks are complete, the TaskManager calculates the overall success rate before shutting down.
+## Implementation Guide
 
-    subgraph TaskGroup[Task Group]
-        Tasks[Tasks]
-        Goal[Goal Checker]
-        Status[Status Tracker]
-    end
-
-    subgraph Workers[Worker Agents]
-        W1[Worker 1]
-        W2[Worker 2]
-        subgraph Queue1[Worker 1 Queue]
-            TQ1[Task Queue]
-            AT1[Active Tasks]
-        end
-        subgraph Queue2[Worker 2 Queue]
-            TQ2[Task Queue]
-            AT2[Active Tasks]
-        end
-    end
-
-    TM --> |Creates| TaskGroup
-    Tasks --> |Assigned to| WR
-    WR --> |Distributes| TQ1
-    WR --> |Distributes| TQ2
-    W1 --> |Processes| AT1
-    W2 --> |Processes| AT2
-    AT1 --> |Updates| Status
-    AT2 --> |Updates| Status
-    Status --> |Monitors| PM
-    PM --> |Checks| Goal
-```
-
-## Prerequisites
-
-1. Python 3.8+
-2. Ceylon framework
-3. Basic understanding of async programming
-
-```bash
-pip install ceylon loguru
-```
-
-## Core Components
-
-### 1. TaskProcessor Class
-
-The main class that orchestrates the distributed processing system:
+### 1. Define Your Task Structure
 
 ```python
-class TaskProcessor:
-    def __init__(self, num_workers: int = 2, tasks_per_worker: int = 2):
-        self.playground = TaskPlayGround(name="task_processor")
-        self.workers = [
-            TaskExecutionAgent(
-                f"worker{i}", 
-                "processor",
-                max_concurrent_tasks=tasks_per_worker
-            )
-            for i in range(num_workers)
-        ]
+@dataclass
+class WorkTask:
+    id: int
+    description: str
+    difficulty: int
 ```
 
-### 2. Task Creation
+This structure defines what information each task contains. Customize fields based on your needs.
 
-Tasks represent individual units of work:
+### 2. Create a Worker Processor
 
 ```python
-def create_processing_tasks(self, num_tasks: int) -> List[TaskMessage]:
-    return [
-        TaskMessage(
-            task_id=str(uuid.uuid4()),
-            name=f"Process Data Item {i}",
-            description=f"Processing task {i}",
-            duration=1,
-            required_role="processor",
-            metadata={"item_number": i}
+class WorkerProcessor(ProcessWorker):
+    def __init__(self, name: str, skill_level: int):
+        super().__init__(name=name, role="worker")
+        self.skill_level = skill_level
+
+    async def _processor(self, request: ProcessRequest, time: int) -> tuple[bool, dict]:
+        task = request.data
+        await asyncio.sleep(task.difficulty)  # Simulate work
+        success = self.skill_level >= task.difficulty
+        return success, {
+            "task_id": task.id,
+            "worker": self.name,
+            "difficulty": task.difficulty
+        }
+```
+
+Key points:
+- Inherit from ProcessWorker
+- Initialize with worker-specific attributes
+- Implement _processor method to handle tasks
+- Return results and metadata
+
+### 3. Set Up the Playground
+
+```python
+playground = TaskProcessingPlayground(name="task_playground", port=8000)
+workers = [
+    WorkerProcessor("Junior", skill_level=3),
+    WorkerProcessor("Intermediate", skill_level=6),
+    WorkerProcessor("Senior", skill_level=9),
+]
+```
+
+### 4. Create and Execute Tasks
+
+```python
+async with playground.play(workers=workers) as active_playground:
+    ceylon_tasks = [
+        Task(
+            name=f"Task {task.id}",
+            processor="worker",
+            input_data={'data': task}
         )
-        for i in range(num_tasks)
+        for task in tasks
     ]
-```
 
-### 3. Goal Checker
-
-Monitors task completion and determines when goals are met:
-
-```python
-def create_goal_checker(self, required_tasks: int) -> Callable:
-    def check_completion(task_groups: Dict[str, TaskGroup],
-                       completed_tasks: Dict[str, TaskMessage]) -> bool:
-        completed_group_tasks = sum(
-            1 for task in completed_tasks.values()
-            if hasattr(task, 'group_id') and
-            task.group_id in task_groups
+    results = []
+    for task in ceylon_tasks:
+        result = await active_playground.add_and_execute_task(
+            task=task,
+            wait_for_completion=True
         )
-        logger.info(f"Progress: {completed_group_tasks}/{required_tasks} tasks completed")
-        return completed_group_tasks >= required_tasks
-
-    return check_completion
-```
-
-## Implementation Steps
-
-### 1. Initialize the System
-
-```python
-# Create TaskProcessor instance
-processor = TaskProcessor(
-    num_workers=2,
-    tasks_per_worker=2
-)
-```
-
-### 2. Create Task Groups
-
-```python
-processing_group = TaskManager.create_task_group(
-    name="Data Processing",
-    description=f"Process {num_tasks} data items, goal achieves at {required_tasks}",
-    subtasks=self.create_processing_tasks(num_tasks),
-    goal=TaskGroupGoal(
-        name="Partial Processing Complete",
-        description=f"Complete at least {required_tasks} processing tasks",
-        check_condition=self.create_goal_checker(required_tasks),
-        success_message="Successfully completed minimum required tasks!",
-        failure_message="Failed to complete minimum required tasks."
-    ),
-    priority=1
-)
-```
-
-### 3. Monitor Progress
-
-```python
-async def monitor_progress(self, active_playground: TaskPlayGround,
-                           processing_group: TaskGroup) -> None:
-   while True:
-      await asyncio.sleep(1)
-      current_group = active_playground.task_manager.task_groups[processing_group.id]
-
-      # Print status updates
-      logger.info(f"Group Status: {current_group.status}")
-      if current_group.goal:
-         logger.info(f"Goal Status: {current_group.goal.status}")
-
-      if (current_group.goal and
-              current_group.goal.status == GoalStatus.ACHIEVED):
-         logger.info("Goal achieved! System can stop while tasks continue.")
-         break
-```
-
-### 4. Run the System
-
-```python
-async def run(self, num_tasks: int = 10, required_tasks: int = 5) -> None:
-    processing_group = self.create_task_group(num_tasks, required_tasks)
-
-    async with self.playground.play(workers=self.workers) as active_playground:
-        await active_playground.assign_task_groups([processing_group])
-        await self.monitor_progress(active_playground, processing_group)
-        await self.print_statistics(active_playground)
-```
-
-## Running the System
-
-### Basic Usage
-
-```python
-async def main():
-    processor = TaskProcessor(num_workers=2, tasks_per_worker=2)
-    await processor.run(num_tasks=10, required_tasks=5)
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-### Example Output
-
-```
-2025-02-04 10:15:30 | INFO | Starting task processor...
-2025-02-04 10:15:30 | INFO | Workers initialized: 2
-2025-02-04 10:15:30 | INFO | Tasks created: 10
-2025-02-04 10:15:30 | INFO | Required completions: 5
-
-2025-02-04 10:15:31 | INFO | Progress: 2/5 tasks completed
-2025-02-04 10:15:32 | INFO | Progress: 4/5 tasks completed
-2025-02-04 10:15:33 | INFO | Progress: 5/5 tasks completed
-2025-02-04 10:15:33 | INFO | Goal achieved! System can stop while tasks continue.
-
-2025-02-04 10:15:34 | INFO | Final Statistics:
-2025-02-04 10:15:34 | INFO | Completed Tasks: 7
-2025-02-04 10:15:34 | INFO | Average Duration: 1.2s
+        results.append(result)
 ```
 
 ## Advanced Features
 
-### 1. Custom Task Types
-
-You can extend the system to handle different types of tasks:
+### Task Dependencies
 
 ```python
-@dataclass
-class CustomTask(TaskMessage):
-    task_type: str
-    parameters: Dict[str, Any]
-    
-def create_custom_task(self, task_type: str, params: Dict[str, Any]) -> CustomTask:
-    return CustomTask(
-        task_id=str(uuid.uuid4()),
-        name=f"Custom {task_type} Task",
-        description=f"Execute {task_type} with parameters",
-        duration=1,
-        required_role="processor",
-        task_type=task_type,
-        parameters=params
-    )
+task3 = Task(
+    name="Aggregate Results",
+    processor="aggregator",
+    dependencies={task1.id, task2.id}
+)
 ```
 
-### 2. Dynamic Worker Scaling
+Dependencies ensure tasks execute in the correct order.
 
-Implement worker scaling based on load:
+### Error Handling
 
 ```python
-async def scale_workers(self, current_load: float, 
-                       min_workers: int = 2, max_workers: int = 10):
-    target_workers = min(max_workers, 
-                        max(min_workers, 
-                            int(current_load * 1.5)))
-    
-    while len(self.workers) < target_workers:
-        worker = TaskExecutionAgent(
-            f"worker{len(self.workers) + 1}",
-            "processor",
-            max_concurrent_tasks=self.tasks_per_worker
-        )
-        self.workers.append(worker)
+try:
+    result = await active_playground.add_and_execute_task(task)
+    if not result.success:
+        print(f"Task failed: {result.error}")
+except Exception as e:
+    print(f"Error executing task: {e}")
 ```
 
-### 3. Task Dependencies
+### Parallel Processing
 
-Add task dependencies for complex workflows:
-
-```python
-def add_task_dependencies(self, task_group: TaskGroup, 
-                         dependencies: Dict[str, List[str]]):
-    task_group.dependencies = dependencies
-    return task_group
-```
+TaskProcessingPlayground automatically handles parallel execution of independent tasks.
 
 ## Best Practices
 
-1. **Error Handling**
-    - Implement comprehensive error handling
-    - Use try-except blocks for task execution
-    - Log errors with context
+1. **Task Granularity**
+   - Keep tasks focused and atomic
+   - Avoid overly complex task dependencies
+   - Consider breaking large tasks into smaller units
 
-2. **Resource Management**
-    - Monitor worker load
-    - Implement proper cleanup
-    - Use context managers
+2. **Worker Design**
+   - Make workers stateless when possible
+   - Handle errors gracefully in _processor
+   - Include relevant metadata in results
 
-3. **Performance Optimization**
-    - Adjust worker count based on load
-    - Configure appropriate task durations
-    - Monitor system resources
+3. **Resource Management**
+   - Use async context manager for cleanup
+   - Monitor worker load and task distribution
+   - Implement appropriate timeouts
 
-## Troubleshooting
+4. **Error Handling**
+   - Implement retries for transient failures
+   - Log errors with sufficient context
+   - Have fallback strategies for critical tasks
 
-### Common Issues
+## Example: Task Pipeline
 
-1. **Tasks Not Starting**
-    - Check worker roles match task requirements
-    - Verify worker connection status
-    - Check task queue status
-
-2. **Slow Processing**
-    - Monitor worker load
-    - Adjust concurrent task limits
-    - Check for resource bottlenecks
-
-3. **Goals Not Achieving**
-    - Verify goal checker logic
-    - Check task completion status
-    - Monitor progress updates
-
-### Debug Mode
-
-Enable detailed logging:
+Here's an example of a more complex task pipeline:
 
 ```python
-import logging
-logging.basicConfig(level=logging.DEBUG)
+async def create_pipeline(playground):
+    # Data preparation task
+    prep_task = Task(
+        name="Data Preparation",
+        processor="prep_worker",
+        input_data={'raw_data': data}
+    )
+    
+    # Processing task depending on prep
+    process_task = Task(
+        name="Data Processing",
+        processor="process_worker",
+        dependencies={prep_task.id}
+    )
+    
+    # Final aggregation
+    aggregate_task = Task(
+        name="Result Aggregation",
+        processor="aggregator",
+        dependencies={process_task.id}
+    )
+    
+    # Execute pipeline
+    tasks = [prep_task, process_task, aggregate_task]
+    results = []
+    
+    for task in tasks:
+        result = await playground.add_and_execute_task(task)
+        results.append(result)
+        
+    return results
+```
+
+## Debugging Tips
+
+1. Enable detailed logging:
+```python
+from loguru import logger
 logger.enable("ceylon")
+```
+
+2. Monitor task states:
+```python
+task_status = playground.task_manager.get_task(task_id)
+print(f"Task status: {task_status.status}")
+```
+
+3. Inspect worker connections:
+```python
+connected_workers = playground.llm_agents
+print(f"Connected workers: {connected_workers}")
+```
+
+## Common Patterns
+
+### Worker Pool
+```python
+workers = [
+    WorkerProcessor(f"Worker-{i}", skill_level=5)
+    for i in range(num_workers)
+]
+```
+
+### Task Batching
+```python
+task_batch = [
+    Task(name=f"Batch-{i}", processor="worker", input_data={'batch_id': i})
+    for i in range(batch_size)
+]
+results = await asyncio.gather(*[
+    playground.add_and_execute_task(task) for task in task_batch
+])
+```
+
+### Result Aggregation
+```python
+async def aggregate_results(results):
+    success_count = sum(1 for r in results if r.success)
+    success_rate = success_count / len(results)
+    return {
+        'success_rate': success_rate,
+        'total_tasks': len(results),
+        'successful_tasks': success_count
+    }
 ```
 
 ## Conclusion
 
-This tutorial demonstrated building a robust distributed task processing system using Ceylon. Key takeaways:
+Ceylon's TaskProcessingPlayground provides a robust framework for distributed task processing. Key benefits include:
+- Built-in task dependency management
+- Automatic parallel processing
+- Clean worker abstraction
+- Error handling and retries
+- Resource management
 
-1. Modular system design
-2. Scalable worker architecture
-3. Goal-based completion tracking
-4. Comprehensive monitoring
-5. Error handling and recovery
+Remember to:
+- Design tasks and workers for your specific use case
+- Implement proper error handling
+- Monitor system performance
+- Scale workers based on load
 
-For more information, visit:
-- Ceylon Documentation: [https://docs.ceylon.ai](https://docs.ceylon.ai)
-- GitHub Repository: [https://github.com/ceylon-ai/ceylon](https://github.com/ceylon-ai/ceylon)
+For more details, refer to the Ceylon documentation and example implementations.

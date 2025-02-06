@@ -19,6 +19,36 @@ This tutorial demonstrates how to build a distributed task processing system usi
 - Contains input data and processing instructions
 - Can have dependencies on other tasks
 
+## Message Passing
+
+````mermaid
+sequenceDiagram
+    participant TM as TaskManager
+    participant W1 as Junior(skill=3)
+    participant W2 as Intermediate(skill=6)
+    participant W3 as Senior(skill=9)
+    
+    Note over TM,W3: Connection Phase
+    W1->>TM: Connect
+    W2->>TM: Connect
+    W3->>TM: Connect
+    
+    Note over TM,W3: Task Assignment Phase
+    TM->>W1: TaskAssignment(Task 1, difficulty=2)
+    TM->>W2: TaskAssignment(Task 2, difficulty=5)
+    TM->>W3: TaskAssignment(Task 3, difficulty=8)
+    
+    Note over TM,W3: Task Processing Phase
+    par Process Tasks
+        W1-->>TM: TaskResult(id=1, success=true)
+        W2-->>TM: TaskResult(id=2, success=true)
+        W3-->>TM: TaskResult(id=3, success=true)
+    end
+    
+    Note over TM: Calculate Success Rate
+    Note over TM: End Task Management
+````
+The diagram illustrates a distributed task management system where a central TaskManager coordinates with multiple worker agents. Each worker has a different skill level (3, 6, and 9) and can handle tasks of varying difficulty (2, 5, and 8). The workflow begins with workers connecting to the TaskManager, followed by task assignments based on availability. Workers process their assigned tasks in parallel, with success determined by whether their skill level exceeds the task's difficulty. Once all tasks are complete, the TaskManager calculates the overall success rate before shutting down.
 ## Implementation Guide
 
 ### 1. Define Your Task Structure
@@ -154,29 +184,29 @@ async def create_pipeline(playground):
         processor="prep_worker",
         input_data={'raw_data': data}
     )
-    
+
     # Processing task depending on prep
     process_task = Task(
         name="Data Processing",
         processor="process_worker",
         dependencies={prep_task.id}
     )
-    
+
     # Final aggregation
     aggregate_task = Task(
         name="Result Aggregation",
         processor="aggregator",
         dependencies={process_task.id}
     )
-    
+
     # Execute pipeline
     tasks = [prep_task, process_task, aggregate_task]
     results = []
-    
+
     for task in tasks:
         result = await playground.add_and_execute_task(task)
         results.append(result)
-        
+
     return results
 ```
 
