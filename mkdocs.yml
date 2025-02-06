@@ -93,6 +93,7 @@ nav:
   - Getting started:
       - Quickstart: quickstart.md
       - 5 minutes to Ceylon: 5-minutes-to-ceylon.md
+      - Start with a Playground: playground-start.md
       - Technology: technology.md
       - Core Concepts: core-concepts.md
   - How to:
