@@ -5,6 +5,7 @@
 import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
+from functools import wraps
 from typing import Dict, Any, Optional, List, Sequence
 
 from pydantic import BaseModel
@@ -18,6 +19,7 @@ from ceylon.llm.models.support.messages import (
     ModelMessagePart
 )
 from ceylon.llm.models.support.tools import ToolDefinition
+from ceylon.llm.tool_registgry import ToolRegistry
 from ceylon.processor.agent import ProcessWorker
 from ceylon.processor.data import ProcessRequest
 
@@ -44,7 +46,7 @@ class LLMConfig(BaseModel):
         arbitrary_types_allowed = True
 
 
-class LLMAgent(ProcessWorker):
+class BaseLLMAgent(ProcessWorker):
     """
     An agent that processes tasks using configurable LLM capabilities.
     Supports multiple LLM backends through the Model interface.
@@ -239,3 +241,55 @@ class LLMAgent(ProcessWorker):
         if self.llm_model:
             await self.llm_model.close()
         await super().stop()
+
+
+class LLMAgent(BaseLLMAgent):
+    """Enhanced LLM Agent with tool decorator support."""
+
+    def __init__(
+            self,
+            name: str,
+            llm_model: Model,
+            config: Optional[LLMConfig] = None,
+            role: str = "llm_processor",
+    ):
+        self.tool_registry = ToolRegistry()
+
+        # If no config provided, create default
+        if config is None:
+            config = LLMConfig(
+                system_prompt="You are a helpful assistant."
+            )
+
+        super().__init__(
+            name=name,
+            llm_model=llm_model,
+            config=config,
+            role=role
+        )
+
+    def tool(self, name: str, description: str):
+        """Decorator to register a new tool."""
+        def decorator(func):
+            @wraps(func)
+            async def wrapper(*args, **kwargs):
+                return await func(*args, **kwargs)
+
+            # Register the tool
+            self.tool_registry.register(name, description, wrapper)
+
+            # Update agent's config with new tools
+            self.config.tools = self.tool_registry.get_tools()
+
+            # Reinitialize model context with updated tools
+            self.model_context = self.llm_model.create_context(
+                settings=ModelSettings(
+                    temperature=self.config.temperature,
+                    max_tokens=self.config.max_tokens,
+                    parallel_tool_calls=self.config.parallel_tool_calls
+                ),
+                tools=self.config.tools
+            )
+
+            return wrapper
+        return decorator
