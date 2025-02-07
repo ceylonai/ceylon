@@ -223,5 +223,3 @@ print(f"Connected workers: {connected_workers}")
 - Add monitoring and metrics collection
 - Scale your system with additional workers
 - Implement custom task scheduling logic
-
-For more information, visit the Ceylon documentation at https://ceylon.ai

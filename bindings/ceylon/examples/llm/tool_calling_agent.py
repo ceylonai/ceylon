@@ -48,15 +48,12 @@ async def main():
         name="math_assistant",
         llm_model=OllamaModel(
             model_name="deepseek-r1:8b",
-            base_url="http://localhost:11434"
         ),
         config=LLMConfig(
             system_prompt=(
                 "You are a math assistant. Use the calculator tool to perform calculations. "
                 "When asked to perform calculations, always use the calculator tool for accuracy."
             ),
-            temperature=0.7,
-            max_tokens=1000,
             tools=tools
         ),
         role="math_assistant"

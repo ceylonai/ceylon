@@ -9,27 +9,18 @@ from ceylon.processor.playground import ProcessPlayGround
 async def main():
     # Create playground and worker
     playground = ProcessPlayGround()
-    llm_model = OllamaModel(
-        model_name="llama3.2",
-        base_url="http://localhost:11434"
-    )
-
-    # Configure LLM agent
-    llm_config = LLMConfig(
-        system_prompt=(
-            "You are an expert content writer specializing in technology topics. "
-            "Provide clear, informative, and engaging responses."
-        ),
-        temperature=0.7,
-        max_tokens=1000,
-        retry_attempts=1
-    )
-
     # Create LLM agent
     llm_agent = LLMAgent(
         name="writer_1",
-        llm_model=llm_model,
-        config=llm_config,
+        llm_model=OllamaModel(
+            model_name="llama3.2",
+        ),
+        config=LLMConfig(
+            system_prompt=(
+                "You are an expert content writer specializing in technology topics. "
+                "Provide clear, informative, and engaging responses."
+            )
+        ),
         role="writer"
     )
 
@@ -42,8 +33,8 @@ async def main():
             data="Write a blog post about AI in 2023."
         ))
         print(f"Response received: {response.result}")
+        await active_playground.finish()
 
 
 if __name__ == "__main__":
     asyncio.run(main())
-
