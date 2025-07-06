@@ -1,3 +1,7 @@
 [workspace]
-members = ["libs/sangedama", "bindings/ceylon",  "libs/ceylon-core"]
+members = [
+    #    "libs/sangedama", "bindings/ceylon",  "libs/ceylon-core",
+    "sdk",
+    "sdk/agent-core",
+]
 resolver = "2"
