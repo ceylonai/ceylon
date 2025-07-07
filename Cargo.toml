@@ -3,5 +3,6 @@ members = [
     #    "libs/sangedama", "bindings/ceylon",  "libs/ceylon-core",
     "sdk",
     "sdk/agent-core",
+    "sdk/agent-communication"
 ]
 resolver = "2"
