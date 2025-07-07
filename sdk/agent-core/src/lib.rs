@@ -1,5 +1,11 @@
-mod lifecycle;
-mod task_manager;
+pub mod lifecycle;
+pub mod task_manager;
+pub mod scheduler;
+pub mod events;
+pub mod config;
+pub mod errors;
+
+
 
 pub fn add(left: u64, right: u64) -> u64 {
     left + right

@@ -1,3 +1,4 @@
+#[derive(Debug, PartialEq)]
 pub enum AgentState {
     Uninitialized,
     Initialized,
@@ -6,7 +7,7 @@ pub enum AgentState {
 }
 
 pub struct LifecycleManager {
-    state: AgentState,
+    pub state: AgentState,
 }
 
 impl LifecycleManager {
@@ -15,8 +16,17 @@ impl LifecycleManager {
             state: AgentState::Uninitialized,
         }
     }
-    pub async fn initialize(&mut self) {}
-    pub async fn start(&mut self) {}
-    pub async fn stop(&mut self) {}
-    pub async fn restart(&mut self) {}
+    pub async fn initialize(&mut self) {
+        self.state = AgentState::Initialized;
+    }
+    pub async fn start(&mut self) {
+        self.state = AgentState::Running;
+    }
+    pub async fn stop(&mut self) {
+        self.state = AgentState::Stopped;
+    }
+    pub async fn restart(&mut self) {
+        self.stop().await;
+        self.start().await;
+    }
 }
