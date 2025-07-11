@@ -2,15 +2,32 @@ use async_trait::async_trait;
 use libp2p::futures::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use libp2p::request_response::Codec;
 use serde_json;
-use std::io;
+use std::{fmt, io};
 
 use crate::anp::AnpMessage;
+
 
 #[derive(Debug, Clone)]
 pub struct AnpRequest(pub AnpMessage);
 
+impl fmt::Display for AnpRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let AnpRequest(msg) = self;
+        write!(f, "AnpRequest(from: {}, to: {}, type: {})", 
+               msg.from, msg.to, msg.msg_type)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct AnpResponse(pub AnpMessage);
+
+impl fmt::Display for AnpResponse {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let AnpResponse(msg) = self;
+        write!(f, "AnpResponse(from: {}, to: {}, type: {})", 
+               msg.from, msg.to, msg.msg_type)
+    }
+}
 
 #[derive(Clone, Default)]
 pub struct AnpCodec();

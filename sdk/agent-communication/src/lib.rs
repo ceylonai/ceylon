@@ -1,7 +1,12 @@
-mod anp;
-mod messaging;
-mod handlers;
-mod node;
+pub mod anp;
+pub mod messaging;
+pub mod handlers;
+pub mod node;
+pub mod behaviour;
+pub mod peer;
+pub mod peer_swarm;
+pub mod peer_builder;
+pub mod data;
 
 pub fn add(left: u64, right: u64) -> u64 {
     left + right
