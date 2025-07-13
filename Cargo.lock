@@ -2659,6 +2659,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "simple_chat"
+version = "0.1.0"
+dependencies = [
+ "agent-communication",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "slab"
 version = "0.4.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"

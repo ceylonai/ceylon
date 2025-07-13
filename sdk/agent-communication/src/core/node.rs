@@ -1,17 +1,9 @@
-/*
- *
- *  * Copyright 2024-Present, Syigen Ltd. and Syigen Private Limited. All rights reserved.
- *  * Licensed under the Apache License, Version 2.0 (See LICENSE or http://www.apache.org/licenses/LICENSE-2.0).
- *  *
- *
- */
-
 use anyhow::Result;
 use futures::StreamExt;
 use libp2p::request_response::{Event, Message, OutboundRequestId};
 use libp2p::{
-    Multiaddr, PeerId, Swarm, Transport, core::upgrade, identity, mdns, noise, request_response,
-    swarm::SwarmEvent, tcp, yamux,
+    Multiaddr, PeerId, Swarm, SwarmBuilder, Transport, core::upgrade, identity, mdns, noise,
+    request_response, swarm::SwarmEvent, tcp, yamux,
 };
 use serde_json::json;
 use std::collections::HashMap;
@@ -19,13 +11,15 @@ use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::time::{Instant, interval};
 
-use crate::messaging::{ANP_PROTOCOL, AnpRequest, AnpResponse};
+use crate::data::AgentConfig;
+use crate::messaging::{ANP_PROTOCOL, AnpCodec, AnpRequest, AnpResponse};
 use crate::network::behaviour::{AgentBehaviour, AgentEvent};
 use crate::protocol::anp::AnpMessage;
 use crate::protocol::handlers::handle_message;
 
 pub struct AgentNode {
     pub name: String,
+    pub protocol: String, // Store the protocol in the node
     pub swarm: Swarm<AgentBehaviour>,
     pub discovered_peers: HashMap<PeerId, Multiaddr>,
     pub last_message_time: Instant,
@@ -33,6 +27,7 @@ pub struct AgentNode {
 }
 
 impl AgentNode {
+    /// Create a new AgentNode with simple configuration
     pub async fn new(name: &str, listen_addr: &str) -> Result<Self> {
         // 1️⃣ Identity
         let id_keys = identity::Keypair::generate_ed25519();
@@ -47,7 +42,8 @@ impl AgentNode {
             .boxed();
 
         // 3️⃣ RequestResponse behavior
-        let req_resp_config = request_response::Config::default();
+        let mut req_resp_config = request_response::Config::default();
+        req_resp_config.set_request_timeout(Duration::from_secs(10));
 
         let protocols = std::iter::once((ANP_PROTOCOL, request_response::ProtocolSupport::Full));
         let request_response = request_response::Behaviour::new(protocols, req_resp_config);
@@ -76,6 +72,65 @@ impl AgentNode {
 
         Ok(Self {
             name: name.to_string(),
+            protocol: ANP_PROTOCOL.to_string(),
+            swarm,
+            discovered_peers: HashMap::new(),
+            last_message_time: Instant::now(),
+            pending_requests: HashMap::new(),
+        })
+    }
+
+    /// Create a new AgentNode from an AgentConfig
+    pub async fn from_config(name: &str, config: AgentConfig) -> Result<Self> {
+        let keypair = config
+            .keypair
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("AgentConfig must have a keypair"))?;
+
+        println!("🔑 {} Peer ID: {}", name, config.peer_id);
+
+        // Create transport with the provided keypair
+        let transport = tcp::tokio::Transport::new(tcp::Config::default().nodelay(true))
+            .upgrade(upgrade::Version::V1)
+            .authenticate(noise::Config::new(keypair)?)
+            .multiplex(yamux::Config::default())
+            .boxed();
+
+        // RequestResponse behavior with custom configuration
+        let mut req_resp_config = request_response::Config::default();
+        // req_resp_config.set_request_timeout(Duration::from_secs(config.request_timeout_secs));
+        // req_resp_config.set_connection_keep_alive(Duration::from_secs(config.keep_alive_secs));
+
+        // Use the ANP_PROTOCOL constant to avoid lifetime issues
+        let protocols = std::iter::once((ANP_PROTOCOL, request_response::ProtocolSupport::Full));
+        let request_response = request_response::Behaviour::new(protocols, req_resp_config);
+
+        // mDNS for peer discovery
+        let mdns = mdns::Behaviour::new(mdns::Config::default(), config.peer_id)?;
+
+        // Combined behavior
+        let behaviour = AgentBehaviour {
+            request_response,
+            mdns,
+        };
+
+        // Create swarm
+        let mut swarm = Swarm::new(
+            transport,
+            behaviour,
+            config.peer_id,
+            libp2p_swarm::Config::with_tokio_executor(),
+        );
+
+        // Start listening on all configured addresses
+        for addr in &config.listen_addrs {
+            swarm.listen_on(addr.clone())?;
+            println!("🎧 {} listening on {}", name, addr);
+        }
+
+        Ok(Self {
+            name: name.to_string(),
+            protocol: config.protocol.clone(),
             swarm,
             discovered_peers: HashMap::new(),
             last_message_time: Instant::now(),
@@ -274,8 +329,10 @@ impl AgentNode {
                     if peer != *self.swarm.local_peer_id() {
                         println!("🔎 [{}] Discovered peer: {} at {}", self.name, peer, addr);
                         self.discovered_peers.insert(peer, addr.clone());
-
-                        Swarm::add_peer_address(&mut self.swarm, peer, addr.clone());
+                        self.swarm
+                            .behaviour_mut()
+                            .request_response
+                            .add_address(&peer, addr);
                     }
                 }
             }
@@ -283,12 +340,10 @@ impl AgentNode {
                 for (peer, addr) in expired {
                     println!("❌ [{}] Expired peer: {} at {}", self.name, peer, addr);
                     self.discovered_peers.remove(&peer);
-                    Swarm::remove_external_address(&mut self.swarm, &addr);
-                    // self.swarm
-                    //     .behaviour_mut()
-                    //     .request_response
-                    //     .remove_address(&peer, &addr);
-                    // AgentRequestResponseBehaviour::remove_address( )
+                    self.swarm
+                        .behaviour_mut()
+                        .request_response
+                        .remove_address(&peer, &addr);
                 }
             }
         }
