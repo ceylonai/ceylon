@@ -1,9 +1,17 @@
+/*
+ *
+ *  * Copyright 2024-Present, Syigen Ltd. and Syigen Private Limited. All rights reserved.
+ *  * Licensed under the Apache License, Version 2.0 (See LICENSE or http://www.apache.org/licenses/LICENSE-2.0).
+ *  *
+ *
+ */
+
 use anyhow::Result;
 use futures::StreamExt;
 use libp2p::request_response::{Event, Message, OutboundRequestId};
 use libp2p::{
-    Multiaddr, PeerId, Swarm, SwarmBuilder, Transport, core::upgrade, identity, mdns, noise,
-    request_response, swarm::SwarmEvent, tcp, yamux,
+    Multiaddr, PeerId, Swarm, Transport, core::upgrade, identity, mdns, noise, request_response,
+    swarm::SwarmEvent, tcp, yamux,
 };
 use serde_json::json;
 use std::collections::HashMap;
@@ -11,10 +19,10 @@ use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::time::{Instant, interval};
 
-use crate::anp::AnpMessage;
-use crate::behaviour::{AgentBehaviour, AgentEvent};
-use crate::handlers::handle_message;
-use crate::messaging::{ANP_PROTOCOL, AnpCodec, AnpRequest, AnpResponse};
+use crate::messaging::{ANP_PROTOCOL, AnpRequest, AnpResponse};
+use crate::network::behaviour::{AgentBehaviour, AgentEvent};
+use crate::protocol::anp::AnpMessage;
+use crate::protocol::handlers::handle_message;
 
 pub struct AgentNode {
     pub name: String,
@@ -39,8 +47,7 @@ impl AgentNode {
             .boxed();
 
         // 3️⃣ RequestResponse behavior
-        let mut req_resp_config = request_response::Config::default();
-        req_resp_config.set_request_timeout(Duration::from_secs(10));
+        let req_resp_config = request_response::Config::default();
 
         let protocols = std::iter::once((ANP_PROTOCOL, request_response::ProtocolSupport::Full));
         let request_response = request_response::Behaviour::new(protocols, req_resp_config);
@@ -267,10 +274,8 @@ impl AgentNode {
                     if peer != *self.swarm.local_peer_id() {
                         println!("🔎 [{}] Discovered peer: {} at {}", self.name, peer, addr);
                         self.discovered_peers.insert(peer, addr.clone());
-                        self.swarm
-                            .behaviour_mut()
-                            .request_response
-                            .add_address(&peer, addr);
+
+                        Swarm::add_peer_address(&mut self.swarm, peer, addr.clone());
                     }
                 }
             }
@@ -278,10 +283,12 @@ impl AgentNode {
                 for (peer, addr) in expired {
                     println!("❌ [{}] Expired peer: {} at {}", self.name, peer, addr);
                     self.discovered_peers.remove(&peer);
-                    self.swarm
-                        .behaviour_mut()
-                        .request_response
-                        .remove_address(&peer, &addr);
+                    Swarm::remove_external_address(&mut self.swarm, &addr);
+                    // self.swarm
+                    //     .behaviour_mut()
+                    //     .request_response
+                    //     .remove_address(&peer, &addr);
+                    // AgentRequestResponseBehaviour::remove_address( )
                 }
             }
         }

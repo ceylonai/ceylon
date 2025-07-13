@@ -6,7 +6,7 @@
  *
  */
 
-use crate::anp::AnpMessage;
+use crate::protocol::anp::AnpMessage;
 
 pub async fn handle_message(anp: AnpMessage) {
     match anp.payload.get("action").and_then(|v| v.as_str()) {

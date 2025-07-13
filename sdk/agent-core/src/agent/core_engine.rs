@@ -11,8 +11,8 @@ use crate::agent::{
     event::AgentEvent,
     task::{Task, TaskExecutor},
 };
-use tokio::sync::mpsc::{Receiver, Sender};
-use agent_communication::anp::AnpMessage;
+use agent_communication::protocol::anp::AnpMessage;
+use tokio::sync::mpsc::Receiver;
 
 pub struct CoreEngine {
     rx: Receiver<AgentEvent>,

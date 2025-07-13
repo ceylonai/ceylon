@@ -4,20 +4,19 @@ use anyhow::Result;
 use futures::StreamExt;
 use libp2p::request_response::{Event, Message, OutboundRequestId};
 use libp2p::{
-    Multiaddr, PeerId, Swarm, SwarmBuilder, Transport, core::upgrade, identity, mdns, noise,
-    request_response, swarm::SwarmEvent, tcp, yamux,
+    core::upgrade, identity, mdns, noise, request_response, swarm::SwarmEvent, tcp, yamux,
+    Multiaddr, PeerId, Swarm, Transport,
 };
 use serde_json::json;
 use std::collections::HashMap;
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::time::{Instant, interval};
+use tokio::time::{interval, Instant};
 
 // Import your existing modules
-use agent_communication::anp::AnpMessage;
-use agent_communication::behaviour::{AgentBehaviour, AgentEvent};
-use agent_communication::handlers::handle_message;
-use agent_communication::messaging::{ANP_PROTOCOL, AnpCodec, AnpRequest, AnpResponse};
+use agent_communication::messaging::{AnpRequest, AnpResponse, ANP_PROTOCOL};
+use agent_communication::network::behaviour::{AgentBehaviour, AgentEvent};
+use agent_communication::protocol::anp::AnpMessage;
 
 pub struct DiscoveryNode {
     pub name: String,
@@ -43,7 +42,7 @@ impl DiscoveryNode {
             .boxed();
 
         // 3️⃣ Configure RequestResponse behavior for ANP protocol
-        let mut req_resp_config = request_response::Config::default();
+        let req_resp_config = request_response::Config::default();
         // req_resp_config.set_request_timeout(Duration::from_secs(10));
         // req_resp_config.set_connection_keep_alive(Duration::from_secs(30));
 
@@ -257,7 +256,7 @@ impl DiscoveryNode {
             SwarmEvent::IncomingConnectionError { error, .. } => {
                 eprintln!("⚠️ [{}] Incoming connection error: {:?}", self.name, error);
             }
-            other => {
+            _ => {
                 // Uncomment for more verbose logging
                 // println!("⚙️ [{}] Other SwarmEvent: {:?}", self.name, other);
             }
@@ -384,11 +383,12 @@ impl DiscoveryNode {
                         self.discovered_peers.insert(peer, addr.clone());
 
                         // Add address to request-response behavior
-                        self.swarm
-                            .behaviour_mut()
-                            .request_response
-                            .add_address(&peer, addr);
+                        // self.swarm
+                        //     .behaviour_mut()
+                        //     .request_response
+                        //     .add_address(&peer, addr);
 
+                        Swarm::add_peer_address(&mut self.swarm, peer, addr.clone());
                         // The welcome message will be sent on the next discovery interval
                     }
                 }
@@ -398,10 +398,11 @@ impl DiscoveryNode {
                     println!("❌ [{}] Peer expired: {} at {}", self.name, peer, addr);
                     self.discovered_peers.remove(&peer);
                     self.welcomed_peers.remove(&peer);
-                    self.swarm
-                        .behaviour_mut()
-                        .request_response
-                        .remove_address(&peer, &addr);
+                    // self.swarm
+                    //     .behaviour_mut()
+                    //     .request_response
+                    //     .remove_address(&peer, &addr);
+                    Swarm::remove_external_address(&mut self.swarm, &addr);
                 }
             }
         }

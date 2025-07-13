@@ -7,7 +7,7 @@
  */
 // src/agent/event.rs
 
-use agent_communication::anp::AnpMessage;
+use agent_communication::protocol::anp::AnpMessage;
 use crate::agent::task::Task;
 
 #[derive(Debug)]

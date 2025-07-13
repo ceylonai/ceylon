@@ -1,18 +1,26 @@
+/*
+ *
+ *  * Copyright 2024-Present, Syigen Ltd. and Syigen Private Limited. All rights reserved.
+ *  * Licensed under the Apache License, Version 2.0 (See LICENSE or http://www.apache.org/licenses/LICENSE-2.0).
+ *  *
+ *
+ */
+
 use crate::messaging::{AnpCodec, AnpRequest, AnpResponse};
 use libp2p::mdns::tokio::Tokio;
 use libp2p::{
-    PeerId,
     mdns::{Behaviour as Mdns, Event as MdnsEvent},
     request_response::{Behaviour as RequestResponse, Event as RequestResponseEvent},
     swarm::NetworkBehaviour,
 };
 
+pub type AgentRequestResponseBehaviour = RequestResponse<AnpCodec>;
 /// Combines RequestResponse (for ANP) and mDNS discovery into a single behaviour.
 #[derive(NetworkBehaviour)]
 #[behaviour(to_swarm = "AgentEvent", event_process = false)]
 pub struct AgentBehaviour {
     /// Handles ANP protocol messaging
-    pub request_response: RequestResponse<AnpCodec>,
+    pub request_response: AgentRequestResponseBehaviour,
 
     /// mDNS for local peer discovery
     pub mdns: Mdns<Tokio>,

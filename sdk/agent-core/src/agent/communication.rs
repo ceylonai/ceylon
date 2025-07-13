@@ -13,7 +13,10 @@ use tokio::sync::mpsc::Sender;
 use tokio::task::JoinHandle;
 
 // Import from agent-communication crate
-use agent_communication::{PeerId, anp::AnpMessage, data::AgentConfig, handlers::handle_message, messaging::ANP_PROTOCOL, node::run_node, peer_builder::AgentNodeBuilder, Multiaddr};
+use agent_communication::{
+    Multiaddr, PeerId, core::node::run_node, data::AgentConfig, messaging::ANP_PROTOCOL,
+    peer_builder::AgentNodeBuilder, protocol::anp::AnpMessage, protocol::handlers::handle_message,
+};
 
 use crate::agent::event::AgentEvent;
 
@@ -90,9 +93,7 @@ impl CommunicationModule {
 
         // Send via event channel
         self.tx
-            .send(AgentEvent::SendANPMessage {
-                0: anp_msg,
-            })
+            .send(AgentEvent::SendANPMessage { 0: anp_msg })
             .await
             .map_err(|e| anyhow::anyhow!("Failed to send message: {}", e))?;
 

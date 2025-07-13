@@ -7,17 +7,16 @@
  */
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use agent_communication::anp::AnpMessage;
     use agent_communication::data::AgentConfig;
     use agent_communication::messaging::{AnpCodec, AnpRequest, AnpResponse};
     use agent_communication::peer::Peer;
     use agent_communication::peer_builder::AgentNodeBuilder;
     use agent_communication::peer_swarm::PeerManager;
+    use agent_communication::protocol::anp::AnpMessage;
     use futures::io::Cursor;
     use libp2p::request_response::Codec;
-    use libp2p::{Multiaddr, PeerId, identity};
-    use serde_json::{Value, json};
+    use libp2p::{identity, Multiaddr, PeerId};
+    use serde_json::json;
 
     // Helper function to create a test AnpMessage
     fn create_test_message(from: &str, to: &str, action: &str) -> AnpMessage {

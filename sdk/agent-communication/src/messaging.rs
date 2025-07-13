@@ -3,9 +3,7 @@ use libp2p::futures::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use libp2p::request_response::Codec;
 use serde_json;
 use std::{fmt, io};
-
-use crate::anp::AnpMessage;
-
+use crate::protocol::anp::AnpMessage;
 
 #[derive(Debug, Clone)]
 pub struct AnpRequest(pub AnpMessage);

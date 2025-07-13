@@ -1,12 +1,12 @@
-pub mod anp;
 pub mod messaging;
-pub mod handlers;
-pub mod node;
-pub mod behaviour;
 pub mod peer;
+pub mod core;
+pub mod network;
+pub mod protocol;
 pub mod peer_swarm;
 pub mod peer_builder;
 pub mod data;
+pub mod utils;
 
 pub use libp2p::PeerId;
 pub use libp2p::Multiaddr;
