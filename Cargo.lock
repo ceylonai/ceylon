@@ -1797,6 +1797,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "multi_agent"
+version = "0.1.0"
+dependencies = [
+ "agent-communication",
+ "serde_json",
+ "tokio",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "multiaddr"
 version = "0.18.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
