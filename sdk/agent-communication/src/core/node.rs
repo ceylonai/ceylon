@@ -2,30 +2,30 @@ use anyhow::Result;
 use futures::StreamExt;
 use libp2p::request_response::{Event, Message, OutboundRequestId};
 use libp2p::{
-    Multiaddr, PeerId, Swarm, SwarmBuilder, Transport, core::upgrade, identity, mdns, noise,
-    request_response, swarm::SwarmEvent, tcp, yamux,
+    core::upgrade, identity, mdns, noise, request_response, swarm::SwarmEvent, tcp, yamux,
+    Multiaddr, PeerId, Swarm, Transport,
 };
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::time::Duration;
 use tokio::sync::{broadcast, mpsc};
-use tokio::time::{Instant, interval};
+use tokio::time::{interval, Instant};
 
 use crate::data::AgentConfig;
-use crate::messaging::{ANP_PROTOCOL, AnpCodec, AnpRequest, AnpResponse};
+use crate::messaging::{AnpRequest, AnpResponse, ANP_PROTOCOL};
 use crate::network::behaviour::{AgentBehaviour, AgentEvent};
 use crate::protocol::anp::AnpMessage;
 use crate::protocol::handlers::handle_message;
 
-// Event types that the AgentNode can emit
+// Event types that the AgentNode can emit (no libp2p types exposed)
 #[derive(Debug, Clone)]
 pub enum AgentNodeEvent {
-    PeerDiscovered { peer_id: PeerId, address: Multiaddr },
-    PeerDisconnected { peer_id: PeerId },
-    MessageReceived { from: PeerId, message: AnpMessage },
-    MessageSent { to: PeerId, message: AnpMessage },
-    ConnectionEstablished { peer_id: PeerId },
-    ConnectionClosed { peer_id: PeerId },
+    PeerDiscovered { peer_id: String, address: String },
+    PeerDisconnected { peer_id: String },
+    MessageReceived { from: String, message: AnpMessage },
+    MessageSent { to: String, message: AnpMessage },
+    ConnectionEstablished { peer_id: String },
+    ConnectionClosed { peer_id: String },
     Error { description: String },
 }
 
@@ -44,10 +44,10 @@ pub struct AgentNode {
     pub command_rx: Option<mpsc::UnboundedReceiver<AgentCommand>>,
 }
 
-// Commands that can be sent to the AgentNode
+// Commands that can be sent to the AgentNode (no libp2p types)
 #[derive(Debug)]
 pub enum AgentCommand {
-    SendMessage { to: PeerId, payload: Value },
+    SendMessage { to: String, payload: Value },
     BroadcastMessage { payload: Value },
     GetPeers,
     Shutdown,
@@ -185,7 +185,11 @@ impl AgentNode {
     }
 
     /// Send a message to a specific peer
-    pub fn send_message_to_peer(&mut self, peer_id: &PeerId, payload: Value) -> Result<()> {
+    pub fn send_message_to_peer(&mut self, peer_id: &str, payload: Value) -> Result<()> {
+        // Convert string peer_id back to PeerId
+        let peer_id = peer_id.parse::<PeerId>()
+            .map_err(|e| anyhow::anyhow!("Invalid peer ID: {}", e))?;
+
         let anp_message = AnpMessage::new(
             self.name.clone(),
             peer_id.to_string(),
@@ -198,13 +202,13 @@ impl AgentNode {
         let request_id = self.swarm
             .behaviour_mut()
             .request_response
-            .send_request(peer_id, request);
+            .send_request(&peer_id, request);
 
-        self.pending_requests.insert(request_id, *peer_id);
+        self.pending_requests.insert(request_id, peer_id);
 
         // Emit event
         let _ = self.event_tx.send(AgentNodeEvent::MessageSent {
-            to: *peer_id,
+            to: peer_id.to_string(),
             message: anp_message,
         });
 
@@ -216,7 +220,7 @@ impl AgentNode {
         let peer_ids: Vec<PeerId> = self.discovered_peers.keys().cloned().collect();
 
         for peer_id in peer_ids {
-            if let Err(e) = self.send_message_to_peer(&peer_id, payload.clone()) {
+            if let Err(e) = self.send_message_to_peer(&peer_id.to_string(), payload.clone()) {
                 eprintln!("Failed to send message to {}: {:?}", peer_id, e);
             }
         }
@@ -224,14 +228,16 @@ impl AgentNode {
         Ok(())
     }
 
-    /// Get list of discovered peers
-    pub fn get_peers(&self) -> Vec<(PeerId, Multiaddr)> {
-        self.discovered_peers.iter().map(|(k, v)| (*k, v.clone())).collect()
+    /// Get list of discovered peers (returns strings, not libp2p types)
+    pub fn get_peers(&self) -> Vec<(String, String)> {
+        self.discovered_peers.iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
     }
 
-    /// Get local peer ID
-    pub fn local_peer_id(&self) -> PeerId {
-        *self.swarm.local_peer_id()
+    /// Get local peer ID as string
+    pub fn local_peer_id(&self) -> String {
+        self.swarm.local_peer_id().to_string()
     }
 
     /// Run the agent node with event processing
@@ -335,13 +341,19 @@ impl AgentNode {
             }
             SwarmEvent::ConnectionEstablished { peer_id, .. } => {
                 println!("🔗 [{}] Connection established with {}", self.name, peer_id);
-                let _ = self.event_tx.send(AgentNodeEvent::ConnectionEstablished { peer_id });
+                let _ = self.event_tx.send(AgentNodeEvent::ConnectionEstablished {
+                    peer_id: peer_id.to_string()
+                });
             }
             SwarmEvent::ConnectionClosed { peer_id, .. } => {
                 println!("🔌 [{}] Connection closed with {}", self.name, peer_id);
                 self.discovered_peers.remove(&peer_id);
-                let _ = self.event_tx.send(AgentNodeEvent::ConnectionClosed { peer_id });
-                let _ = self.event_tx.send(AgentNodeEvent::PeerDisconnected { peer_id });
+                let _ = self.event_tx.send(AgentNodeEvent::ConnectionClosed {
+                    peer_id: peer_id.to_string()
+                });
+                let _ = self.event_tx.send(AgentNodeEvent::PeerDisconnected {
+                    peer_id: peer_id.to_string()
+                });
             }
             SwarmEvent::NewListenAddr { address, .. } => {
                 println!("🎧 [{}] Now listening on {}", self.name, address);
@@ -402,7 +414,7 @@ impl AgentNode {
 
                         // Emit message received event
                         let _ = self.event_tx.send(AgentNodeEvent::MessageReceived {
-                            from: peer,
+                            from: peer.to_string(),
                             message: request.0.clone(),
                         });
 
@@ -441,7 +453,7 @@ impl AgentNode {
 
                         // Emit message received event for responses too
                         let _ = self.event_tx.send(AgentNodeEvent::MessageReceived {
-                            from: peer,
+                            from: peer.to_string(),
                             message: response.0.clone(),
                         });
 
@@ -468,8 +480,8 @@ impl AgentNode {
 
                         // Emit peer discovered event
                         let _ = self.event_tx.send(AgentNodeEvent::PeerDiscovered {
-                            peer_id: peer,
-                            address: addr,
+                            peer_id: peer.to_string(),
+                            address: addr.to_string(),
                         });
                     }
                 }
@@ -485,7 +497,9 @@ impl AgentNode {
                         .remove_address(&peer, &addr);
 
                     // Emit peer disconnected event
-                    let _ = self.event_tx.send(AgentNodeEvent::PeerDisconnected { peer_id: peer });
+                    let _ = self.event_tx.send(AgentNodeEvent::PeerDisconnected {
+                        peer_id: peer.to_string()
+                    });
                 }
             }
         }

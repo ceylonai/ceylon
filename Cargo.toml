@@ -4,5 +4,5 @@ members = [
     "sdk",
     "sdk/agent-core",
     "sdk/agent-communication"
-, "examples/simple_chat", "examples/multi_agent"]
+, "examples/simple_chat", "examples/multi_agent", "examples/advnace_chat"]
 resolver = "2"

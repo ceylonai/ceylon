@@ -1,0 +1,13 @@
+[package]
+name = "advnace_chat"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde_json = "1.0.140"
+tokio = "1.46.1"
+chrono = "0.4.41"
+agent-communication = { path = "../../sdk/agent-communication", version = "0.1.0" }
+crossterm = "0.29.0"
+futures = "0.3.31"
+anyhow = "1.0.98"
