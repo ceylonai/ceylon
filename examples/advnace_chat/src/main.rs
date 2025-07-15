@@ -239,11 +239,28 @@ impl P2PChat {
                 println!("\n🔎 New peer discovered!");
                 println!("   Peer ID: {}", peer_id);
                 println!("   Address: {}", address);
+                println!("   Time: {}", Utc::now().format("%H:%M:%S"));
                 Self::print_prompt_static(username);
             }
 
             AgentNodeEvent::PeerDisconnected { peer_id } => {
                 println!("\n❌ Peer disconnected: {}", peer_id);
+                println!("   Time: {}", Utc::now().format("%H:%M:%S"));
+                println!("   Reason: Connection closed or expired");
+                Self::print_prompt_static(username);
+            }
+
+            AgentNodeEvent::ConnectionEstablished { peer_id } => {
+                println!("\n🔗 Connected to peer: {}", peer_id);
+                println!("   Time: {}", Utc::now().format("%H:%M:%S"));
+                println!("   Status: Active connection established");
+                Self::print_prompt_static(username);
+            }
+
+            AgentNodeEvent::ConnectionClosed { peer_id } => {
+                println!("\n🔌 Connection closed with peer: {}", peer_id);
+                println!("   Time: {}", Utc::now().format("%H:%M:%S"));
+                println!("   Note: Peer may still be discoverable for reconnection");
                 Self::print_prompt_static(username);
             }
 
@@ -359,11 +376,16 @@ impl P2PChat {
         io::stdout().flush().unwrap();
     }
 
+    // Update help text
     fn print_help_static() {
         println!("📋 P2P Chat Commands:");
         println!("   <message>           - Send message to all peers");
         println!("   /msg <peer> <text>  - Send private message to specific peer");
         println!("   /peers (/p)         - List discovered peers");
+        println!("   /ping               - Send ping to all peers");
+        println!("   /status             - Show connection status");
+        println!("   /reconnect          - Force reconnection attempt");
+        println!("   /verbose            - Toggle verbose logging");
         println!("   /help (/h)          - Show this help");
         println!("   /quit (/q)          - Exit chat");
         println!();
