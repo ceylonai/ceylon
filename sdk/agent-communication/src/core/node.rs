@@ -2,17 +2,17 @@ use anyhow::Result;
 use futures::StreamExt;
 use libp2p::request_response::{Event, Message, OutboundRequestId};
 use libp2p::{
-    core::upgrade, identity, mdns, noise, request_response, swarm::SwarmEvent, tcp, yamux,
-    Multiaddr, PeerId, Swarm, Transport,
+    Multiaddr, PeerId, Swarm, Transport, core::upgrade, identity, mdns, noise, request_response,
+    swarm::SwarmEvent, tcp, yamux,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::time::Duration;
 use tokio::sync::{broadcast, mpsc};
-use tokio::time::{interval, Instant};
+use tokio::time::{Instant, interval};
 
 use crate::data::AgentConfig;
-use crate::messaging::{AnpRequest, AnpResponse, ANP_PROTOCOL};
+use crate::messaging::{ANP_PROTOCOL, AnpRequest, AnpResponse};
 use crate::network::behaviour::{AgentBehaviour, AgentEvent};
 use crate::protocol::anp::AnpMessage;
 use crate::protocol::handlers::handle_message;
@@ -130,9 +130,8 @@ impl AgentNode {
             .boxed();
 
         // RequestResponse behavior with custom configuration
-        let mut req_resp_config = request_response::Config::default();
-        // req_resp_config.set_request_timeout(Duration::from_secs(config.request_timeout_secs));
-        // req_resp_config.set_connection_keep_alive(Duration::from_secs(config.keep_alive_secs));
+        let req_resp_config = request_response::Config::default()
+            .with_request_timeout(Duration::from_secs(config.request_timeout_secs));
 
         let protocols = std::iter::once((ANP_PROTOCOL, request_response::ProtocolSupport::Full));
         let request_response = request_response::Behaviour::new(protocols, req_resp_config);
@@ -187,7 +186,8 @@ impl AgentNode {
     /// Send a message to a specific peer
     pub fn send_message_to_peer(&mut self, peer_id: &str, payload: Value) -> Result<()> {
         // Convert string peer_id back to PeerId
-        let peer_id = peer_id.parse::<PeerId>()
+        let peer_id = peer_id
+            .parse::<PeerId>()
             .map_err(|e| anyhow::anyhow!("Invalid peer ID: {}", e))?;
 
         let anp_message = AnpMessage::new(
@@ -199,7 +199,8 @@ impl AgentNode {
 
         let request = AnpRequest(anp_message.clone());
 
-        let request_id = self.swarm
+        let request_id = self
+            .swarm
             .behaviour_mut()
             .request_response
             .send_request(&peer_id, request);
@@ -230,7 +231,8 @@ impl AgentNode {
 
     /// Get list of discovered peers (returns strings, not libp2p types)
     pub fn get_peers(&self) -> Vec<(String, String)> {
-        self.discovered_peers.iter()
+        self.discovered_peers
+            .iter()
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect()
     }
@@ -358,7 +360,8 @@ impl AgentNode {
             let request = AnpRequest(anp_message);
 
             // Send ping but don't wait for response
-            let request_id = self.swarm
+            let request_id = self
+                .swarm
                 .behaviour_mut()
                 .request_response
                 .send_request(&peer_id, request);
@@ -378,17 +381,17 @@ impl AgentNode {
             SwarmEvent::ConnectionEstablished { peer_id, .. } => {
                 println!("🔗 [{}] Connection established with {}", self.name, peer_id);
                 let _ = self.event_tx.send(AgentNodeEvent::ConnectionEstablished {
-                    peer_id: peer_id.to_string()
+                    peer_id: peer_id.to_string(),
                 });
             }
             SwarmEvent::ConnectionClosed { peer_id, .. } => {
                 println!("🔌 [{}] Connection closed with {}", self.name, peer_id);
                 self.discovered_peers.remove(&peer_id);
                 let _ = self.event_tx.send(AgentNodeEvent::ConnectionClosed {
-                    peer_id: peer_id.to_string()
+                    peer_id: peer_id.to_string(),
                 });
                 let _ = self.event_tx.send(AgentNodeEvent::PeerDisconnected {
-                    peer_id: peer_id.to_string()
+                    peer_id: peer_id.to_string(),
                 });
             }
             SwarmEvent::NewListenAddr { address, .. } => {
@@ -399,7 +402,10 @@ impl AgentNode {
             }
             SwarmEvent::OutgoingConnectionError { peer_id, error, .. } => {
                 if let Some(peer_id) = peer_id {
-                    eprintln!("⚠️ [{}] Outgoing connection error to {}: {:?}", self.name, peer_id, error);
+                    eprintln!(
+                        "⚠️ [{}] Outgoing connection error to {}: {:?}",
+                        self.name, peer_id, error
+                    );
                     let _ = self.event_tx.send(AgentNodeEvent::Error {
                         description: format!("Connection error to {}: {:?}", peer_id, error),
                     });
@@ -428,14 +434,20 @@ impl AgentNode {
                 request_id,
                 ..
             } => {
-                eprintln!("⚠️ [{}] Outbound failure to {}: {:?}", self.name, peer, error);
+                eprintln!(
+                    "⚠️ [{}] Outbound failure to {}: {:?}",
+                    self.name, peer, error
+                );
                 self.pending_requests.remove(&request_id);
                 let _ = self.event_tx.send(AgentNodeEvent::Error {
                     description: format!("Message send failure to {}: {:?}", peer, error),
                 });
             }
             request_response::Event::InboundFailure { peer, error, .. } => {
-                eprintln!("⚠️ [{}] Inbound failure from {}: {:?}", self.name, peer, error);
+                eprintln!(
+                    "⚠️ [{}] Inbound failure from {}: {:?}",
+                    self.name, peer, error
+                );
                 let _ = self.event_tx.send(AgentNodeEvent::Error {
                     description: format!("Message receive failure from {}: {:?}", peer, error),
                 });
@@ -445,8 +457,13 @@ impl AgentNode {
             }
             Event::Message { peer, message, .. } => {
                 match message {
-                    Message::Request { request, channel, .. } => {
-                        println!("📥 [{}] Request received from {}: {}", self.name, peer, request);
+                    Message::Request {
+                        request, channel, ..
+                    } => {
+                        println!(
+                            "📥 [{}] Request received from {}: {}",
+                            self.name, peer, request
+                        );
 
                         // Emit message received event
                         let _ = self.event_tx.send(AgentNodeEvent::MessageReceived {
@@ -483,7 +500,10 @@ impl AgentNode {
                             eprintln!("❌ [{}] Failed to send response: {:?}", self.name, e);
                         }
                     }
-                    Message::Response { response, request_id } => {
+                    Message::Response {
+                        response,
+                        request_id,
+                    } => {
                         println!("📤 [{}] Response received: {}", self.name, response);
                         self.pending_requests.remove(&request_id);
 
@@ -534,7 +554,7 @@ impl AgentNode {
 
                     // Emit peer disconnected event
                     let _ = self.event_tx.send(AgentNodeEvent::PeerDisconnected {
-                        peer_id: peer.to_string()
+                        peer_id: peer.to_string(),
                     });
                 }
             }
