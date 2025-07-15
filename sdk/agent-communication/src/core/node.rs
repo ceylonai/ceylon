@@ -306,18 +306,25 @@ impl AgentNode {
     /// Run without external command processing (simpler version)
     pub async fn run_simple(&mut self) -> Result<()> {
         let mut heartbeat_interval = interval(Duration::from_secs(30));
+        let mut ping_interval = interval(Duration::from_secs(60)); // Ping every minute
 
-        println!("🟢 {} is running (simple mode)", self.name);
+        println!("🟢 {} is running", self.name);
 
         loop {
             tokio::select! {
+                // Send periodic pings to keep connections alive
+                _ = ping_interval.tick() => {
+                    self.send_ping_to_all_peers().await;
+                }
+
                 // Send periodic heartbeat
                 _ = heartbeat_interval.tick() => {
                     if !self.discovered_peers.is_empty() {
                         let heartbeat = json!({
                             "action": "heartbeat",
                             "timestamp": chrono::Utc::now().to_rfc3339(),
-                            "sender": self.name
+                            "sender": self.name,
+                            "keep_alive": true
                         });
                         let _ = self.broadcast_message(heartbeat);
                     }
@@ -328,6 +335,35 @@ impl AgentNode {
                     self.handle_swarm_event(event).await;
                 }
             }
+        }
+    }
+
+    // Fix 3: Add ping method to maintain connections
+    async fn send_ping_to_all_peers(&mut self) {
+        for peer_id in self.discovered_peers.keys().cloned().collect::<Vec<_>>() {
+            let ping_payload = json!({
+                "action": "ping",
+                "sender": self.name,
+                "timestamp": chrono::Utc::now().to_rfc3339(),
+                "ping_id": uuid::Uuid::new_v4().to_string()
+            });
+
+            let anp_message = AnpMessage::new(
+                self.name.clone(),
+                peer_id.to_string(),
+                ping_payload,
+                "ping_signature".to_string(),
+            );
+
+            let request = AnpRequest(anp_message);
+
+            // Send ping but don't wait for response
+            let request_id = self.swarm
+                .behaviour_mut()
+                .request_response
+                .send_request(&peer_id, request);
+
+            self.pending_requests.insert(request_id, peer_id);
         }
     }
 
@@ -502,6 +538,28 @@ impl AgentNode {
                     });
                 }
             }
+        }
+    }
+    async fn handle_connection_closed(&mut self, peer_id: &PeerId) {
+        println!("🔌 [{}] Connection closed with {}", self.name, peer_id);
+
+        // Keep the peer in discovered_peers for potential reconnection
+        // Don't remove it immediately
+
+        // Schedule a reconnection attempt
+        self.schedule_reconnect(peer_id.clone()).await;
+    }
+
+    async fn schedule_reconnect(&mut self, peer_id: PeerId) {
+        if let Some(addr) = self.discovered_peers.get(&peer_id) {
+            let addr = addr.clone();
+            println!("📞 [{}] Scheduling reconnect to {}", self.name, peer_id);
+
+            // Re-add the address to trigger reconnection
+            self.swarm
+                .behaviour_mut()
+                .request_response
+                .add_address(&peer_id, addr);
         }
     }
 }

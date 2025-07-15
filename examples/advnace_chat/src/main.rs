@@ -1,12 +1,14 @@
 use anyhow::Result;
+use chrono::{DateTime, Utc};
 use serde_json::json;
 use std::io::{self, Write};
 use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::sync::{ mpsc};
-use chrono::{DateTime, Utc};
+use tokio::sync::mpsc;
 
 // Import your agent communication library
-use agent_communication::{AgentNode, core::node::AgentCommand, core::node::AgentNodeEvent, AnpMessage};
+use agent_communication::{
+    AgentNode, AnpMessage, core::node::AgentCommand, core::node::AgentNodeEvent,
+};
 
 // Internal events for communication between tasks
 #[derive(Debug, Clone)]
@@ -131,7 +133,10 @@ impl P2PChat {
                     }
 
                     // Send input to main loop for processing
-                    if internal_tx.send(InternalEvent::UserInput(input.to_string())).is_err() {
+                    if internal_tx
+                        .send(InternalEvent::UserInput(input.to_string()))
+                        .is_err()
+                    {
                         break;
                     }
 
@@ -144,9 +149,37 @@ impl P2PChat {
                                 eprintln!("Failed to send peers command: {:?}", e);
                             }
                         }
-                        "/quit" | "/q" | "/exit" => {
-                            // This will be handled by the main loop
-                            break;
+                        "/ping" => {
+                            // Send ping to all peers
+                            let payload = json!({
+                                "action": "ping",
+                                "sender": username,
+                                "timestamp": Utc::now().to_rfc3339(),
+                                "manual_ping": true
+                            });
+
+                            if let Err(e) =
+                                command_tx.send(AgentCommand::BroadcastMessage { payload })
+                            {
+                                eprintln!("Failed to send ping: {:?}", e);
+                            } else {
+                                println!("📡 Ping sent to all peers");
+                            }
+                        }
+                        "/status" => {
+                            // Request node status
+                            if let Err(e) = command_tx.send(AgentCommand::GetPeers) {
+                                eprintln!("Failed to get status: {:?}", e);
+                            }
+                            // You'll need to extend AgentCommand enum for this
+                        }
+                        "/reconnect" => {
+                            println!("🔄 Attempting to reconnect to all peers...");
+                            // Force reconnection attempt - you'll need to implement this
+                        }
+                        "/verbose" => {
+                            println!("🔍 Enabling verbose mode...");
+                            // Toggle verbose logging
                         }
                         input if input.starts_with("/msg ") => {
                             // Private message: /msg <peer_id> <message>
@@ -183,7 +216,9 @@ impl P2PChat {
                                 "message_type": "broadcast"
                             });
 
-                            if let Err(e) = command_tx.send(AgentCommand::BroadcastMessage { payload }) {
+                            if let Err(e) =
+                                command_tx.send(AgentCommand::BroadcastMessage { payload })
+                            {
                                 eprintln!("Failed to send message: {:?}", e);
                             }
                         }
@@ -249,13 +284,19 @@ impl P2PChat {
 
         match action {
             Some("chat_message") => {
-                let sender = message.payload.get("sender")
+                let sender = message
+                    .payload
+                    .get("sender")
                     .and_then(|v| v.as_str())
                     .unwrap_or("Unknown");
-                let msg = message.payload.get("message")
+                let msg = message
+                    .payload
+                    .get("message")
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
-                let timestamp = message.payload.get("timestamp")
+                let timestamp = message
+                    .payload
+                    .get("timestamp")
                     .and_then(|v| v.as_str())
                     .and_then(|s| s.parse::<DateTime<Utc>>().ok());
 
@@ -270,13 +311,19 @@ impl P2PChat {
             }
 
             Some("private_message") => {
-                let sender = message.payload.get("sender")
+                let sender = message
+                    .payload
+                    .get("sender")
                     .and_then(|v| v.as_str())
                     .unwrap_or("Unknown");
-                let msg = message.payload.get("message")
+                let msg = message
+                    .payload
+                    .get("message")
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
-                let timestamp = message.payload.get("timestamp")
+                let timestamp = message
+                    .payload
+                    .get("timestamp")
                     .and_then(|v| v.as_str())
                     .and_then(|s| s.parse::<DateTime<Utc>>().ok());
 
@@ -330,7 +377,8 @@ async fn main() -> Result<()> {
 
     let (username, port) = if args.len() >= 3 {
         let username = args[1].clone();
-        let port = args[2].parse::<u16>()
+        let port = args[2]
+            .parse::<u16>()
             .map_err(|_| anyhow::anyhow!("Invalid port number"))?;
         (username, port)
     } else {
@@ -349,7 +397,7 @@ async fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::time::{timeout, Duration};
+    use tokio::time::{Duration, timeout};
 
     #[tokio::test]
     async fn test_chat_creation() {

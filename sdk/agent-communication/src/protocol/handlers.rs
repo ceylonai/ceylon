@@ -16,6 +16,31 @@ pub async fn handle_message(anp: AnpMessage) {
         }
         Some("ping") => {
             println!("Received ping from {}", anp.from);
+            // Ping responses help keep connections alive
+        }
+        Some("heartbeat") => {
+            println!("Received heartbeat from {}", anp.from);
+            // Heartbeats indicate peer is still active
+        }
+        Some("chat_message") => {
+            // Handle chat messages properly
+            if let Some(message) = anp.payload.get("message").and_then(|v| v.as_str()) {
+                if let Some(sender) = anp.payload.get("sender").and_then(|v| v.as_str()) {
+                    println!("Chat message from {}: {}", sender, message);
+                }
+            }
+        }
+        Some("private_message") => {
+            // Handle private messages
+            if let Some(message) = anp.payload.get("message").and_then(|v| v.as_str()) {
+                if let Some(sender) = anp.payload.get("sender").and_then(|v| v.as_str()) {
+                    println!("Private message from {}: {}", sender, message);
+                }
+            }
+        }
+        Some("ack") => {
+            // Acknowledgment received - connection is working
+            println!("Received acknowledgment from {}", anp.from);
         }
         _ => {
             println!("Unknown action: {:?}", anp.payload);
