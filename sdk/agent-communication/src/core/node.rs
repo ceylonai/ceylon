@@ -67,22 +67,27 @@ impl AgentNode {
         println!("🔑 {} Peer ID: {}", name, peer_id);
 
         // 2️⃣ Create transport
-        let transport = tcp::tokio::Transport::new(tcp::Config::default().nodelay(true))
-            .upgrade(upgrade::Version::V1)
-            .authenticate(noise::Config::new(&id_keys)?)
-            .multiplex(yamux::Config::default())
-            .boxed();
+        let transport =
+            tcp::tokio::Transport::new(tcp::Config::default().nodelay(true).listen_backlog(256))
+                .upgrade(upgrade::Version::V1)
+                .authenticate(noise::Config::new(&id_keys)?)
+                .multiplex(
+                    yamux::Config::default()
+                        .set_max_num_streams(2 * 1024 * 1024)
+                        .to_owned(),
+                )
+                .timeout(Duration::from_secs(20))
+                .boxed();
 
         // 3️⃣ RequestResponse behavior
-        let mut req_resp_config = request_response::Config::default();
-        req_resp_config.set_request_timeout(Duration::from_secs(10));
+        let req_resp_config = request_response::Config::default()
+            .with_request_timeout(Duration::from_secs(10))
+            .with_max_concurrent_streams(2 * 1024 * 1024);
 
         let protocols = std::iter::once((ANP_PROTOCOL, request_response::ProtocolSupport::Full));
         let request_response = request_response::Behaviour::new(protocols, req_resp_config);
-
         // 4️⃣ mDNS for peer discovery
         let mdns = mdns::Behaviour::new(mdns::Config::default(), peer_id)?;
-
         // 5️⃣ Ping for connection keep-alive
         let ping = ping::Behaviour::new(ping::Config::new());
 
@@ -130,15 +135,22 @@ impl AgentNode {
         println!("🔑 {} Peer ID: {}", name, config.peer_id);
 
         // Create transport with the provided keypair
-        let transport = tcp::tokio::Transport::new(tcp::Config::default().nodelay(true))
-            .upgrade(upgrade::Version::V1)
-            .authenticate(noise::Config::new(keypair)?)
-            .multiplex(yamux::Config::default())
-            .boxed();
+        let transport =
+            tcp::tokio::Transport::new(tcp::Config::default().nodelay(true).listen_backlog(256))
+                .upgrade(upgrade::Version::V1)
+                .authenticate(noise::Config::new(keypair)?)
+                .multiplex(
+                    yamux::Config::default()
+                        .set_max_num_streams(2 * 1024 * 1024)
+                        .to_owned(),
+                )
+                .timeout(Duration::from_secs(20))
+                .boxed();
 
         // RequestResponse behavior with custom configuration
         let req_resp_config = request_response::Config::default()
-            .with_request_timeout(Duration::from_secs(config.request_timeout_secs));
+            .with_request_timeout(Duration::from_secs(10))
+            .with_max_concurrent_streams(2 * 1024 * 1024);
 
         let protocols = std::iter::once((ANP_PROTOCOL, request_response::ProtocolSupport::Full));
         let request_response = request_response::Behaviour::new(protocols, req_resp_config);
