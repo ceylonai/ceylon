@@ -41,9 +41,11 @@ impl P2PChat {
 
     /// Start the chat application
     pub async fn start(mut self) -> Result<()> {
-        println!("🚀 Starting P2P Chat for user: {}", self.username);
+        println!("🚀 Starting Enhanced P2P Chat for user: {}", self.username);
         println!("📡 Your Peer ID: {}", self.node.local_peer_id());
         println!("🎧 Listening for peers...");
+        println!("📻 GossipSub enabled for topic-based messaging");
+        println!("🌐 Auto-subscribed to 'agent-network' topic");
         println!();
         Self::print_help_static();
 
@@ -61,6 +63,18 @@ impl P2PChat {
         let input_tx = internal_tx.clone();
         let event_tx = internal_tx.clone();
         let node_cmd_tx = node_command_tx.clone();
+
+        // Subscribe to some default topics
+        let default_topics = vec!["general", "announcements"];
+        for topic in default_topics {
+            if let Err(e) = node_command_tx.send(AgentCommand::SubscribeToTopic {
+                topic: topic.to_string(),
+            }) {
+                eprintln!("Failed to subscribe to {}: {:?}", topic, e);
+            } else {
+                println!("📡 Auto-subscribed to topic: {}", topic);
+            }
+        }
 
         // Spawn input handler task
         let input_task = tokio::spawn(async move {
@@ -152,12 +166,18 @@ impl P2PChat {
                             if let Err(e) = command_tx.send(AgentCommand::GetPeers) {
                                 eprintln!("Failed to send peers command: {:?}", e);
                             } else {
-                                // Note: libp2p ping will handle actual pings automatically
                                 println!("ℹ️ Peer list requested (libp2p handles pings automatically)");
                             }
                         }
+                        "/topics" | "/t" => {
+                            if let Err(e) = command_tx.send(AgentCommand::GetTopics) {
+                                eprintln!("Failed to get topics: {:?}", e);
+                            } else {
+                                println!("📋 Subscribed topics list requested");
+                            }
+                        }
                         "/ping" => {
-                            // Send application-level ping to all peers
+                            // Send application-level ping to all peers via direct messaging
                             let payload = json!({
                                 "action": "app_ping",
                                 "sender": username,
@@ -170,28 +190,99 @@ impl P2PChat {
                             {
                                 eprintln!("Failed to send ping: {:?}", e);
                             } else {
-                                println!("📡 Application ping sent to all peers");
-                                println!("ℹ️ Note: libp2p also handles automatic connection pings");
+                                println!("📡 Application ping sent to all peers (direct)");
                             }
                         }
                         "/status" => {
-                            // Request node status
+                            println!("📊 Node Status:");
                             if let Err(e) = command_tx.send(AgentCommand::GetPeers) {
-                                eprintln!("Failed to get status: {:?}", e);
-                            } else {
-                                println!("📊 Status requested - check peer list and connection events");
+                                eprintln!("Failed to get peer status: {:?}", e);
+                            }
+                            if let Err(e) = command_tx.send(AgentCommand::GetTopics) {
+                                eprintln!("Failed to get topic status: {:?}", e);
                             }
                         }
                         "/reconnect" => {
-                            println!("🔄 Attempting to reconnect to all peers...");
-                            println!("ℹ️ libp2p handles reconnections automatically via mDNS discovery");
-                            // libp2p will handle reconnections automatically
+                            println!("🔄 Reconnection Info:");
+                            println!("   - libp2p handles reconnections automatically via mDNS discovery");
+                            println!("   - GossipSub mesh healing happens automatically");
+                            println!("   - Connection state is managed transparently");
                         }
                         "/verbose" => {
-                            println!("🔍 Verbose mode info:");
+                            println!("🔍 Verbose Mode Information:");
                             println!("   - Connection events are automatically displayed");
                             println!("   - Ping results are shown when they occur");
-                            println!("   - Message send/receive events are logged");
+                            println!("   - Direct message send/receive events are logged");
+                            println!("   - GossipSub topic messages are displayed");
+                            println!("   - Topic subscription/unsubscription events are shown");
+                        }
+                        input if input.starts_with("/topic ") => {
+                            // Subscribe to topic: /topic <topic_name>
+                            let topic = &input[7..].trim();
+                            if !topic.is_empty() {
+                                if let Err(e) = command_tx.send(AgentCommand::SubscribeToTopic {
+                                    topic: topic.to_string(),
+                                }) {
+                                    eprintln!("Failed to subscribe to topic: {:?}", e);
+                                } else {
+                                    println!("📡 Subscribing to topic: {}", topic);
+                                }
+                            } else {
+                                println!("Usage: /topic <topic_name>");
+                                println!("Example: /topic gaming");
+                            }
+                        }
+                        input if input.starts_with("/untopic ") => {
+                            // Unsubscribe from topic: /untopic <topic_name>
+                            let topic = &input[9..].trim();
+                            if !topic.is_empty() {
+                                if let Err(e) = command_tx.send(AgentCommand::UnsubscribeFromTopic {
+                                    topic: topic.to_string(),
+                                }) {
+                                    eprintln!("Failed to unsubscribe from topic: {:?}", e);
+                                } else {
+                                    println!("📡 Unsubscribing from topic: {}", topic);
+                                }
+                            } else {
+                                println!("Usage: /untopic <topic_name>");
+                                println!("Example: /untopic gaming");
+                            }
+                        }
+                        input if input.starts_with("/pub ") => {
+                            // Publish to topic: /pub <topic> <message>
+                            let parts: Vec<&str> = input[5..].splitn(2, ' ').collect();
+                            if parts.len() == 2 {
+                                let topic = parts[0];
+                                let message = parts[1];
+
+                                if let Err(e) = command_tx.send(AgentCommand::PublishToTopic {
+                                    topic: topic.to_string(),
+                                    message: message.to_string(),
+                                }) {
+                                    eprintln!("Failed to publish to topic: {:?}", e);
+                                } else {
+                                    println!("📢 Publishing to topic '{}': {}", topic, message);
+                                }
+                            } else {
+                                println!("Usage: /pub <topic> <message>");
+                                println!("Example: /pub general Hello everyone!");
+                            }
+                        }
+                        input if input.starts_with("/tpeers ") => {
+                            // Get topic peers: /tpeers <topic>
+                            let topic = &input[8..].trim();
+                            if !topic.is_empty() {
+                                if let Err(e) = command_tx.send(AgentCommand::GetTopicPeers {
+                                    topic: topic.to_string(),
+                                }) {
+                                    eprintln!("Failed to get topic peers: {:?}", e);
+                                } else {
+                                    println!("👥 Getting peers for topic: {}", topic);
+                                }
+                            } else {
+                                println!("Usage: /tpeers <topic>");
+                                println!("Example: /tpeers general");
+                            }
                         }
                         input if input.starts_with("/msg ") => {
                             // Private message: /msg <peer_id> <message>
@@ -219,21 +310,40 @@ impl P2PChat {
                                 println!("Tip: Use /peers to see available peer IDs");
                             }
                         }
-                        _ => {
-                            // Regular chat message (broadcast)
-                            let payload = json!({
-                                "action": "chat_message",
-                                "message": input,
-                                "sender": username,
-                                "timestamp": Utc::now().to_rfc3339(),
-                                "message_type": "broadcast"
-                            });
+                        input if input.starts_with("/broadcast ") => {
+                            // Broadcast via direct messaging: /broadcast <message>
+                            let message = &input[11..];
+                            if !message.is_empty() {
+                                let payload = json!({
+                                    "action": "broadcast_message",
+                                    "message": message,
+                                    "sender": username,
+                                    "timestamp": Utc::now().to_rfc3339(),
+                                    "message_type": "broadcast"
+                                });
 
-                            if let Err(e) =
-                                command_tx.send(AgentCommand::BroadcastMessage { payload })
-                            {
-                                eprintln!("Failed to send message: {:?}", e);
+                                if let Err(e) =
+                                    command_tx.send(AgentCommand::BroadcastMessage { payload })
+                                {
+                                    eprintln!("Failed to broadcast message: {:?}", e);
+                                } else {
+                                    println!("📡 Broadcasting message to all peers");
+                                }
+                            } else {
+                                println!("Usage: /broadcast <message>");
+                                println!("Example: /broadcast Hello everyone!");
                             }
+                        }
+                        _ => {
+                            // Default: Publish to general topic
+                            if let Err(e) = command_tx.send(AgentCommand::PublishToTopic {
+                                topic: "general".to_string(),
+                                message: input.to_string(),
+                            }) {
+                                eprintln!("Failed to publish to general topic: {:?}", e);
+                            }
+                            // Also show it locally for immediate feedback
+                            println!("📢 [general] {}: {}", username, input);
                         }
                     }
                 }
@@ -291,6 +401,45 @@ impl P2PChat {
                 Self::print_prompt_static(username);
             }
 
+            // New GossipSub events
+            AgentNodeEvent::GossipSubMessageReceived {
+                topic,
+                from,
+                message,
+                message_id
+            } => {
+                let time_str = Utc::now().format("%H:%M:%S");
+                println!("\n📻 [{}] [{}] {}: {}", time_str, topic, from, message);
+                println!("   Message ID: {}", message_id);
+                Self::print_prompt_static(username);
+            }
+
+            AgentNodeEvent::TopicSubscribed { topic } => {
+                println!("\n📡 Subscribed to topic: {}", topic);
+                println!("   Time: {}", Utc::now().format("%H:%M:%S"));
+                println!("   You can now receive messages from this topic");
+                Self::print_prompt_static(username);
+            }
+
+            AgentNodeEvent::TopicUnsubscribed { topic } => {
+                println!("\n📭 Unsubscribed from topic: {}", topic);
+                println!("   Time: {}", Utc::now().format("%H:%M:%S"));
+                println!("   You will no longer receive messages from this topic");
+                Self::print_prompt_static(username);
+            }
+
+            AgentNodeEvent::PeerSubscribedToTopic { peer_id, topic } => {
+                println!("\n👤 Peer {} joined topic: {}", peer_id, topic);
+                println!("   Time: {}", Utc::now().format("%H:%M:%S"));
+                Self::print_prompt_static(username);
+            }
+
+            AgentNodeEvent::PeerUnsubscribedFromTopic { peer_id, topic } => {
+                println!("\n👤 Peer {} left topic: {}", peer_id, topic);
+                println!("   Time: {}", Utc::now().format("%H:%M:%S"));
+                Self::print_prompt_static(username);
+            }
+
             AgentNodeEvent::MessageReceived { from, message } => {
                 Self::handle_incoming_message(username, &from, &message).await;
             }
@@ -312,7 +461,7 @@ impl P2PChat {
         }
     }
 
-    /// Handle incoming messages
+    /// Handle incoming direct messages (RequestResponse)
     async fn handle_incoming_message(username: &str, from: &str, message: &AnpMessage) {
         let action = message.payload.get("action").and_then(|v| v.as_str());
 
@@ -340,7 +489,7 @@ impl P2PChat {
                     "??:??:??".to_string()
                 };
 
-                println!("\n💬 [{}] {}: {}", time_str, sender, msg);
+                println!("\n💬 [{}] Direct from {}: {}", time_str, sender, msg);
                 Self::print_prompt_static(username);
             }
 
@@ -371,6 +520,33 @@ impl P2PChat {
                 Self::print_prompt_static(username);
             }
 
+            Some("broadcast_message") => {
+                let sender = message
+                    .payload
+                    .get("sender")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown");
+                let msg = message
+                    .payload
+                    .get("message")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let timestamp = message
+                    .payload
+                    .get("timestamp")
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| s.parse::<DateTime<Utc>>().ok());
+
+                let time_str = if let Some(ts) = timestamp {
+                    ts.format("%H:%M:%S").to_string()
+                } else {
+                    "??:??:??".to_string()
+                };
+
+                println!("\n📡 [{}] Broadcast from {}: {}", time_str, sender, msg);
+                Self::print_prompt_static(username);
+            }
+
             Some("app_ping") => {
                 let sender = message
                     .payload
@@ -391,7 +567,7 @@ impl P2PChat {
 
             _ => {
                 // Handle other message types
-                println!("\n📩 Message from {}: {:?}", from, message.payload);
+                println!("\n📩 Direct message from {}: {:?}", from, message.payload);
                 Self::print_prompt_static(username);
             }
         }
@@ -403,20 +579,38 @@ impl P2PChat {
         io::stdout().flush().unwrap();
     }
 
-    // Update help text
+    // Enhanced help text with GossipSub commands
     fn print_help_static() {
-        println!("📋 P2P Chat Commands:");
-        println!("   <message>           - Send message to all peers");
-        println!("   /msg <peer> <text>  - Send private message to specific peer");
-        println!("   /peers (/p)         - List discovered peers");
-        println!("   /ping               - Send application ping to all peers");
-        println!("   /status             - Show connection status");
-        println!("   /reconnect          - Info about reconnection (automatic)");
-        println!("   /verbose            - Show verbose mode information");
-        println!("   /help (/h)          - Show this help");
-        println!("   /quit (/q)          - Exit chat");
+        println!("📋 Enhanced P2P Chat Commands:");
         println!();
-        println!("ℹ️ Note: libp2p automatically handles connection pings and reconnections");
+        println!("🔹 Basic Messaging:");
+        println!("   <message>             - Publish to 'general' topic (default)");
+        println!("   /broadcast <message>  - Send direct message to all peers");
+        println!("   /msg <peer> <text>    - Send private message to specific peer");
+        println!();
+        println!("🔹 Topic Commands (GossipSub):");
+        println!("   /pub <topic> <msg>    - Publish message to specific topic");
+        println!("   /topic <name>         - Subscribe to a topic");
+        println!("   /untopic <name>       - Unsubscribe from a topic");
+        println!("   /topics (/t)          - List your subscribed topics");
+        println!("   /tpeers <topic>       - List peers subscribed to topic");
+        println!();
+        println!("🔹 Network Commands:");
+        println!("   /peers (/p)           - List discovered peers");
+        println!("   /ping                 - Send application ping to all peers");
+        println!("   /status               - Show connection and topic status");
+        println!();
+        println!("🔹 Info & Control:");
+        println!("   /reconnect            - Show reconnection info");
+        println!("   /verbose              - Show verbose mode information");
+        println!("   /help (/h)            - Show this help");
+        println!("   /quit (/q)            - Exit chat");
+        println!();
+        println!("ℹ️ Notes:");
+        println!("   • Default topics: 'agent-network', 'general', 'announcements'");
+        println!("   • GossipSub provides efficient topic-based broadcasting");
+        println!("   • Direct messages use RequestResponse for reliability");
+        println!("   • libp2p handles connections and discovery automatically");
         println!();
     }
 }
@@ -435,6 +629,12 @@ async fn main() -> Result<()> {
     } else {
         println!("Usage: {} <username> <port>", args[0]);
         println!("Example: {} Alice 4001", args[0]);
+        println!();
+        println!("🎯 Enhanced P2P Chat with GossipSub Support");
+        println!("   • Topic-based messaging with /pub and /topic commands");
+        println!("   • Direct peer messaging with /msg command");
+        println!("   • Automatic peer discovery and connection management");
+        println!("   • Real-time connection and ping status updates");
         std::process::exit(1);
     };
 
@@ -472,5 +672,15 @@ mod tests {
         let chat2 = chat2.unwrap();
 
         assert_ne!(chat1.node.local_peer_id(), chat2.node.local_peer_id());
+    }
+
+    #[tokio::test]
+    async fn test_chat_with_custom_topics() {
+        let chat = P2PChat::new("TopicUser", 0).await;
+        assert!(chat.is_ok());
+
+        // Chat instance should be ready for topic operations
+        let chat = chat.unwrap();
+        assert!(!chat.username.is_empty());
     }
 }

@@ -3,11 +3,12 @@ use futures::StreamExt;
 use libp2p::ping::Failure;
 use libp2p::request_response::{Event, Message, OutboundRequestId};
 use libp2p::{
-    Multiaddr, PeerId, Swarm, Transport, core::upgrade, identity, mdns, noise, ping,
+    Multiaddr, PeerId, Swarm, Transport, core::upgrade, gossipsub, identity, mdns, noise, ping,
     request_response, swarm::SwarmEvent, tcp, yamux,
 };
 use serde_json::{Value, json};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::time::Duration;
 use tokio::sync::{broadcast, mpsc};
 use tokio::time::{Instant, interval};
@@ -21,15 +22,57 @@ use crate::protocol::handlers::handle_message;
 // Event types that the AgentNode can emit (no libp2p types exposed)
 #[derive(Debug, Clone)]
 pub enum AgentNodeEvent {
-    PeerDiscovered { peer_id: String, address: String },
-    PeerDisconnected { peer_id: String },
-    MessageReceived { from: String, message: AnpMessage },
-    MessageSent { to: String, message: AnpMessage },
-    ConnectionEstablished { peer_id: String },
-    ConnectionClosed { peer_id: String },
-    PingSuccess { peer_id: String, rtt: Duration },
-    PingFailure { peer_id: String },
-    Error { description: String },
+    PeerDiscovered {
+        peer_id: String,
+        address: String,
+    },
+    PeerDisconnected {
+        peer_id: String,
+    },
+    MessageReceived {
+        from: String,
+        message: AnpMessage,
+    },
+    MessageSent {
+        to: String,
+        message: AnpMessage,
+    },
+    ConnectionEstablished {
+        peer_id: String,
+    },
+    ConnectionClosed {
+        peer_id: String,
+    },
+    PingSuccess {
+        peer_id: String,
+        rtt: Duration,
+    },
+    PingFailure {
+        peer_id: String,
+    },
+    GossipSubMessageReceived {
+        topic: String,
+        from: String,
+        message: String,
+        message_id: String,
+    },
+    TopicSubscribed {
+        topic: String,
+    },
+    TopicUnsubscribed {
+        topic: String,
+    },
+    PeerSubscribedToTopic {
+        peer_id: String,
+        topic: String,
+    },
+    PeerUnsubscribedFromTopic {
+        peer_id: String,
+        topic: String,
+    },
+    Error {
+        description: String,
+    },
 }
 
 pub struct AgentNode {
@@ -39,6 +82,10 @@ pub struct AgentNode {
     pub discovered_peers: HashMap<PeerId, Multiaddr>,
     pub last_message_time: Instant,
     pub pending_requests: HashMap<OutboundRequestId, PeerId>,
+
+    // GossipSub management
+    pub subscribed_topics: HashSet<String>,
+    pub topic_peers: HashMap<String, HashSet<PeerId>>,
 
     // Event broadcasting
     pub event_tx: broadcast::Sender<AgentNodeEvent>,
@@ -52,8 +99,19 @@ pub struct AgentNode {
 pub enum AgentCommand {
     SendMessage { to: String, payload: Value },
     BroadcastMessage { payload: Value },
+    PublishToTopic { topic: String, message: String },
+    SubscribeToTopic { topic: String },
+    UnsubscribeFromTopic { topic: String },
     GetPeers,
+    GetTopics,
+    GetTopicPeers { topic: String },
     Shutdown,
+}
+
+pub fn message_id_fn(message: &gossipsub::Message) -> gossipsub::MessageId {
+    let mut s = DefaultHasher::new();
+    message.data.hash(&mut s);
+    gossipsub::MessageId::from(s.finish().to_string())
 }
 
 impl AgentNode {
@@ -86,19 +144,48 @@ impl AgentNode {
 
         let protocols = std::iter::once((ANP_PROTOCOL, request_response::ProtocolSupport::Full));
         let request_response = request_response::Behaviour::new(protocols, req_resp_config);
+
         // 4️⃣ mDNS for peer discovery
         let mdns = mdns::Behaviour::new(mdns::Config::default(), peer_id)?;
+
         // 5️⃣ Ping for connection keep-alive
         let ping = ping::Behaviour::new(ping::Config::new());
 
-        // 6️⃣ Combined behavior
+        // 6️⃣ GossipSub configuration
+        let gossip_sub_config = gossipsub::ConfigBuilder::default()
+            .heartbeat_interval(Duration::from_millis(700)) // How often to send heartbeat
+            .mesh_n_low(16) // Lower bound for mesh network degree
+            .mesh_n(32) // Target number of peers in mesh
+            .mesh_n_high(64) // Upper bound for mesh network degree
+            .history_length(64) // Number of heartbeat intervals to retain message IDs
+            .history_gossip(32) // Number of past heartbeat intervals to gossip about
+            .max_transmit_size(1024 * 1024) // Maximum size of messages to transmit
+            .validation_mode(gossipsub::ValidationMode::Strict) // Validate messages
+            .message_id_fn(message_id_fn) // Custom message ID function
+            .build()
+            .map_err(|e| anyhow::anyhow!("Failed to build gossipsub config: {}", e))?;
+
+        let mut gossipsub = gossipsub::Behaviour::new(
+            gossipsub::MessageAuthenticity::Signed(id_keys.clone()),
+            gossip_sub_config,
+        )
+        .map_err(|e| anyhow::anyhow!("Failed to create gossipsub behavior: {}", e))?;
+
+        // Subscribe to a default general topic
+        let default_topic = gossipsub::IdentTopic::new("agent-network");
+        gossipsub
+            .subscribe(&default_topic)
+            .map_err(|e| anyhow::anyhow!("Failed to subscribe to default topic: {}", e))?;
+
+        // 7️⃣ Combined behavior
         let behaviour = AgentBehaviour {
             request_response,
             mdns,
             ping,
+            gossipsub,
         };
 
-        // 7️⃣ Create swarm
+        // 8️⃣ Create swarm
         let mut swarm = Swarm::new(
             transport,
             behaviour,
@@ -106,10 +193,14 @@ impl AgentNode {
             libp2p_swarm::Config::with_tokio_executor(),
         );
 
-        // 8️⃣ Start listening
+        // 9️⃣ Start listening
         let addr: Multiaddr = listen_addr.parse()?;
         swarm.listen_on(addr.clone())?;
         println!("🎧 {} listening on {}", name, addr);
+
+        // Initialize subscribed topics with default topic
+        let mut subscribed_topics = HashSet::new();
+        subscribed_topics.insert("agent-network".to_string());
 
         Ok(Self {
             name: name.to_string(),
@@ -118,6 +209,8 @@ impl AgentNode {
             discovered_peers: HashMap::new(),
             last_message_time: Instant::now(),
             pending_requests: HashMap::new(),
+            subscribed_topics,
+            topic_peers: HashMap::new(),
             event_tx,
             command_rx: None,
         })
@@ -161,11 +254,38 @@ impl AgentNode {
         // Ping with custom interval
         let ping = ping::Behaviour::new(ping::Config::new().with_interval(Duration::from_secs(30)));
 
+        // GossipSub configuration
+        let gossip_sub_config = gossipsub::ConfigBuilder::default()
+            .heartbeat_interval(Duration::from_millis(700))
+            .mesh_n_low(16)
+            .mesh_n(32)
+            .mesh_n_high(64)
+            .history_length(64)
+            .history_gossip(32)
+            .max_transmit_size(1024 * 1024)
+            .validation_mode(gossipsub::ValidationMode::Strict)
+            .message_id_fn(message_id_fn)
+            .build()
+            .map_err(|e| anyhow::anyhow!("Failed to build gossipsub config: {}", e))?;
+
+        let mut gossipsub = gossipsub::Behaviour::new(
+            gossipsub::MessageAuthenticity::Signed(keypair.clone()),
+            gossip_sub_config,
+        )
+        .map_err(|e| anyhow::anyhow!("Failed to create gossipsub behavior: {}", e))?;
+
+        // Subscribe to default topic
+        let default_topic = gossipsub::IdentTopic::new("agent-network");
+        gossipsub
+            .subscribe(&default_topic)
+            .map_err(|e| anyhow::anyhow!("Failed to subscribe to default topic: {}", e))?;
+
         // Combined behavior
         let behaviour = AgentBehaviour {
             request_response,
             mdns,
             ping,
+            gossipsub,
         };
 
         // Create swarm
@@ -182,6 +302,10 @@ impl AgentNode {
             println!("🎧 {} listening on {}", name, addr);
         }
 
+        // Initialize subscribed topics with default topic
+        let mut subscribed_topics = HashSet::new();
+        subscribed_topics.insert("agent-network".to_string());
+
         Ok(Self {
             name: name.to_string(),
             protocol: config.protocol.clone(),
@@ -189,6 +313,8 @@ impl AgentNode {
             discovered_peers: HashMap::new(),
             last_message_time: Instant::now(),
             pending_requests: HashMap::new(),
+            subscribed_topics,
+            topic_peers: HashMap::new(),
             event_tx,
             command_rx: None,
         })
@@ -204,6 +330,109 @@ impl AgentNode {
         let (tx, rx) = mpsc::unbounded_channel();
         self.command_rx = Some(rx);
         tx
+    }
+
+    /// Subscribe to a GossipSub topic
+    pub fn subscribe_to_topic(&mut self, topic: &str) -> Result<()> {
+        let topic_hash = gossipsub::IdentTopic::new(topic);
+
+        match self.swarm.behaviour_mut().gossipsub.subscribe(&topic_hash) {
+            Ok(_) => {
+                self.subscribed_topics.insert(topic.to_string());
+                println!("📡 [{}] Subscribed to topic: {}", self.name, topic);
+
+                let _ = self.event_tx.send(AgentNodeEvent::TopicSubscribed {
+                    topic: topic.to_string(),
+                });
+
+                Ok(())
+            }
+            Err(e) => {
+                let error_msg = format!("Failed to subscribe to topic {}: {:?}", topic, e);
+                eprintln!("❌ [{}] {}", self.name, error_msg);
+
+                let _ = self.event_tx.send(AgentNodeEvent::Error {
+                    description: error_msg.clone(),
+                });
+
+                Err(anyhow::anyhow!(error_msg))
+            }
+        }
+    }
+
+    /// Unsubscribe from a GossipSub topic
+    pub fn unsubscribe_from_topic(&mut self, topic: &str) -> Result<()> {
+        let topic_hash = gossipsub::IdentTopic::new(topic);
+
+        match self
+            .swarm
+            .behaviour_mut()
+            .gossipsub
+            .unsubscribe(&topic_hash)
+        {
+            true => {
+                self.subscribed_topics.remove(topic);
+                self.topic_peers.remove(topic);
+                println!("📡 [{}] Unsubscribed from topic: {}", self.name, topic);
+
+                let _ = self.event_tx.send(AgentNodeEvent::TopicUnsubscribed {
+                    topic: topic.to_string(),
+                });
+
+                Ok(())
+            }
+            false => {
+                let error_msg = format!("Failed to unsubscribe from topic {}", topic);
+                eprintln!("❌ [{}] {}", self.name, error_msg);
+
+                let _ = self.event_tx.send(AgentNodeEvent::Error {
+                    description: error_msg.clone(),
+                });
+
+                Err(anyhow::anyhow!(error_msg))
+            }
+        }
+    }
+
+    /// Publish a message to a GossipSub topic
+    pub fn publish_to_topic(&mut self, topic: &str, message: &str) -> Result<()> {
+        let topic_hash = gossipsub::IdentTopic::new(topic);
+
+        // Create a structured message with metadata
+        let message_data = json!({
+            "sender": self.name,
+            "timestamp": chrono::Utc::now().to_rfc3339(),
+            "content": message,
+            "message_type": "gossipsub"
+        });
+
+        let message_bytes = serde_json::to_vec(&message_data)
+            .map_err(|e| anyhow::anyhow!("Failed to serialize message: {}", e))?;
+
+        match self
+            .swarm
+            .behaviour_mut()
+            .gossipsub
+            .publish(topic_hash, message_bytes)
+        {
+            Ok(message_id) => {
+                println!(
+                    "📢 [{}] Published to {}: {} (ID: {})",
+                    self.name, topic, message, message_id
+                );
+                Ok(())
+            }
+            Err(e) => {
+                let error_msg = format!("Failed to publish to topic {}: {:?}", topic, e);
+                eprintln!("❌ [{}] {}", self.name, error_msg);
+
+                let _ = self.event_tx.send(AgentNodeEvent::Error {
+                    description: error_msg.clone(),
+                });
+
+                Err(anyhow::anyhow!(error_msg))
+            }
+        }
     }
 
     /// Send a message to a specific peer
@@ -260,6 +489,19 @@ impl AgentNode {
             .collect()
     }
 
+    /// Get list of subscribed topics
+    pub fn get_subscribed_topics(&self) -> Vec<String> {
+        self.subscribed_topics.iter().cloned().collect()
+    }
+
+    /// Get peers subscribed to a specific topic
+    pub fn get_topic_peers(&self, topic: &str) -> Vec<String> {
+        self.topic_peers
+            .get(topic)
+            .map(|peers| peers.iter().map(|p| p.to_string()).collect())
+            .unwrap_or_default()
+    }
+
     /// Get local peer ID as string
     pub fn local_peer_id(&self) -> String {
         self.swarm.local_peer_id().to_string()
@@ -296,8 +538,35 @@ impl AgentNode {
                                 });
                             }
                         }
+                        AgentCommand::PublishToTopic { topic, message } => {
+                            if let Err(e) = self.publish_to_topic(&topic, &message) {
+                                let _ = self.event_tx.send(AgentNodeEvent::Error {
+                                    description: format!("Failed to publish to topic: {:?}", e),
+                                });
+                            }
+                        }
+                        AgentCommand::SubscribeToTopic { topic } => {
+                            if let Err(e) = self.subscribe_to_topic(&topic) {
+                                let _ = self.event_tx.send(AgentNodeEvent::Error {
+                                    description: format!("Failed to subscribe to topic: {:?}", e),
+                                });
+                            }
+                        }
+                        AgentCommand::UnsubscribeFromTopic { topic } => {
+                            if let Err(e) = self.unsubscribe_from_topic(&topic) {
+                                let _ = self.event_tx.send(AgentNodeEvent::Error {
+                                    description: format!("Failed to unsubscribe from topic: {:?}", e),
+                                });
+                            }
+                        }
                         AgentCommand::GetPeers => {
                             // Peers can be accessed via get_peers() method
+                        }
+                        AgentCommand::GetTopics => {
+                            // Topics can be accessed via get_subscribed_topics() method
+                        }
+                        AgentCommand::GetTopicPeers { topic } => {
+                            // Topic peers can be accessed via get_topic_peers() method
                         }
                         AgentCommand::Shutdown => {
                             println!("👋 {} shutting down", self.name);
@@ -316,6 +585,10 @@ impl AgentNode {
                         });
                         let _ = self.broadcast_message(heartbeat);
                     }
+
+                    // Also publish heartbeat to default topic
+                    let _ = self.publish_to_topic("agent-network",
+                        &format!("Heartbeat from {}", self.name));
                 }
 
                 // Handle swarm events
@@ -347,6 +620,10 @@ impl AgentNode {
                         });
                         let _ = self.broadcast_message(heartbeat);
                     }
+
+                    // Also publish heartbeat to default topic
+                    let _ = self.publish_to_topic("agent-network",
+                        &format!("Heartbeat from {}", self.name));
                 }
 
                 // Handle swarm events
@@ -368,6 +645,9 @@ impl AgentNode {
             SwarmEvent::Behaviour(AgentEvent::Ping(event)) => {
                 self.handle_ping_event(event).await;
             }
+            SwarmEvent::Behaviour(AgentEvent::GossipSub(event)) => {
+                self.handle_gossipsub_event(event).await;
+            }
             SwarmEvent::ConnectionEstablished { peer_id, .. } => {
                 println!("🔗 [{}] Connection established with {}", self.name, peer_id);
                 let _ = self.event_tx.send(AgentNodeEvent::ConnectionEstablished {
@@ -377,6 +657,12 @@ impl AgentNode {
             SwarmEvent::ConnectionClosed { peer_id, .. } => {
                 println!("🔌 [{}] Connection closed with {}", self.name, peer_id);
                 self.discovered_peers.remove(&peer_id);
+
+                // Clean up topic peer tracking
+                for peers in self.topic_peers.values_mut() {
+                    peers.remove(&peer_id);
+                }
+
                 let _ = self.event_tx.send(AgentNodeEvent::ConnectionClosed {
                     peer_id: peer_id.to_string(),
                 });
@@ -413,6 +699,122 @@ impl AgentNode {
         }
     }
 
+    async fn handle_gossipsub_event(&mut self, event: gossipsub::Event) {
+        match event {
+            gossipsub::Event::Message {
+                propagation_source,
+                message_id,
+                message,
+            } => {
+                let topic = message.topic.to_string();
+                let from = propagation_source.to_string();
+
+                // Try to parse the message as JSON
+                match serde_json::from_slice::<Value>(&message.data) {
+                    Ok(parsed_message) => {
+                        let content = parsed_message
+                            .get("content")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or_else(|| {
+                                std::str::from_utf8(&message.data).unwrap_or("Invalid UTF-8")
+                            });
+
+                        let sender = parsed_message
+                            .get("sender")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("Unknown");
+
+                        println!(
+                            "📻 [{}] GossipSub message from {}: {} (topic: {}, id: {})",
+                            self.name, sender, content, topic, message_id
+                        );
+
+                        let _ = self
+                            .event_tx
+                            .send(AgentNodeEvent::GossipSubMessageReceived {
+                                topic: topic.clone(),
+                                from: sender.to_string(),
+                                message: content.to_string(),
+                                message_id: message_id.to_string(),
+                            });
+                    }
+                    Err(_) => {
+                        // Fallback to raw message
+                        let content = std::str::from_utf8(&message.data).unwrap_or("Invalid UTF-8");
+
+                        println!(
+                            "📻 [{}] GossipSub raw message from {}: {} (topic: {}, id: {})",
+                            self.name, from, content, topic, message_id
+                        );
+
+                        let _ = self
+                            .event_tx
+                            .send(AgentNodeEvent::GossipSubMessageReceived {
+                                topic: topic.clone(),
+                                from: from.clone(),
+                                message: content.to_string(),
+                                message_id: message_id.to_string(),
+                            });
+                    }
+                }
+            }
+            gossipsub::Event::Subscribed { peer_id, topic } => {
+                let topic_str = topic.to_string();
+                println!(
+                    "🔔 [{}] Peer {} subscribed to topic: {}",
+                    self.name, peer_id, topic_str
+                );
+
+                // Track peer subscription
+                self.topic_peers
+                    .entry(topic_str.clone())
+                    .or_insert_with(HashSet::new)
+                    .insert(peer_id);
+
+                let _ = self.event_tx.send(AgentNodeEvent::PeerSubscribedToTopic {
+                    peer_id: peer_id.to_string(),
+                    topic: topic_str,
+                });
+            }
+            gossipsub::Event::Unsubscribed { peer_id, topic } => {
+                let topic_str = topic.to_string();
+                println!(
+                    "🔕 [{}] Peer {} unsubscribed from topic: {}",
+                    self.name, peer_id, topic_str
+                );
+
+                // Remove peer from topic tracking
+                if let Some(peers) = self.topic_peers.get_mut(&topic_str) {
+                    peers.remove(&peer_id);
+                    if peers.is_empty() {
+                        self.topic_peers.remove(&topic_str);
+                    }
+                }
+
+                let _ = self
+                    .event_tx
+                    .send(AgentNodeEvent::PeerUnsubscribedFromTopic {
+                        peer_id: peer_id.to_string(),
+                        topic: topic_str,
+                    });
+            }
+            gossipsub::Event::GossipsubNotSupported { peer_id } => {
+                println!(
+                    "⚠️ [{}] Peer {} does not support GossipSub",
+                    self.name, peer_id
+                );
+
+                let _ = self.event_tx.send(AgentNodeEvent::Error {
+                    description: format!("Peer {} does not support GossipSub", peer_id),
+                });
+            }
+
+            gossipsub::Event::SlowPeer { peer_id, .. } => {
+                println!("⚠️ [{}] Peer {} is slow", self.name, peer_id);
+            }
+        }
+    }
+
     async fn handle_ping_event(&mut self, event: ping::Event) {
         match event {
             ping::Event {
@@ -431,38 +833,26 @@ impl AgentNode {
                             rtt,
                         });
                     }
-                    Err(err) => {
-                        println!("⏰ [{}] Ping timeout to {}", self.name, peer);
-
-                        match err {
-                            ping::Failure::Timeout => {
-                                println!("⏰ [{}] Ping timeout to {}", self.name, peer);
-                                let _ = self.event_tx.send(AgentNodeEvent::PingFailure {
-                                    peer_id: peer.to_string(),
-                                });
-                            }
-
-                            ping::Failure::Unsupported => {
-                                println!(
-                                    "❌ [{}] Ping protocol not supported to {}",
-                                    self.name, peer
-                                );
-                                let _ = self.event_tx.send(AgentNodeEvent::PingFailure {
-                                    peer_id: peer.to_string(),
-                                });
-                            }
-
-                            ping::Failure::Other { error: failure } => {
-                                println!(
-                                    "❌ [{}] Ping failure to {}: {:?}",
-                                    self.name, peer, failure
-                                );
-                                let _ = self.event_tx.send(AgentNodeEvent::PingFailure {
-                                    peer_id: peer.to_string(),
-                                });
-                            }
+                    Err(err) => match err {
+                        ping::Failure::Timeout => {
+                            println!("⏰ [{}] Ping timeout to {}", self.name, peer);
+                            let _ = self.event_tx.send(AgentNodeEvent::PingFailure {
+                                peer_id: peer.to_string(),
+                            });
                         }
-                    }
+                        ping::Failure::Unsupported => {
+                            println!("❌ [{}] Ping protocol not supported to {}", self.name, peer);
+                            let _ = self.event_tx.send(AgentNodeEvent::PingFailure {
+                                peer_id: peer.to_string(),
+                            });
+                        }
+                        ping::Failure::Other { error: failure } => {
+                            println!("❌ [{}] Ping failure to {}: {:?}", self.name, peer, failure);
+                            let _ = self.event_tx.send(AgentNodeEvent::PingFailure {
+                                peer_id: peer.to_string(),
+                            });
+                        }
+                    },
                 };
             }
         }
@@ -591,6 +981,11 @@ impl AgentNode {
                 for (peer, addr) in expired {
                     println!("❌ [{}] Expired peer: {} at {}", self.name, peer, addr);
                     self.discovered_peers.remove(&peer);
+
+                    // Clean up topic peer tracking
+                    for peers in self.topic_peers.values_mut() {
+                        peers.remove(&peer);
+                    }
 
                     self.swarm
                         .behaviour_mut()

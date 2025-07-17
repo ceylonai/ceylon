@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 libp2p = { version = "0.56.0", features = [
     "tcp", "websocket", "noise", "yamux", "request-response", "dns", "mdns", "tokio", "macros",
-    "ping"
+    "ping", "gossipsub"
 ] }
 libp2p-swarm = "0.47.0"
 serde = { version = "1.0.219", features = ["derive"] }

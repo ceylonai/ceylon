@@ -8,11 +8,7 @@
 
 use crate::messaging::{AnpCodec, AnpRequest, AnpResponse};
 use libp2p::mdns::tokio::Tokio;
-use libp2p::{
-    mdns::{Behaviour as Mdns, Event as MdnsEvent},
-    request_response::{Behaviour as RequestResponse, Event as RequestResponseEvent},
-    swarm::NetworkBehaviour,
-};
+use libp2p::{gossipsub, mdns::{Behaviour as Mdns, Event as MdnsEvent}, request_response::{Behaviour as RequestResponse, Event as RequestResponseEvent}, swarm::NetworkBehaviour};
 
 pub type AgentRequestResponseBehaviour = RequestResponse<AnpCodec>;
 /// Combines RequestResponse (for ANP) and mDNS discovery into a single behaviour.
@@ -26,6 +22,8 @@ pub struct AgentBehaviour {
     pub mdns: Mdns<Tokio>,
 
     pub ping: libp2p::ping::Behaviour,
+
+    pub gossipsub: gossipsub::Behaviour
 }
 
 /// Unified event type for all AgentBehaviour events.
@@ -39,11 +37,19 @@ pub enum AgentEvent {
 
     /// Events from ping
     Ping(libp2p::ping::Event),
+
+    GossipSub(gossipsub::Event)
 }
 
 impl From<libp2p::ping::Event> for AgentEvent {
     fn from(event: libp2p::ping::Event) -> Self {
         AgentEvent::Ping(event)
+    }
+}
+
+impl From<gossipsub::Event> for AgentEvent {
+    fn from(event: gossipsub::Event) -> Self {
+        AgentEvent::GossipSub(event)
     }
 }
 
