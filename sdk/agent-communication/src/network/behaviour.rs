@@ -24,6 +24,8 @@ pub struct AgentBehaviour {
 
     /// mDNS for local peer discovery
     pub mdns: Mdns<Tokio>,
+
+    pub ping: libp2p::ping::Behaviour,
 }
 
 /// Unified event type for all AgentBehaviour events.
@@ -34,6 +36,15 @@ pub enum AgentEvent {
 
     /// Events from mDNS discovery
     Mdns(MdnsEvent),
+
+    /// Events from ping
+    Ping(libp2p::ping::Event),
+}
+
+impl From<libp2p::ping::Event> for AgentEvent {
+    fn from(event: libp2p::ping::Event) -> Self {
+        AgentEvent::Ping(event)
+    }
 }
 
 // Conversion glue so libp2p can turn sub-behaviour events into our top-level AgentEvent

@@ -2,13 +2,17 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde_json::json;
 use std::io::{self, Write};
+use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::mpsc;
 
 // Import your agent communication library
 use agent_communication::{
-    AgentNode, AnpMessage, core::node::AgentCommand, core::node::AgentNodeEvent,
+    AgentNode, AnpMessage,
 };
+
+// Import the types directly from the core::node module
+use agent_communication::core::node::{AgentCommand, AgentNodeEvent};
 
 // Internal events for communication between tasks
 #[derive(Debug, Clone)]
@@ -147,12 +151,15 @@ impl P2PChat {
                         "/peers" | "/p" => {
                             if let Err(e) = command_tx.send(AgentCommand::GetPeers) {
                                 eprintln!("Failed to send peers command: {:?}", e);
+                            } else {
+                                // Note: libp2p ping will handle actual pings automatically
+                                println!("ℹ️ Peer list requested (libp2p handles pings automatically)");
                             }
                         }
                         "/ping" => {
-                            // Send ping to all peers
+                            // Send application-level ping to all peers
                             let payload = json!({
-                                "action": "ping",
+                                "action": "app_ping",
                                 "sender": username,
                                 "timestamp": Utc::now().to_rfc3339(),
                                 "manual_ping": true
@@ -163,23 +170,28 @@ impl P2PChat {
                             {
                                 eprintln!("Failed to send ping: {:?}", e);
                             } else {
-                                println!("📡 Ping sent to all peers");
+                                println!("📡 Application ping sent to all peers");
+                                println!("ℹ️ Note: libp2p also handles automatic connection pings");
                             }
                         }
                         "/status" => {
                             // Request node status
                             if let Err(e) = command_tx.send(AgentCommand::GetPeers) {
                                 eprintln!("Failed to get status: {:?}", e);
+                            } else {
+                                println!("📊 Status requested - check peer list and connection events");
                             }
-                            // You'll need to extend AgentCommand enum for this
                         }
                         "/reconnect" => {
                             println!("🔄 Attempting to reconnect to all peers...");
-                            // Force reconnection attempt - you'll need to implement this
+                            println!("ℹ️ libp2p handles reconnections automatically via mDNS discovery");
+                            // libp2p will handle reconnections automatically
                         }
                         "/verbose" => {
-                            println!("🔍 Enabling verbose mode...");
-                            // Toggle verbose logging
+                            println!("🔍 Verbose mode info:");
+                            println!("   - Connection events are automatically displayed");
+                            println!("   - Ping results are shown when they occur");
+                            println!("   - Message send/receive events are logged");
                         }
                         input if input.starts_with("/msg ") => {
                             // Private message: /msg <peer_id> <message>
@@ -204,6 +216,7 @@ impl P2PChat {
                                 }
                             } else {
                                 println!("Usage: /msg <peer_id> <message>");
+                                println!("Tip: Use /peers to see available peer IDs");
                             }
                         }
                         _ => {
@@ -264,6 +277,20 @@ impl P2PChat {
                 Self::print_prompt_static(username);
             }
 
+            AgentNodeEvent::PingSuccess { peer_id, rtt } => {
+                println!("\n🏓 Ping success to peer: {}", peer_id);
+                println!("   RTT: {:?}", rtt);
+                println!("   Time: {}", Utc::now().format("%H:%M:%S"));
+                Self::print_prompt_static(username);
+            }
+
+            AgentNodeEvent::PingFailure { peer_id } => {
+                println!("\n⏰ Ping failed to peer: {}", peer_id);
+                println!("   Time: {}", Utc::now().format("%H:%M:%S"));
+                println!("   Note: Connection may be having issues");
+                Self::print_prompt_static(username);
+            }
+
             AgentNodeEvent::MessageReceived { from, message } => {
                 Self::handle_incoming_message(username, &from, &message).await;
             }
@@ -276,16 +303,6 @@ impl P2PChat {
                         Self::print_prompt_static(username);
                     }
                 }
-            }
-
-            AgentNodeEvent::ConnectionEstablished { peer_id } => {
-                println!("\n🔗 Connected to peer: {}", peer_id);
-                Self::print_prompt_static(username);
-            }
-
-            AgentNodeEvent::ConnectionClosed { peer_id } => {
-                println!("\n🔌 Connection closed with peer: {}", peer_id);
-                Self::print_prompt_static(username);
             }
 
             AgentNodeEvent::Error { description } => {
@@ -354,6 +371,16 @@ impl P2PChat {
                 Self::print_prompt_static(username);
             }
 
+            Some("app_ping") => {
+                let sender = message
+                    .payload
+                    .get("sender")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown");
+                println!("\n🏓 Application ping received from {}", sender);
+                Self::print_prompt_static(username);
+            }
+
             Some("heartbeat") => {
                 // Silently handle heartbeats (already logged by the library)
             }
@@ -382,12 +409,14 @@ impl P2PChat {
         println!("   <message>           - Send message to all peers");
         println!("   /msg <peer> <text>  - Send private message to specific peer");
         println!("   /peers (/p)         - List discovered peers");
-        println!("   /ping               - Send ping to all peers");
+        println!("   /ping               - Send application ping to all peers");
         println!("   /status             - Show connection status");
-        println!("   /reconnect          - Force reconnection attempt");
-        println!("   /verbose            - Toggle verbose logging");
+        println!("   /reconnect          - Info about reconnection (automatic)");
+        println!("   /verbose            - Show verbose mode information");
         println!("   /help (/h)          - Show this help");
         println!("   /quit (/q)          - Exit chat");
+        println!();
+        println!("ℹ️ Note: libp2p automatically handles connection pings and reconnections");
         println!();
     }
 }

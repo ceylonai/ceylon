@@ -1,9 +1,10 @@
 use anyhow::Result;
 use futures::StreamExt;
+use libp2p::ping::Failure;
 use libp2p::request_response::{Event, Message, OutboundRequestId};
 use libp2p::{
-    Multiaddr, PeerId, Swarm, Transport, core::upgrade, identity, mdns, noise, request_response,
-    swarm::SwarmEvent, tcp, yamux,
+    Multiaddr, PeerId, Swarm, Transport, core::upgrade, identity, mdns, noise, ping,
+    request_response, swarm::SwarmEvent, tcp, yamux,
 };
 use serde_json::{Value, json};
 use std::collections::HashMap;
@@ -26,6 +27,8 @@ pub enum AgentNodeEvent {
     MessageSent { to: String, message: AnpMessage },
     ConnectionEstablished { peer_id: String },
     ConnectionClosed { peer_id: String },
+    PingSuccess { peer_id: String, rtt: Duration },
+    PingFailure { peer_id: String },
     Error { description: String },
 }
 
@@ -80,13 +83,17 @@ impl AgentNode {
         // 4️⃣ mDNS for peer discovery
         let mdns = mdns::Behaviour::new(mdns::Config::default(), peer_id)?;
 
-        // 5️⃣ Combined behavior
+        // 5️⃣ Ping for connection keep-alive
+        let ping = ping::Behaviour::new(ping::Config::new());
+
+        // 6️⃣ Combined behavior
         let behaviour = AgentBehaviour {
             request_response,
             mdns,
+            ping,
         };
 
-        // 6️⃣ Create swarm
+        // 7️⃣ Create swarm
         let mut swarm = Swarm::new(
             transport,
             behaviour,
@@ -94,7 +101,7 @@ impl AgentNode {
             libp2p_swarm::Config::with_tokio_executor(),
         );
 
-        // 7️⃣ Start listening
+        // 8️⃣ Start listening
         let addr: Multiaddr = listen_addr.parse()?;
         swarm.listen_on(addr.clone())?;
         println!("🎧 {} listening on {}", name, addr);
@@ -139,10 +146,14 @@ impl AgentNode {
         // mDNS for peer discovery
         let mdns = mdns::Behaviour::new(mdns::Config::default(), config.peer_id)?;
 
+        // Ping with custom interval
+        let ping = ping::Behaviour::new(ping::Config::new().with_interval(Duration::from_secs(30)));
+
         // Combined behavior
         let behaviour = AgentBehaviour {
             request_response,
             mdns,
+            ping,
         };
 
         // Create swarm
@@ -308,17 +319,11 @@ impl AgentNode {
     /// Run without external command processing (simpler version)
     pub async fn run_simple(&mut self) -> Result<()> {
         let mut heartbeat_interval = interval(Duration::from_secs(30));
-        let mut ping_interval = interval(Duration::from_secs(60)); // Ping every minute
 
         println!("🟢 {} is running", self.name);
 
         loop {
             tokio::select! {
-                // Send periodic pings to keep connections alive
-                _ = ping_interval.tick() => {
-                    self.send_ping_to_all_peers().await;
-                }
-
                 // Send periodic heartbeat
                 _ = heartbeat_interval.tick() => {
                     if !self.discovered_peers.is_empty() {
@@ -340,36 +345,6 @@ impl AgentNode {
         }
     }
 
-    // Fix 3: Add ping method to maintain connections
-    async fn send_ping_to_all_peers(&mut self) {
-        for peer_id in self.discovered_peers.keys().cloned().collect::<Vec<_>>() {
-            let ping_payload = json!({
-                "action": "ping",
-                "sender": self.name,
-                "timestamp": chrono::Utc::now().to_rfc3339(),
-                "ping_id": uuid::Uuid::new_v4().to_string()
-            });
-
-            let anp_message = AnpMessage::new(
-                self.name.clone(),
-                peer_id.to_string(),
-                ping_payload,
-                "ping_signature".to_string(),
-            );
-
-            let request = AnpRequest(anp_message);
-
-            // Send ping but don't wait for response
-            let request_id = self
-                .swarm
-                .behaviour_mut()
-                .request_response
-                .send_request(&peer_id, request);
-
-            self.pending_requests.insert(request_id, peer_id);
-        }
-    }
-
     async fn handle_swarm_event(&mut self, event: SwarmEvent<AgentEvent>) {
         match event {
             SwarmEvent::Behaviour(AgentEvent::RequestResponse(event)) => {
@@ -377,6 +352,9 @@ impl AgentNode {
             }
             SwarmEvent::Behaviour(AgentEvent::Mdns(event)) => {
                 self.handle_mdns_event(event).await;
+            }
+            SwarmEvent::Behaviour(AgentEvent::Ping(event)) => {
+                self.handle_ping_event(event).await;
             }
             SwarmEvent::ConnectionEstablished { peer_id, .. } => {
                 println!("🔗 [{}] Connection established with {}", self.name, peer_id);
@@ -419,6 +397,61 @@ impl AgentNode {
             }
             _ => {
                 // Other events can be logged if needed
+            }
+        }
+    }
+
+    async fn handle_ping_event(&mut self, event: ping::Event) {
+        match event {
+            ping::Event {
+                peer,
+                connection: _,
+                result: res,
+            } => {
+                match res {
+                    Ok(rtt) => {
+                        println!(
+                            "🏓 [{}] Ping success to {} (RTT: {:?})",
+                            self.name, peer, rtt
+                        );
+                        let _ = self.event_tx.send(AgentNodeEvent::PingSuccess {
+                            peer_id: peer.to_string(),
+                            rtt,
+                        });
+                    }
+                    Err(err) => {
+                        println!("⏰ [{}] Ping timeout to {}", self.name, peer);
+
+                        match err {
+                            ping::Failure::Timeout => {
+                                println!("⏰ [{}] Ping timeout to {}", self.name, peer);
+                                let _ = self.event_tx.send(AgentNodeEvent::PingFailure {
+                                    peer_id: peer.to_string(),
+                                });
+                            }
+
+                            ping::Failure::Unsupported => {
+                                println!(
+                                    "❌ [{}] Ping protocol not supported to {}",
+                                    self.name, peer
+                                );
+                                let _ = self.event_tx.send(AgentNodeEvent::PingFailure {
+                                    peer_id: peer.to_string(),
+                                });
+                            }
+
+                            ping::Failure::Other { error: failure } => {
+                                println!(
+                                    "❌ [{}] Ping failure to {}: {:?}",
+                                    self.name, peer, failure
+                                );
+                                let _ = self.event_tx.send(AgentNodeEvent::PingFailure {
+                                    peer_id: peer.to_string(),
+                                });
+                            }
+                        }
+                    }
+                };
             }
         }
     }
@@ -560,6 +593,7 @@ impl AgentNode {
             }
         }
     }
+
     async fn handle_connection_closed(&mut self, peer_id: &PeerId) {
         println!("🔌 [{}] Connection closed with {}", self.name, peer_id);
 
